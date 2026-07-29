@@ -215,6 +215,7 @@ namespace pipedal
         bool mute_ = false;
         float pan_ = 0;
         std::vector<int64_t> inputChannels_ = {0};
+        std::vector<int64_t> outputChannels_;
         std::vector<PedalboardItem> items_;
     public:
         GETTER_SETTER_REF(id)
@@ -225,6 +226,7 @@ namespace pipedal
         GETTER_SETTER(mute)
         GETTER_SETTER(pan)
         GETTER_SETTER_VEC(inputChannels)
+        GETTER_SETTER_VEC(outputChannels)
         GETTER_SETTER_VEC(items)
 
         DECLARE_JSON_MAP(PedalboardPath);
@@ -350,6 +352,7 @@ namespace pipedal
         float input_volume_db_ = 0;
         float output_volume_db_ = 0;
         std::vector<int64_t> pathAInputChannels_;
+        std::vector<int64_t> pathAOutputChannels_;
         bool pathAMute_ = false;
         float pathAPan_ = 0;
 
@@ -361,6 +364,7 @@ namespace pipedal
         bool pathBMute_ = false;
         float pathBPan_ = 0;
         std::vector<int64_t> pathBInputChannels_ = {0};
+        std::vector<int64_t> pathBOutputChannels_;
         std::vector<PedalboardItem> pathBItems_;
         std::vector<PedalboardPath> additionalPaths_;
         std::vector<MidiAction> midiActions_;
@@ -415,6 +419,7 @@ namespace pipedal
         GETTER_SETTER(input_volume_db)
         GETTER_SETTER(output_volume_db)
         GETTER_SETTER_VEC(pathAInputChannels)
+        GETTER_SETTER_VEC(pathAOutputChannels)
         GETTER_SETTER(pathAMute)
         GETTER_SETTER(pathAPan)
         GETTER_SETTER(pathBEnabled)
@@ -424,6 +429,7 @@ namespace pipedal
         GETTER_SETTER(pathBMute)
         GETTER_SETTER(pathBPan)
         GETTER_SETTER_VEC(pathBInputChannels)
+        GETTER_SETTER_VEC(pathBOutputChannels)
         GETTER_SETTER_VEC(pathBItems)
         GETTER_SETTER_VEC(additionalPaths)
         GETTER_SETTER_VEC(midiActions)

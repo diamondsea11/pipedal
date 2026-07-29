@@ -70,6 +70,8 @@ namespace pipedal {
         virtual std::vector<float*> &DeviceOutputBuffers() = 0;
         virtual size_t DeviceOutputBufferCount() const = 0;
         virtual float* GetDeviceOutputBuffer(size_t channel) const = 0;
+        virtual size_t DirectOutputBufferCount() const { return 0; }
+        virtual float* GetDirectOutputBuffer(size_t) const { return nullptr; }
 
         virtual std::vector<float*> &MainInputBuffers() = 0;
         virtual size_t MainInputBufferCount() const = 0;

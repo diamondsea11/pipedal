@@ -2328,6 +2328,32 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
     }
 
+    configurePathOutput(
+        pathId: "A" | "B" | "C" | "D",
+        outputChannels: number[]
+    ): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        const sanitizedChannels = outputChannels
+            .filter((channel, index) =>
+                Number.isInteger(channel) &&
+                channel >= 0 &&
+                outputChannels.indexOf(channel) === index)
+            .slice(0, 2);
+        if (pathId === "A") {
+            newPedalboard.pathAOutputChannels = sanitizedChannels;
+        } else if (pathId === "B") {
+            newPedalboard.pathBOutputChannels = sanitizedChannels;
+        } else {
+            const path = newPedalboard.additionalPaths.find(
+                (value) => value.id === pathId);
+            if (path) {
+                path.outputChannels = sanitizedChannels;
+            }
+        }
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
     configurePathMix(path: "A" | "B", mute: boolean, pan: number): void {
         let newPedalboard = this.pedalboard.get().clone();
         if (path === "A") {

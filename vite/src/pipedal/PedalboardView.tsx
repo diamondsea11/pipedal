@@ -1523,6 +1523,7 @@ const PedalboardView =
                         id: "C" | "D";
                         name: string;
                         inputChannels: number[];
+                        outputChannels: number[];
                         mute: boolean;
                         pan: number;
                         layout: PedalLayout[];
@@ -1557,6 +1558,7 @@ const PedalboardView =
                             id,
                             name: path.name,
                             inputChannels: path.inputChannels,
+                            outputChannels: path.outputChannels,
                             mute: path.mute,
                             pan: path.pan,
                             layout: pathLayout,
@@ -1572,12 +1574,13 @@ const PedalboardView =
                         .concat(pathBLayout)
                         .concat(...additionalPathLayouts.map((path) => path.layout));
                     let frameWidth = Math.max(
-                        680,
+                        840,
                         layoutSize.width,
                         pathBSize.width,
                         ...additionalPathLayouts.map((path) => path.size.width));
                     let frameHeight = nextPathTop;
                     let inputPorts = this.model.jackConfiguration.get().inputAudioPorts;
+                    let outputPorts = this.model.jackConfiguration.get().outputAudioPorts;
                     let pathAInput = pedalboard?.pathAInputChannels[0]
                         ?? this.model.channelRouterSettings.get().mainInputChannels[0]
                         ?? 0;
@@ -1592,10 +1595,82 @@ const PedalboardView =
                     const nextAdditionalPathId = !enabledAdditionalPathIds.has("C")
                         ? "C"
                         : (!enabledAdditionalPathIds.has("D") ? "D" : null);
-                    let outputChannels = this.model.channelRouterSettings.get().mainOutputChannels
-                        .filter((channel) => channel >= 0)
-                        .map((channel) => `OUT ${channel + 1}`)
-                        .join("/");
+                    const outputPortName = (index: number): string => {
+                        const rawName = outputPorts[index] ?? "";
+                        if (!rawName || /playback[_:-]?\d+$/i.test(rawName)) {
+                            return `OUT ${index + 1}`;
+                        }
+                        const separator = Math.max(
+                            rawName.lastIndexOf("::"),
+                            rawName.lastIndexOf(":"));
+                        return separator >= 0
+                            ? rawName.substring(separator + (rawName[separator + 1] === ":" ? 2 : 1))
+                            : rawName;
+                    };
+                    const outputSelectionValue = (channels: number[]): string => {
+                        if (channels.length === 0) return "main";
+                        if (channels.length === 1) return `mono:${channels[0]}`;
+                        return `stereo:${channels[0]}:${channels[1]}`;
+                    };
+                    const setPathOutput = (
+                        pathId: "A" | "B" | "C" | "D",
+                        value: string
+                    ) => {
+                        if (value === "main") {
+                            this.model.configurePathOutput(pathId, []);
+                        } else {
+                            const channels = value
+                                .split(":")
+                                .slice(1)
+                                .map((part) => Number(part));
+                            this.model.configurePathOutput(pathId, channels);
+                        }
+                    };
+                    const pathOutputSelect = (
+                        pathId: "A" | "B" | "C" | "D",
+                        channels: number[]
+                    ) => {
+                        const selectedValue = outputSelectionValue(channels);
+                        const knownValues = new Set<string>(["main"]);
+                        outputPorts.forEach((_port, index) =>
+                            knownValues.add(`mono:${index}`));
+                        for (let index = 0; index + 1 < outputPorts.length; index += 2) {
+                            knownValues.add(`stereo:${index}:${index + 1}`);
+                        }
+                        return (
+                            <Select
+                                size="small"
+                                value={knownValues.has(selectedValue)
+                                    ? selectedValue
+                                    : "main"}
+                                onChange={(event) =>
+                                    setPathOutput(pathId, String(event.target.value))}
+                                aria-label={`Path ${pathId} output`}
+                                style={{ height: 28, minWidth: 132 }}
+                            >
+                                <MenuItem value="main">Main bus</MenuItem>
+                                {Array.from(
+                                    { length: Math.floor(outputPorts.length / 2) },
+                                    (_, pairIndex) => pairIndex * 2
+                                ).map((index) => (
+                                    <MenuItem
+                                        key={`stereo-${index}`}
+                                        value={`stereo:${index}:${index + 1}`}
+                                    >
+                                        {outputPortName(index)} / {outputPortName(index + 1)}
+                                    </MenuItem>
+                                ))}
+                                {outputPorts.map((_port, index) => (
+                                    <MenuItem
+                                        key={`mono-${index}`}
+                                        value={`mono:${index}`}
+                                    >
+                                        {outputPortName(index)} mono
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        );
+                    };
                     let contextMenuItem = this.state.contextMenu
                         ? this.state.pedalboard?.maybeGetItem(this.state.contextMenu.instanceId) ?? null
                         : null;
@@ -1624,6 +1699,9 @@ const PedalboardView =
                                             <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
                                         ))}
                                     </Select>
+                                    {pathOutputSelect(
+                                        "A",
+                                        pedalboard?.pathAOutputChannels ?? [])}
                                     <Select
                                         size="small"
                                         value=""
@@ -1671,9 +1749,6 @@ const PedalboardView =
                                     >
                                         Global EQ
                                     </Button>
-                                    <Typography variant="caption" color="textSecondary">
-                                        {outputChannels}
-                                    </Typography>
                                     {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
                                         <Button
                                             size="small"
@@ -1715,6 +1790,9 @@ const PedalboardView =
                                                     <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
                                                 ))}
                                             </Select>
+                                            {pathOutputSelect(
+                                                "B",
+                                                pedalboard?.pathBOutputChannels ?? [])}
                                             <Typography variant="caption" color="textSecondary">
                                                 {pedalboard?.pathBName}
                                             </Typography>
@@ -1784,6 +1862,9 @@ const PedalboardView =
                                                     </MenuItem>
                                                 ))}
                                             </Select>
+                                            {pathOutputSelect(
+                                                path.id as "C" | "D",
+                                                path.outputChannels)}
                                             <Typography variant="caption" color="textSecondary">
                                                 {path.name}
                                             </Typography>

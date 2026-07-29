@@ -550,7 +550,11 @@ private:
     Lv2Pedalboard *realtimeSpilloverPedalboard = nullptr;
     uint64_t spilloverSamplesRemaining = 0;
     static constexpr size_t SPILLOVER_BUFFER_CAPACITY = 65536;
+    static constexpr size_t MAX_SPILLOVER_DIRECT_OUTPUTS = 32;
     std::array<std::array<float, SPILLOVER_BUFFER_CAPACITY>, 2> spilloverOutputBuffers;
+    std::array<
+        std::array<float, SPILLOVER_BUFFER_CAPACITY>,
+        MAX_SPILLOVER_DIRECT_OUTPUTS> spilloverDirectOutputBuffers;
 
     uint32_t sampleRate = 0;
     uint64_t currentSample = 0;
@@ -1415,6 +1419,23 @@ private:
 
     PIPEDAL_NON_INLINE void ProcessLv2Pedalboard(size_t nframes)
     {
+        static constexpr size_t MAX_DIRECT_OUTPUTS = 128;
+        std::array<float *, MAX_DIRECT_OUTPUTS> directOutputBuffers = {};
+        const size_t directOutputCount = std::min(
+            audioDriver->DirectOutputBufferCount(),
+            MAX_DIRECT_OUTPUTS);
+        for (size_t channel = 0; channel < directOutputCount; ++channel)
+        {
+            directOutputBuffers[channel] =
+                audioDriver->GetDirectOutputBuffer(channel);
+            if (directOutputBuffers[channel] != nullptr)
+            {
+                std::fill_n(
+                    directOutputBuffers[channel],
+                    nframes,
+                    0.0f);
+            }
+        }
         Lv2Pedalboard *pedalboard = nullptr;
 
         std::vector<float *> *pInputBuffers;
@@ -1502,6 +1523,8 @@ private:
                 pathBInputBuffers,
                 additionalPathInputBuffers,
                 additionalPathCount,
+                directOutputBuffers.data(),
+                directOutputCount,
                 (uint32_t)nframes,
                 &realtimeWriter);
             pedalboard->GatherPatchProperties(pParameterRequests);
@@ -1550,6 +1573,21 @@ private:
         float **additionalInputs[2] = {
             additionalStorage[0],
             additionalStorage[1]};
+        std::array<
+            float *,
+            MAX_SPILLOVER_DIRECT_OUTPUTS> spilloverDirectOutputs = {};
+        const size_t directOutputCount = std::min(
+            audioDriver->DirectOutputBufferCount(),
+            MAX_SPILLOVER_DIRECT_OUTPUTS);
+        for (size_t channel = 0; channel < directOutputCount; ++channel)
+        {
+            spilloverDirectOutputs[channel] =
+                spilloverDirectOutputBuffers[channel].data();
+            std::fill_n(
+                spilloverDirectOutputs[channel],
+                nframes,
+                0.0f);
+        }
 
         pedalboard->ResetAtomBuffers();
         pedalboard->Run(
@@ -1558,6 +1596,8 @@ private:
             pathBInputBuffers,
             additionalInputs,
             std::min(pedalboard->GetAdditionalPathCount(), (size_t)2),
+            spilloverDirectOutputs.data(),
+            directOutputCount,
             (uint32_t)nframes,
             &realtimeWriter);
 
@@ -1576,6 +1616,26 @@ private:
                     ? 1.0f
                     : (float)remaining / (float)fadeSamples;
                 mainOutput[frame] += tailOutput[frame] * gain;
+            }
+        }
+        for (size_t channel = 0; channel < directOutputCount; ++channel)
+        {
+            float *directOutput = audioDriver->GetDirectOutputBuffer(channel);
+            if (directOutput == nullptr)
+            {
+                continue;
+            }
+            const float *tailOutput =
+                spilloverDirectOutputBuffers[channel].data();
+            for (size_t frame = 0; frame < nframes; ++frame)
+            {
+                const uint64_t remaining = spilloverSamplesRemaining > frame
+                    ? spilloverSamplesRemaining - frame
+                    : 0;
+                const float gain = remaining >= fadeSamples
+                    ? 1.0f
+                    : (float)remaining / (float)fadeSamples;
+                directOutput[frame] += tailOutput[frame] * gain;
             }
         }
         if (spilloverSamplesRemaining <= nframes)

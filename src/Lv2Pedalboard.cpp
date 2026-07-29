@@ -437,6 +437,7 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
     }
 
     this->pathAInputChannels = pedalboard.pathAInputChannels();
+    this->pathAOutputChannels = pedalboard.pathAOutputChannels();
     size_t nInputs = this->pathAInputChannels.empty()
         ? std::max(GetNumberOfAudioInputChannels(), (size_t)1)
         : std::max(this->pathAInputChannels.size(), (size_t)1);
@@ -473,6 +474,7 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
 
     this->pathBEnabled = pedalboard.pathBEnabled();
     this->pathBInputChannels = pedalboard.pathBInputChannels();
+    this->pathBOutputChannels = pedalboard.pathBOutputChannels();
     if (this->pathBEnabled)
     {
         size_t nPathBInputs = std::max(this->pathBInputChannels.size(), (size_t)1);
@@ -512,6 +514,7 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         auto runtimePath = std::make_unique<AdditionalPathRuntime>();
         runtimePath->id = path.id();
         runtimePath->inputChannels = path.inputChannels();
+        runtimePath->outputChannels = path.outputChannels();
         runtimePath->mute = path.mute();
         runtimePath->pan = std::max(-1.0f, std::min(1.0f, path.pan()));
         runtimePath->inputVolume.SetSampleRate((float)this->pHost->GetSampleRate());
@@ -739,6 +742,8 @@ bool Lv2Pedalboard::Run(
     float **pathBHardwareInputBuffers,
     float *const *const *additionalPathHardwareInputBuffers,
     size_t additionalPathHardwareInputCount,
+    float *const *directOutputBuffers,
+    size_t directOutputBufferCount,
     uint32_t samples,
     RealtimeRingBufferWriter *ringBufferWriter)
 {
@@ -827,6 +832,59 @@ bool Lv2Pedalboard::Run(
             maximumPathLatency,
             additionalPathLatencies[pathIndex]);
     }
+    auto hasDirectOutput = [directOutputBufferCount](
+                               const std::vector<int64_t> &channels)
+    {
+        for (int64_t channel : channels)
+        {
+            if (channel >= 0 && (size_t)channel < directOutputBufferCount)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    const bool pathADirect = hasDirectOutput(pathAOutputChannels);
+    const bool pathBDirect = hasDirectOutput(pathBOutputChannels);
+    std::array<bool, 2> additionalPathDirect = {false, false};
+    for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
+    {
+        additionalPathDirect[pathIndex] =
+            hasDirectOutput(additionalPaths[pathIndex]->outputChannels);
+    }
+    auto addDirectOutput = [
+        directOutputBuffers,
+        directOutputBufferCount](
+            const std::vector<int64_t> &channels,
+            size_t frame,
+            float left,
+            float right)
+    {
+        if (directOutputBuffers == nullptr || channels.empty())
+        {
+            return;
+        }
+        if (channels.size() == 1)
+        {
+            const int64_t channel = channels[0];
+            if (channel >= 0 && (size_t)channel < directOutputBufferCount &&
+                directOutputBuffers[channel] != nullptr)
+            {
+                directOutputBuffers[channel][frame] += 0.5f * (left + right);
+            }
+            return;
+        }
+        const float values[2] = {left, right};
+        for (size_t sourceChannel = 0; sourceChannel < 2; ++sourceChannel)
+        {
+            const int64_t channel = channels[sourceChannel];
+            if (channel >= 0 && (size_t)channel < directOutputBufferCount &&
+                directOutputBuffers[channel] != nullptr)
+            {
+                directOutputBuffers[channel][frame] += values[sourceChannel];
+            }
+        }
+    };
     for (size_t i = 0; i < samples; ++i)
     {
         float volume = this->pathAMute ? 0 : outputVolume.Tick();
@@ -837,25 +895,34 @@ bool Lv2Pedalboard::Run(
             auto &path = *additionalPaths[pathIndex];
             additionalPathVolumes[pathIndex] = path.mute ? 0 : path.outputVolume.Tick();
         }
-        for (size_t c = 0; c < this->pedalboardOutputBuffers.size(); ++c)
+        std::array<float, 2> pathAValues = {0, 0};
+        std::array<float, 2> pathBValues = {0, 0};
+        std::array<std::array<float, 2>, 2> additionalPathValues = {};
+        for (size_t c = 0; c < 2; ++c)
         {
-            if (outputBuffers[c] == nullptr) {
-                break;
-            }
             float pathAGain = c == 0
                 ? (this->pathAPan > 0 ? 1.0f - this->pathAPan : 1.0f)
                 : (this->pathAPan < 0 ? 1.0f + this->pathAPan : 1.0f);
             float pathBGain = c == 0
                 ? (this->pathBPan > 0 ? 1.0f - this->pathBPan : 1.0f)
                 : (this->pathBPan < 0 ? 1.0f + this->pathBPan : 1.0f);
+            const size_t pathAChannel = std::min(
+                c, this->pedalboardOutputBuffers.size() - 1);
             const float pathARaw =
-                this->pedalboardOutputBuffers[c][i] * volume * pathAGain;
+                this->pedalboardOutputBuffers[pathAChannel][i] *
+                volume *
+                pathAGain;
+            const size_t pathBChannel = this->pathBOutputBuffers.empty()
+                ? 0
+                : std::min(c, this->pathBOutputBuffers.size() - 1);
             const float pathBRaw = this->pathBEnabled
-                ? this->pathBOutputBuffers[c][i] * pathBVolume * pathBGain
+                ? this->pathBOutputBuffers[pathBChannel][i] *
+                    pathBVolume *
+                    pathBGain
                 : 0;
-            float value = pathADelay.Process(
+            pathAValues[c] = pathADelay.Process(
                 c, pathARaw, maximumPathLatency - pathALatency);
-            value += pathBDelay.Process(
+            pathBValues[c] = pathBDelay.Process(
                 c, pathBRaw, maximumPathLatency - pathBLatency);
             for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
             {
@@ -869,10 +936,50 @@ bool Lv2Pedalboard::Run(
                             additionalPathVolumes[pathIndex] *
                             pathGain
                         : 0;
-                value += path.delay.Process(
+                additionalPathValues[pathIndex][c] = path.delay.Process(
                     c,
                     pathRaw,
                     maximumPathLatency - additionalPathLatencies[pathIndex]);
+            }
+        }
+        if (pathADirect)
+        {
+            addDirectOutput(
+                pathAOutputChannels, i, pathAValues[0], pathAValues[1]);
+        }
+        if (pathBDirect)
+        {
+            addDirectOutput(
+                pathBOutputChannels, i, pathBValues[0], pathBValues[1]);
+        }
+        for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
+        {
+            if (additionalPathDirect[pathIndex])
+            {
+                addDirectOutput(
+                    additionalPaths[pathIndex]->outputChannels,
+                    i,
+                    additionalPathValues[pathIndex][0],
+                    additionalPathValues[pathIndex][1]);
+            }
+        }
+        for (size_t c = 0;
+             c < 2 && outputBuffers[c] != nullptr;
+             ++c)
+        {
+            float value = pathADirect ? 0 : pathAValues[c];
+            if (this->pathBEnabled && !pathBDirect)
+            {
+                value += pathBValues[c];
+            }
+            for (size_t pathIndex = 0;
+                 pathIndex < additionalPaths.size();
+                 ++pathIndex)
+            {
+                if (!additionalPathDirect[pathIndex])
+                {
+                    value += additionalPathValues[pathIndex][c];
+                }
             }
             if (this->globalEqEnabled && c < this->globalEq.size())
             {

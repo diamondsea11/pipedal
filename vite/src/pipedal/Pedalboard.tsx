@@ -386,6 +386,7 @@ export class PedalboardPath {
         this.mute = input.mute ?? false;
         this.pan = input.pan ?? 0;
         this.inputChannels = input.inputChannels?.slice() ?? [0];
+        this.outputChannels = input.outputChannels?.slice() ?? [];
         this.items = PedalboardItem.deserializeArray(input.items ?? []);
         return this;
     }
@@ -397,6 +398,7 @@ export class PedalboardPath {
     mute: boolean = false;
     pan: number = 0;
     inputChannels: number[] = [0];
+    outputChannels: number[] = [];
     items: PedalboardItem[] = [];
 }
 
@@ -558,6 +560,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         this.pathAInputChannels = input.pathAInputChannels
             ? input.pathAInputChannels.slice()
             : [];
+        this.pathAOutputChannels = input.pathAOutputChannels
+            ? input.pathAOutputChannels.slice()
+            : [];
         this.pathAMute = input.pathAMute ?? false;
         this.pathAPan = input.pathAPan ?? 0;
         this.items = PedalboardItem.deserializeArray(input.items);
@@ -571,6 +576,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         this.pathBInputChannels = input.pathBInputChannels
             ? input.pathBInputChannels.slice()
             : [0];
+        this.pathBOutputChannels = input.pathBOutputChannels
+            ? input.pathBOutputChannels.slice()
+            : [];
         this.pathBItems = input.pathBItems
             ? PedalboardItem.deserializeArray(input.pathBItems)
             : [];
@@ -602,6 +610,7 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     input_volume_db: number = 0;
     output_volume_db: number = 0;
     pathAInputChannels: number[] = [];
+    pathAOutputChannels: number[] = [];
     pathAMute: boolean = false;
     pathAPan: number = 0;
     items: PedalboardItem[] = [];
@@ -612,6 +621,7 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     pathBMute: boolean = false;
     pathBPan: number = 0;
     pathBInputChannels: number[] = [0];
+    pathBOutputChannels: number[] = [];
     pathBItems: PedalboardItem[] = [];
     additionalPaths: PedalboardPath[] = [];
     midiActions: MidiAction[] = [];

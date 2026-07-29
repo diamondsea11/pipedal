@@ -336,6 +336,7 @@ namespace pipedal
 
         std::vector<float *> deviceCaptureBuffers;
         std::vector<float *> devicePlaybackBuffers;
+        std::vector<float *> directOutputBuffers;
         float *zeroInputBuffer = nullptr;
         float *discardOutputBuffer = nullptr;
         std::vector<float *> mainCaptureBuffers;
@@ -2083,7 +2084,24 @@ namespace pipedal
                     }
                     usedOutputChannels.insert(outputChannel);
                 }
-            } 
+            }
+            for (size_t outputChannel = 0;
+                 outputChannel < directOutputBuffers.size();
+                 ++outputChannel)
+            {
+                if (usedOutputChannels.contains(outputChannel))
+                {
+                    AddMixAddOp(
+                        directOutputBuffers[outputChannel],
+                        devicePlaybackBuffers[outputChannel]);
+                }
+                else
+                {
+                    AddMixCopyOp(
+                        directOutputBuffers[outputChannel],
+                        devicePlaybackBuffers[outputChannel]);
+                }
+            }
         }
 
         bool activated = false;
@@ -2107,9 +2125,11 @@ namespace pipedal
                 deviceCaptureBuffers[i] = AllocateAudioBuffer();
             }
             devicePlaybackBuffers.resize(playbackChannels);
+            directOutputBuffers.resize(playbackChannels);
             for (size_t i = 0; i < playbackChannels; ++i)
             {
                 devicePlaybackBuffers[i] = AllocateAudioBuffer();
+                directOutputBuffers[i] = AllocateAudioBuffer();
             }
 
 
@@ -2182,6 +2202,16 @@ namespace pipedal
             if (channel >= devicePlaybackBuffers.size())
                 return nullptr;
             return devicePlaybackBuffers[channel];
+        }
+        virtual size_t DirectOutputBufferCount() const override
+        {
+            return directOutputBuffers.size();
+        }
+        virtual float *GetDirectOutputBuffer(size_t channel) const override
+        {
+            if (channel >= directOutputBuffers.size())
+                return nullptr;
+            return directOutputBuffers[channel];
         }
 
         virtual float *GetZeroInputBuffer()
@@ -2261,6 +2291,7 @@ namespace pipedal
             mainPlaybackBuffers.clear();
             auxCaptureBuffers.clear();
             auxPlaybackBuffers.clear();
+            directOutputBuffers.clear();
             zeroInputBuffer = nullptr;
             discardOutputBuffer = nullptr;
             allocatedBuffers.clear();

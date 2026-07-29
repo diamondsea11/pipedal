@@ -48,6 +48,8 @@ TEST_CASE("legacy pedalboards default to one path", "[json_read_test][multipath]
     REQUIRE_FALSE(pedalboard.pathBEnabled());
     REQUIRE(pedalboard.pathBName() == "Vocal");
     REQUIRE(pedalboard.pathBInputChannels() == std::vector<int64_t>{0});
+    REQUIRE(pedalboard.pathAOutputChannels().empty());
+    REQUIRE(pedalboard.pathBOutputChannels().empty());
     REQUIRE(pedalboard.pathBItems().empty());
     REQUIRE(pedalboard.additionalPaths().empty());
 }
@@ -58,9 +60,11 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     source.EnsurePathB();
     source.pathBName("Vocal");
     source.pathBInputChannels({0});
+    source.pathBOutputChannels({0});
     source.pathBInputVolumeDb(-3.0f);
     source.pathBOutputVolumeDb(2.5f);
     source.pathAInputChannels({2});
+    source.pathAOutputChannels({2, 3});
     source.pathAMute(true);
     source.pathAPan(-1.0f);
     source.pathBMute(false);
@@ -76,6 +80,7 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     pathC.id("C");
     pathC.name("Keys");
     pathC.inputChannels({4, 5});
+    pathC.outputChannels({6, 7});
     pathC.inputVolumeDb(-2.0f);
     pathC.outputVolumeDb(1.5f);
     pathC.mute(false);
@@ -117,9 +122,11 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.pathBEnabled());
     REQUIRE(result.pathBName() == "Vocal");
     REQUIRE(result.pathBInputChannels() == std::vector<int64_t>{0});
+    REQUIRE(result.pathBOutputChannels() == std::vector<int64_t>{0});
     REQUIRE(result.pathBInputVolumeDb() == -3.0f);
     REQUIRE(result.pathBOutputVolumeDb() == 2.5f);
     REQUIRE(result.pathAInputChannels() == std::vector<int64_t>{2});
+    REQUIRE(result.pathAOutputChannels() == std::vector<int64_t>{2, 3});
     REQUIRE(result.pathAMute());
     REQUIRE(result.pathAPan() == -1.0f);
     REQUIRE_FALSE(result.pathBMute());
@@ -136,6 +143,7 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.additionalPaths()[0].id() == "C");
     REQUIRE(result.additionalPaths()[0].name() == "Keys");
     REQUIRE(result.additionalPaths()[0].inputChannels() == std::vector<int64_t>{4, 5});
+    REQUIRE(result.additionalPaths()[0].outputChannels() == std::vector<int64_t>{6, 7});
     REQUIRE(result.additionalPaths()[0].inputVolumeDb() == -2.0f);
     REQUIRE(result.additionalPaths()[0].outputVolumeDb() == 1.5f);
     REQUIRE(result.additionalPaths()[0].pan() == -0.5f);

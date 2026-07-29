@@ -78,10 +78,12 @@ namespace pipedal
         std::vector<float *> pedalboardInputBuffers;
         std::vector<float *> pedalboardOutputBuffers;
         std::vector<int64_t> pathAInputChannels;
+        std::vector<int64_t> pathAOutputChannels;
         bool pathAMute = false;
         float pathAPan = 0;
         bool pathBEnabled = false;
         std::vector<int64_t> pathBInputChannels;
+        std::vector<int64_t> pathBOutputChannels;
         std::vector<float *> pathBInputBuffers;
         std::vector<float *> pathBOutputBuffers;
         class DelayCompensator
@@ -126,6 +128,7 @@ namespace pipedal
         {
             std::string id;
             std::vector<int64_t> inputChannels;
+            std::vector<int64_t> outputChannels;
             std::vector<float *> inputBuffers;
             std::vector<float *> outputBuffers;
             DbDezipper inputVolume;
@@ -258,6 +261,8 @@ namespace pipedal
             float **pathBHardwareInputBuffers,
             float *const *const *additionalPathHardwareInputBuffers,
             size_t additionalPathHardwareInputCount,
+            float *const *directOutputBuffers,
+            size_t directOutputBufferCount,
             uint32_t samples,
             RealtimeRingBufferWriter *realtimeWriter);
         bool Run(
@@ -266,7 +271,16 @@ namespace pipedal
             uint32_t samples,
             RealtimeRingBufferWriter *realtimeWriter)
         {
-            return Run(inputBuffers, outputBuffers, nullptr, nullptr, 0, samples, realtimeWriter);
+            return Run(
+                inputBuffers,
+                outputBuffers,
+                nullptr,
+                nullptr,
+                0,
+                nullptr,
+                0,
+                samples,
+                realtimeWriter);
         }
 
         void ResetAtomBuffers();

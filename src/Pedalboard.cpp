@@ -411,9 +411,11 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
     }
     if (this->pathBEnabled_ != other.pathBEnabled_ ||
         this->pathAInputChannels_ != other.pathAInputChannels_ ||
+        this->pathAOutputChannels_ != other.pathAOutputChannels_ ||
         this->pathAMute_ != other.pathAMute_ ||
         this->pathAPan_ != other.pathAPan_ ||
         this->pathBInputChannels_ != other.pathBInputChannels_ ||
+        this->pathBOutputChannels_ != other.pathBOutputChannels_ ||
         this->pathBMute_ != other.pathBMute_ ||
         this->pathBPan_ != other.pathBPan_ ||
         this->globalEqEnabled_ != other.globalEqEnabled_ ||
@@ -442,6 +444,7 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
         if (leftPath.id() != rightPath.id() ||
             leftPath.enabled() != rightPath.enabled() ||
             leftPath.inputChannels() != rightPath.inputChannels() ||
+            leftPath.outputChannels() != rightPath.outputChannels() ||
             leftPath.items().size() != rightPath.items().size())
         {
             return false;
@@ -687,6 +690,7 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,input_volume_db)
     JSON_MAP_REFERENCE(Pedalboard,output_volume_db)
     JSON_MAP_REFERENCE(Pedalboard,pathAInputChannels)
+    JSON_MAP_REFERENCE(Pedalboard,pathAOutputChannels)
     JSON_MAP_REFERENCE(Pedalboard,pathAMute)
     JSON_MAP_REFERENCE(Pedalboard,pathAPan)
     JSON_MAP_REFERENCE(Pedalboard,items)
@@ -697,6 +701,7 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,pathBMute)
     JSON_MAP_REFERENCE(Pedalboard,pathBPan)
     JSON_MAP_REFERENCE(Pedalboard,pathBInputChannels)
+    JSON_MAP_REFERENCE(Pedalboard,pathBOutputChannels)
     JSON_MAP_REFERENCE(Pedalboard,pathBItems)
     JSON_MAP_REFERENCE(Pedalboard,additionalPaths)
     JSON_MAP_REFERENCE(Pedalboard,midiActions)
@@ -741,6 +746,7 @@ JSON_MAP_BEGIN(PedalboardPath)
     JSON_MAP_REFERENCE(PedalboardPath,mute)
     JSON_MAP_REFERENCE(PedalboardPath,pan)
     JSON_MAP_REFERENCE(PedalboardPath,inputChannels)
+    JSON_MAP_REFERENCE(PedalboardPath,outputChannels)
     JSON_MAP_REFERENCE(PedalboardPath,items)
 JSON_MAP_END()
 
