@@ -26,6 +26,20 @@
 
 namespace pipedal
 {
+    class OutputRoute
+    {
+        int64_t sourceChannel_ = 0;
+        int64_t outputChannel_ = 0;
+        float gainDb_ = 0;
+        bool mute_ = false;
+    public:
+        JSON_GETTER_SETTER(sourceChannel)
+        JSON_GETTER_SETTER(outputChannel)
+        JSON_GETTER_SETTER(gainDb)
+        JSON_GETTER_SETTER(mute)
+
+        DECLARE_JSON_MAP(OutputRoute);
+    };
 
     class ChannelRouterSettings
     {
@@ -40,6 +54,7 @@ namespace pipedal
 
         std::vector<int64_t> auxInputChannels_ = {-1, -1};
         std::vector<int64_t> auxOutputChannels_ = {-1, -1};
+        std::vector<OutputRoute> outputRoutes_;
 
     public:
 
@@ -58,6 +73,7 @@ namespace pipedal
         JSON_GETTER_SETTER_REF(mainOutputChannels)
         JSON_GETTER_SETTER_REF(auxInputChannels)
         JSON_GETTER_SETTER_REF(auxOutputChannels)
+        JSON_GETTER_SETTER_REF(outputRoutes)
 
         DECLARE_JSON_MAP(ChannelRouterSettings);
     };
@@ -78,11 +94,13 @@ namespace pipedal
         const std::vector<int64_t> &mainOutputChannels() const { return mainOutputChannels_; }
         const std::vector<int64_t> &auxInputChannels() const { return auxInputChannels_; }
         const std::vector<int64_t> &auxOutputChannels() const { return auxOutputChannels_; }
+        const std::vector<OutputRoute> &outputRoutes() const { return outputRoutes_; }
 
         std::vector<int64_t> &mainInputChannels() { return mainInputChannels_; }
         std::vector<int64_t> &mainOutputChannels() { return mainOutputChannels_; }
         std::vector<int64_t> &auxInputChannels() { return auxInputChannels_; }
         std::vector<int64_t> &auxOutputChannels() { return auxOutputChannels_; }
+        std::vector<OutputRoute> &outputRoutes() { return outputRoutes_; }
 
         bool IsValid() const;
     private:
@@ -92,6 +110,7 @@ namespace pipedal
         std::vector<int64_t> mainOutputChannels_;
         std::vector<int64_t> auxInputChannels_;
         std::vector<int64_t> auxOutputChannels_;
+        std::vector<OutputRoute> outputRoutes_;
     };
 
     class ChannelRouterPresetIndexEntry {

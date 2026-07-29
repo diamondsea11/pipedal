@@ -22,6 +22,7 @@
 export default class MidiBinding {
     deserialize(input: any) : MidiBinding {
         this.symbol = input.symbol;
+        this.channel = input.channel ?? -1;
         this.bindingType = input.bindingType;
         this.note = input.note;
         this.control = input.control;
@@ -52,6 +53,7 @@ export default class MidiBinding {
     equals(other: MidiBinding) : boolean
     {
         return (this.symbol === other.symbol)
+            && (this.channel === other.channel)
             && (this.bindingType === other.bindingType)
             && (this.note === other.note)
             && (this.control === other.control)
@@ -68,6 +70,7 @@ export default class MidiBinding {
     static  BINDING_TYPE_NOTE: number = 1;
     static  BINDING_TYPE_CONTROL: number = 2;
     static  BINDING_TYPE_TAP_TEMPO: number = 3;
+    static  BINDING_TYPE_PROGRAM: number = 4;
 
     setBindingType(bindingType:number)
     {
@@ -76,6 +79,7 @@ export default class MidiBinding {
 
 
     symbol: string = "";
+    channel: number = -1;
 
     bindingType: number = MidiBinding.BINDING_TYPE_NONE;
     note: number = 12*4+24; // C4.

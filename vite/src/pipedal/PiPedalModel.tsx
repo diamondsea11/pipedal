@@ -23,7 +23,7 @@ import { PiPedalArgumentError, PiPedalStateError } from './PiPedalError';
 import { UpdateStatus, UpdatePolicyT } from './Updater';
 import ObservableEvent from './ObservableEvent';
 import { ObservableProperty } from './ObservableProperty';
-import { Pedalboard, PedalboardItem, ControlValue, Snapshot } from './Pedalboard'
+import { Pedalboard, PedalboardItem, ControlValue, Snapshot, MidiAction } from './Pedalboard'
 import PluginClass from './PluginClass';
 import ScreenOrientation from './ScreenOrientation';
 import PiPedalSocket, { PiPedalMessageHeader } from './PiPedalSocket';
@@ -1916,6 +1916,19 @@ export class PiPedalModel //implements PiPedalModel
             this.setModelPedalboard(newPedalboard);
             if (notifyServer) this.webSocket?.send("setPathBOutputVolume", value);
             return;
+        } else if (instanceId <= Pedalboard.PATH_C_START_CONTROL_ID &&
+                   instanceId >= Pedalboard.PATH_D_END_CONTROL_ID &&
+                   key === "volume_db") {
+            const id = instanceId >= Pedalboard.PATH_C_END_CONTROL_ID ? "C" : "D";
+            const path = newPedalboard.additionalPaths.find((item) => item.id === id);
+            if (!path) return;
+            const isInput = instanceId === Pedalboard.PATH_C_START_CONTROL_ID ||
+                instanceId === Pedalboard.PATH_D_START_CONTROL_ID;
+            if (isInput) path.inputVolumeDb = value;
+            else path.outputVolumeDb = value;
+            this.setModelPedalboard(newPedalboard);
+            if (notifyServer) this.updateServerPedalboard();
+            return;
         }
         let item = newPedalboard.getItem(instanceId);
         changed = item.setControlValue(key, value);
@@ -2125,6 +2138,9 @@ export class PiPedalModel //implements PiPedalModel
         } else if (instanceId === Pedalboard.AUX_END_CONTROL_ID && key === "volume_db") {
             this.webSocket?.send("previewPathBOutputVolume", value);
             return;
+        } else if (instanceId <= Pedalboard.PATH_C_START_CONTROL_ID &&
+                   instanceId >= Pedalboard.PATH_D_END_CONTROL_ID) {
+            return;
         }
 
         // Get the control info to check if it's expensive
@@ -2321,6 +2337,34 @@ export class PiPedalModel //implements PiPedalModel
             newPedalboard.pathBMute = mute;
             newPedalboard.pathBPan = Math.max(-1, Math.min(1, pan));
         }
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    configureAdditionalPath(
+        id: "C" | "D",
+        enabled: boolean,
+        inputChannel?: number,
+        mute?: boolean,
+        pan?: number
+    ): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        if (enabled) {
+            newPedalboard.addAdditionalPath(id, inputChannel ?? 0);
+            const path = newPedalboard.additionalPaths.find((value) => value.id === id)!;
+            if (inputChannel !== undefined) path.inputChannels = [inputChannel];
+            if (mute !== undefined) path.mute = mute;
+            if (pan !== undefined) path.pan = Math.max(-1, Math.min(1, pan));
+        } else {
+            newPedalboard.removeAdditionalPath(id);
+        }
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    setMidiActions(actions: MidiAction[]): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        newPedalboard.midiActions = actions.map((action) => action.clone());
         this.setModelPedalboard(newPedalboard);
         this.updateServerPedalboard();
     }

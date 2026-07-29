@@ -49,6 +49,7 @@ import WifiDirectConfigDialog from './WifiDirectConfigDialog';
 import DialogEx from './DialogEx'
 import GovernorSettings from './GovernorSettings';
 import SystemMidiBindingsDialog from './SystemMidiBindingsDialog';
+import MidiActionsDialog from './MidiActionsDialog';
 import SelectThemeDialog from './SelectThemeDialog';
 import { AlsaSequencerConfiguration } from './AlsaSequencer';
 
@@ -108,6 +109,7 @@ interface SettingsDialogState {
     showRestartOkDialog: boolean;
     showShutdownOkDialog: boolean;
     showSystemMidiBindingsDialog: boolean;
+    showMidiActionsDialog: boolean;
 
     hasWifiDevice: boolean;
 };
@@ -221,6 +223,7 @@ const SettingsDialog = withStyles(
                 showShutdownOkDialog: false,
                 showRestartOkDialog: false,
                 showSystemMidiBindingsDialog: false,
+                showMidiActionsDialog: false,
                 isAndroidHosted: this.model.isAndroidHosted(),
                 hasWifiDevice: this.model.hasWifiDevice.get()
             };
@@ -793,6 +796,18 @@ const SettingsDialog = withStyles(
 
                                         </div>
                                     </ButtonBase>
+                                    <ButtonBase className={classes.setting} disabled={!isConfigValid}
+                                        onClick={() => this.setState({ showMidiActionsDialog: true })}>
+                                        <SelectHoverBackground selected={false} showHover={true} />
+                                        <div style={{ width: "100%" }}>
+                                            <Typography className={classes.primaryItem} display="block" variant="body2" noWrap>
+                                                Preset MIDI action chains
+                                            </Typography>
+                                            <Typography className={classes.secondaryItem} display="block" variant="caption" color="textSecondary" noWrap>
+                                                {this.model.pedalboard.get().midiActions.length} actions
+                                            </Typography>
+                                        </div>
+                                    </ButtonBase>
 
                                 </div>
                             </div>
@@ -1137,6 +1152,12 @@ const SettingsDialog = withStyles(
                             onClose={() => { this.setState({ showSystemMidiBindingsDialog: false }); }}
                         />
 
+                    )}
+                    {this.state.showMidiActionsDialog && (
+                        <MidiActionsDialog
+                            open={this.state.showMidiActionsDialog}
+                            onClose={() => this.setState({ showMidiActionsDialog: false })}
+                        />
                     )}
                     {this.state.showWindowScaleDialog && (
                         <OptionsDialog open={this.state.showWindowScaleDialog} options={getWindowScaleOptions()} value={getWindowScale()}

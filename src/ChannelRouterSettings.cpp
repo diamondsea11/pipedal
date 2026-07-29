@@ -71,7 +71,7 @@ uint64_t ChannelRouterSettings::numberOfAudioOutputChannels() const
 }
 
 ChannelSelection::ChannelSelection(ChannelRouterSettings &settings)
-    : mainInputChannels_(settings.mainInputChannels()), mainOutputChannels_(settings.mainOutputChannels()), auxInputChannels_(settings.auxInputChannels()), auxOutputChannels_(settings.auxOutputChannels())
+    : mainInputChannels_(settings.mainInputChannels()), mainOutputChannels_(settings.mainOutputChannels()), auxInputChannels_(settings.auxInputChannels()), auxOutputChannels_(settings.auxOutputChannels()), outputRoutes_(settings.outputRoutes())
 {
     normalizeChannelSelection();
 }
@@ -171,6 +171,14 @@ bool ChannelSelection::IsValid() const
     {
         return false;
     }
+    for (const auto &route : outputRoutes_)
+    {
+        if (route.sourceChannel() < 0 || route.sourceChannel() > 1 ||
+            route.outputChannel() < 0)
+        {
+            return false;
+        }
+    }
 
     return true;
 }
@@ -181,7 +189,15 @@ JSON_MAP_REFERENCE(ChannelRouterSettings, channelRouterPresetId)
 JSON_MAP_REFERENCE(ChannelRouterSettings, mainInputChannels)
 JSON_MAP_REFERENCE(ChannelRouterSettings, mainOutputChannels)
 JSON_MAP_REFERENCE(ChannelRouterSettings, auxInputChannels)
-JSON_MAP_REFERENCE(ChannelRouterSettings, auxOutputChannels)
+    JSON_MAP_REFERENCE(ChannelRouterSettings, auxOutputChannels)
+    JSON_MAP_REFERENCE(ChannelRouterSettings, outputRoutes)
+JSON_MAP_END();
+
+JSON_MAP_BEGIN(OutputRoute)
+JSON_MAP_REFERENCE(OutputRoute, sourceChannel)
+JSON_MAP_REFERENCE(OutputRoute, outputChannel)
+JSON_MAP_REFERENCE(OutputRoute, gainDb)
+JSON_MAP_REFERENCE(OutputRoute, mute)
 JSON_MAP_END();
 
 JSON_MAP_BEGIN(ChannelRouterPresetIndexEntry)

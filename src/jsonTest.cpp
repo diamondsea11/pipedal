@@ -28,6 +28,7 @@
 #ifndef PIPEDAL_STANDALONE_JSON_TEST
 #include "Pedalboard.hpp"
 #include "JackServerSettings.hpp"
+#include "ChannelRouterSettings.hpp"
 #endif
 #include <concepts>
 #include <type_traits>
@@ -48,6 +49,7 @@ TEST_CASE("legacy pedalboards default to one path", "[json_read_test][multipath]
     REQUIRE(pedalboard.pathBName() == "Vocal");
     REQUIRE(pedalboard.pathBInputChannels() == std::vector<int64_t>{0});
     REQUIRE(pedalboard.pathBItems().empty());
+    REQUIRE(pedalboard.additionalPaths().empty());
 }
 
 TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][multipath]")
@@ -70,6 +72,36 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     source.globalEqMidFrequencyHz(1250);
     source.globalEqHighGainDb(-2.5f);
     source.globalEqHighCutHz(14500);
+    PedalboardPath pathC;
+    pathC.id("C");
+    pathC.name("Keys");
+    pathC.inputChannels({4, 5});
+    pathC.inputVolumeDb(-2.0f);
+    pathC.outputVolumeDb(1.5f);
+    pathC.mute(false);
+    pathC.pan(-0.5f);
+    pathC.items().push_back(source.MakeEmptyItem());
+    source.additionalPaths().push_back(pathC);
+
+    PedalboardPath pathD;
+    pathD.id("D");
+    pathD.name("Monitor");
+    pathD.enabled(false);
+    source.additionalPaths().push_back(pathD);
+    MidiAction midiAction;
+    midiAction.bindingType(BINDING_TYPE_CONTROL);
+    midiAction.channel(2);
+    midiAction.number(21);
+    midiAction.gesture((int)MidiActionGesture::Press);
+    midiAction.actionType((int)MidiActionType::TogglePathMute);
+    midiAction.outputChannel(4);
+    midiAction.actionNumber(73);
+    midiAction.symbol("C");
+    midiAction.togglePosition(1);
+    midiAction.toggleGroup(3);
+    midiAction.resetGroup(4);
+    midiAction.delayMs(125);
+    source.midiActions().push_back(midiAction);
     source.snapshots().push_back(
         std::make_shared<Snapshot>(source.MakeSnapshotFromCurrentSettings(source)));
 
@@ -100,6 +132,25 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.globalEqHighGainDb() == -2.5f);
     REQUIRE(result.globalEqHighCutHz() == 14500);
     REQUIRE(result.pathBItems().size() == 1);
+    REQUIRE(result.additionalPaths().size() == 2);
+    REQUIRE(result.additionalPaths()[0].id() == "C");
+    REQUIRE(result.additionalPaths()[0].name() == "Keys");
+    REQUIRE(result.additionalPaths()[0].inputChannels() == std::vector<int64_t>{4, 5});
+    REQUIRE(result.additionalPaths()[0].inputVolumeDb() == -2.0f);
+    REQUIRE(result.additionalPaths()[0].outputVolumeDb() == 1.5f);
+    REQUIRE(result.additionalPaths()[0].pan() == -0.5f);
+    REQUIRE(result.additionalPaths()[0].items().size() == 1);
+    REQUIRE_FALSE(result.additionalPaths()[1].enabled());
+    REQUIRE(result.midiActions().size() == 1);
+    REQUIRE(result.midiActions()[0].channel() == 2);
+    REQUIRE(result.midiActions()[0].number() == 21);
+    REQUIRE(result.midiActions()[0].actionType() == (int)MidiActionType::TogglePathMute);
+    REQUIRE(result.midiActions()[0].outputChannel() == 4);
+    REQUIRE(result.midiActions()[0].actionNumber() == 73);
+    REQUIRE(result.midiActions()[0].symbol() == "C");
+    REQUIRE(result.midiActions()[0].toggleGroup() == 3);
+    REQUIRE(result.midiActions()[0].resetGroup() == 4);
+    REQUIRE(result.midiActions()[0].delayMs() == 125);
     REQUIRE(result.snapshots().size() == 1);
     REQUIRE(result.snapshots()[0]->hasMixSettings_);
     REQUIRE(result.snapshots()[0]->pathAMute_);
@@ -107,6 +158,9 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.snapshots()[0]->pathBPan_ == 1.0f);
     REQUIRE(result.snapshots()[0]->globalEqEnabled_);
     REQUIRE(result.snapshots()[0]->globalEqMidFrequencyHz_ == 1250);
+    REQUIRE(result.snapshots()[0]->additionalPathMixes_.size() == 2);
+    REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].id() == "C");
+    REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].pan() == -0.5f);
 }
 
 TEST_CASE("NAM calibration profiles follow the active interface", "[json_read_test][nam-calibration]")
@@ -133,6 +187,33 @@ TEST_CASE("NAM calibration profiles follow the active interface", "[json_read_te
     REQUIRE(restored.GetNamInputCalibrationDbu() == 10.0f);
     restored.SetAlsaInputDevice("hw:CARD=Babyface2359687", "RME Babyface Pro FS");
     REQUIRE(restored.GetNamInputCalibrationDbu() == 14.5f);
+}
+
+TEST_CASE("output matrix follows channel router JSON", "[json_read_test][multipath]")
+{
+    ChannelRouterSettings source;
+    source.configured(true);
+    source.mainInputChannels({2, -1});
+    source.mainOutputChannels({2, 3});
+    OutputRoute route;
+    route.sourceChannel(0);
+    route.outputChannel(5);
+    route.gainDb(-6.0f);
+    route.mute(false);
+    source.outputRoutes().push_back(route);
+
+    std::stringstream serialized;
+    json_writer writer{serialized};
+    writer.write(source);
+    json_reader reader{serialized};
+    ChannelRouterSettings restored;
+    reader.read(&restored);
+
+    REQUIRE(restored.outputRoutes().size() == 1);
+    REQUIRE(restored.outputRoutes()[0].sourceChannel() == 0);
+    REQUIRE(restored.outputRoutes()[0].outputChannel() == 5);
+    REQUIRE(restored.outputRoutes()[0].gainDb() == -6.0f);
+    REQUIRE_FALSE(restored.outputRoutes()[0].mute());
 }
 #endif
 

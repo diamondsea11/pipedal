@@ -364,6 +364,12 @@ bool SystemMidiBinding::IsTriggered(const MidiEvent &event)
 
 bool SystemMidiBinding::IsMatch(const MidiEvent &event)
 {
+    if (currentBinding.channel() >= 0 &&
+        event.size != 0 &&
+        (event.buffer[0] & 0x0F) != currentBinding.channel())
+    {
+        return false;
+    }
     switch (currentBinding.bindingType())
     {
     case BINDING_TYPE_NOTE:
@@ -418,6 +424,13 @@ private:
 
     int selectedBank = -1;
     int64_t midiProgramChangeId = 0;
+    struct ScheduledMidiAction
+    {
+        bool active = false;
+        uint64_t dueSample = 0;
+        const MidiAction *action = nullptr;
+    };
+    std::array<ScheduledMidiAction, 64> scheduledMidiActions;
 
     class Uris
     {
@@ -534,6 +547,10 @@ private:
 
     std::vector<std::shared_ptr<Lv2Pedalboard>> activePedalboards; // pedalboards that have been sent to the audio queue.
     Lv2Pedalboard *realtimeActivePedalboard = nullptr;
+    Lv2Pedalboard *realtimeSpilloverPedalboard = nullptr;
+    uint64_t spilloverSamplesRemaining = 0;
+    static constexpr size_t SPILLOVER_BUFFER_CAPACITY = 65536;
+    std::array<std::array<float, SPILLOVER_BUFFER_CAPACITY>, 2> spilloverOutputBuffers;
 
     uint32_t sampleRate = 0;
     uint64_t currentSample = 0;
@@ -602,6 +619,8 @@ private:
         // release any pdealboards owned by the process thread.
         this->activePedalboards.resize(0);
         this->realtimeActivePedalboard = nullptr;
+        this->realtimeSpilloverPedalboard = nullptr;
+        this->spilloverSamplesRemaining = 0;
 
         // clean up any realtime buffers that may have been lost in transit.
         // TODO: These should be lists, really. There may be multiple items in flight..
@@ -897,8 +916,43 @@ private:
                 {
                     auto oldValue = this->realtimeActivePedalboard;
                     this->realtimeActivePedalboard = body.effect;
+                    for (auto &scheduled : scheduledMidiActions)
+                    {
+                        scheduled.active = false;
+                        scheduled.action = nullptr;
+                    }
 
-                    realtimeWriter.EffectReplaced(oldValue);
+                    if (realtimeSpilloverPedalboard != nullptr)
+                    {
+                        realtimeWriter.EffectReplaced(realtimeSpilloverPedalboard);
+                        realtimeSpilloverPedalboard = nullptr;
+                    }
+                    bool canSpillOver = oldValue != nullptr && sampleRate != 0;
+                    if (canSpillOver)
+                    {
+                        for (const auto &oldEffect : oldValue->GetSharedEffectList())
+                        {
+                            for (const auto &newEffect : body.effect->GetSharedEffectList())
+                            {
+                                if (oldEffect.get() == newEffect.get())
+                                {
+                                    canSpillOver = false;
+                                    break;
+                                }
+                            }
+                            if (!canSpillOver) break;
+                        }
+                    }
+                    if (canSpillOver)
+                    {
+                        realtimeSpilloverPedalboard = oldValue;
+                        spilloverSamplesRemaining = (uint64_t)sampleRate * 2;
+                    }
+                    else
+                    {
+                        realtimeWriter.EffectReplaced(oldValue);
+                        spilloverSamplesRemaining = 0;
+                    }
 
                     // invalidate the possibly no-good subscriptions. Model will update them shortly.
                     freeRealtimeVuConfiguration();
@@ -994,9 +1048,154 @@ private:
         this->realtimeWriter.OnRealtimeMidiSnapshotRequest(snapshotIndex, ++snapshotRequestId);
     }
 
+    void ExecuteMidiAction(const MidiAction &action)
+    {
+        if (realtimeActivePedalboard != nullptr &&
+            realtimeActivePedalboard->ExecuteInternalMidiAction(
+                action, this, fnMidiValueChanged))
+        {
+            const auto actionType = (MidiActionType)action.actionType();
+            if (actionType == MidiActionType::SetPathMute ||
+                actionType == MidiActionType::TogglePathMute)
+            {
+                RealtimeMidiEventType eventType = RealtimeMidiEventType::PathAToggle;
+                if (action.symbol() == "B") eventType = RealtimeMidiEventType::PathBToggle;
+                else if (action.symbol() == "C") eventType = RealtimeMidiEventType::PathCToggle;
+                else if (action.symbol() == "D") eventType = RealtimeMidiEventType::PathDToggle;
+                if (actionType == MidiActionType::SetPathMute)
+                {
+                    const int offset = action.value() != 0 ? 1 : 2;
+                    eventType = (RealtimeMidiEventType)((int)eventType + offset);
+                }
+                realtimeWriter.OnRealtimeMidiEvent(eventType);
+            }
+            else if (actionType == MidiActionType::ToggleGlobalEq)
+            {
+                realtimeWriter.OnRealtimeMidiEvent(
+                    RealtimeMidiEventType::GlobalEqToggle);
+            }
+            return;
+        }
+        switch ((MidiActionType)action.actionType())
+        {
+        case MidiActionType::SelectSnapshot:
+            OnSnapshotTriggered((int)action.targetId());
+            break;
+        case MidiActionType::NextSnapshot:
+            realtimeWriter.OnNextMidiSnapshot(++midiProgramChangeId, 1);
+            break;
+        case MidiActionType::PreviousSnapshot:
+            realtimeWriter.OnNextMidiSnapshot(++midiProgramChangeId, -1);
+            break;
+        case MidiActionType::NextPreset:
+            realtimeWriter.OnNextMidiProgram(++midiProgramChangeId, 1);
+            break;
+        case MidiActionType::PreviousPreset:
+            realtimeWriter.OnNextMidiProgram(++midiProgramChangeId, -1);
+            break;
+        case MidiActionType::NextBank:
+            realtimeWriter.OnNextMidiBank(++midiProgramChangeId, 1);
+            break;
+        case MidiActionType::PreviousBank:
+            realtimeWriter.OnNextMidiBank(++midiProgramChangeId, -1);
+            break;
+        case MidiActionType::SendMidiControl:
+        {
+            const uint8_t message[3] = {
+                (uint8_t)(0xB0 | std::clamp(action.outputChannel(), 0, 15)),
+                (uint8_t)std::clamp(action.actionNumber(), 0, 127),
+                (uint8_t)std::clamp((int)std::round(action.value()), 0, 127)};
+            if (alsaSequencer != nullptr)
+            {
+                alsaSequencer->SendMessage(message, sizeof(message));
+            }
+            break;
+        }
+        case MidiActionType::SendMidiProgram:
+        {
+            const uint8_t message[2] = {
+                (uint8_t)(0xC0 | std::clamp(action.outputChannel(), 0, 15)),
+                (uint8_t)std::clamp(action.actionNumber(), 0, 127)};
+            if (alsaSequencer != nullptr)
+            {
+                alsaSequencer->SendMessage(message, sizeof(message));
+            }
+            break;
+        }
+        default:
+            break;
+        }
+    }
+
+    void ScheduleOrExecuteMidiAction(const MidiAction &action)
+    {
+        if (action.delayMs() == 0 || sampleRate == 0)
+        {
+            ExecuteMidiAction(action);
+            return;
+        }
+        for (auto &scheduled : scheduledMidiActions)
+        {
+            if (!scheduled.active)
+            {
+                scheduled.active = true;
+                scheduled.dueSample =
+                    currentSample +
+                    ((uint64_t)action.delayMs() * sampleRate) / 1000;
+                scheduled.action = &action;
+                return;
+            }
+        }
+    }
+
+    void ProcessScheduledMidiActions()
+    {
+        if (realtimeActivePedalboard != nullptr)
+        {
+            std::array<const MidiAction *, 64> timedActions;
+            const size_t timedActionCount =
+                realtimeActivePedalboard->CollectTimedMidiActions(
+                    timedActions.data(), timedActions.size());
+            for (size_t actionIndex = 0;
+                 actionIndex < timedActionCount;
+                 ++actionIndex)
+            {
+                ScheduleOrExecuteMidiAction(*timedActions[actionIndex]);
+            }
+        }
+        for (auto &scheduled : scheduledMidiActions)
+        {
+            if (scheduled.active && scheduled.dueSample <= currentSample)
+            {
+                const MidiAction *action = scheduled.action;
+                scheduled.active = false;
+                scheduled.action = nullptr;
+                if (action != nullptr)
+                {
+                    ExecuteMidiAction(*action);
+                }
+            }
+        }
+    }
+
     void ProcessMidiEvent(Lv2EventBufferWriter &eventBufferWriter, Lv2EventBufferWriter::LV2_EvBuf_Iterator &iterator, MidiEvent &event)
     {
+        size_t actionCount = 0;
+        if (realtimeActivePedalboard != nullptr)
+        {
+            std::array<const MidiAction *, 64> actions;
+            actionCount = realtimeActivePedalboard->CollectTriggeredMidiActions(
+                event, actions.data(), actions.size());
+            for (size_t actionIndex = 0; actionIndex < actionCount; ++actionIndex)
+            {
+                ScheduleOrExecuteMidiAction(*actions[actionIndex]);
+            }
+        }
         uint8_t midiCommand = (uint8_t)(event.buffer[0] & 0xF0);
+        if (midiCommand == 0xC0 && actionCount != 0)
+        {
+            return;
+        }
         if (midiCommand == 0xC0) // midi program change.
         {
             this->deferredMidiMessageCount = 0; // we can discard previous control changes.
@@ -1232,6 +1431,12 @@ private:
         float *inputBuffers[3];
         float *outputBuffers[3];
         float *pathBInputBuffers[3] = {nullptr, nullptr, nullptr};
+        float *additionalPathInputStorage[2][3] = {
+            {nullptr, nullptr, nullptr},
+            {nullptr, nullptr, nullptr}};
+        float **additionalPathInputBuffers[2] = {
+            additionalPathInputStorage[0],
+            additionalPathInputStorage[1]};
         bool buffersValid = true;
         inputBuffers[0] = pInputBuffers->at(0);
         inputBuffers[1] = pInputBuffers->size() >= 2 ? pInputBuffers->at(1) : nullptr;
@@ -1271,12 +1476,32 @@ private:
                     }
                 }
             }
+            const size_t additionalPathCount =
+                std::min(pedalboard->GetAdditionalPathCount(), (size_t)2);
+            for (size_t pathIndex = 0; pathIndex < additionalPathCount; ++pathIndex)
+            {
+                const auto &channels =
+                    pedalboard->GetAdditionalPathInputChannels(pathIndex);
+                const size_t channelCount = std::min(channels.size(), (size_t)2);
+                for (size_t channelIndex = 0; channelIndex < channelCount; ++channelIndex)
+                {
+                    int64_t channel = channels[channelIndex];
+                    if (channel >= 0 &&
+                        (size_t)channel < audioDriver->DeviceInputBufferCount())
+                    {
+                        additionalPathInputStorage[pathIndex][channelIndex] =
+                            audioDriver->GetDeviceInputBuffer((size_t)channel);
+                    }
+                }
+            }
             pedalboard->ProcessParameterRequests(pParameterRequests, nframes);
 
             pedalboard->Run(
                 inputBuffers,
                 outputBuffers,
                 pathBInputBuffers,
+                additionalPathInputBuffers,
+                additionalPathCount,
                 (uint32_t)nframes,
                 &realtimeWriter);
             pedalboard->GatherPatchProperties(pParameterRequests);
@@ -1300,6 +1525,68 @@ private:
                 }
                 ++ix;
             }
+        }
+    }
+
+    PIPEDAL_NON_INLINE void ProcessSpilloverPedalboard(size_t nframes)
+    {
+        auto *pedalboard = realtimeSpilloverPedalboard;
+        if (pedalboard == nullptr || nframes > SPILLOVER_BUFFER_CAPACITY)
+        {
+            return;
+        }
+        float *zero = audioDriver->GetZeroInputBuffer();
+        float *inputBuffers[3] = {zero, zero, nullptr};
+        float *outputBuffers[3] = {
+            spilloverOutputBuffers[0].data(),
+            audioDriver->MainOutputBufferCount() >= 2
+                ? spilloverOutputBuffers[1].data()
+                : nullptr,
+            nullptr};
+        float *pathBInputBuffers[3] = {zero, zero, nullptr};
+        float *additionalStorage[2][3] = {
+            {zero, zero, nullptr},
+            {zero, zero, nullptr}};
+        float **additionalInputs[2] = {
+            additionalStorage[0],
+            additionalStorage[1]};
+
+        pedalboard->ResetAtomBuffers();
+        pedalboard->Run(
+            inputBuffers,
+            outputBuffers,
+            pathBInputBuffers,
+            additionalInputs,
+            std::min(pedalboard->GetAdditionalPathCount(), (size_t)2),
+            (uint32_t)nframes,
+            &realtimeWriter);
+
+        const uint64_t fadeSamples = std::max((uint64_t)1, (uint64_t)sampleRate / 2);
+        auto &mainOutputs = audioDriver->MainOutputBuffers();
+        for (size_t channel = 0; channel < mainOutputs.size() && channel < 2; ++channel)
+        {
+            float *mainOutput = mainOutputs[channel];
+            float *tailOutput = spilloverOutputBuffers[channel].data();
+            for (size_t frame = 0; frame < nframes; ++frame)
+            {
+                const uint64_t remaining = spilloverSamplesRemaining > frame
+                    ? spilloverSamplesRemaining - frame
+                    : 0;
+                const float gain = remaining >= fadeSamples
+                    ? 1.0f
+                    : (float)remaining / (float)fadeSamples;
+                mainOutput[frame] += tailOutput[frame] * gain;
+            }
+        }
+        if (spilloverSamplesRemaining <= nframes)
+        {
+            realtimeWriter.EffectReplaced(realtimeSpilloverPedalboard);
+            realtimeSpilloverPedalboard = nullptr;
+            spilloverSamplesRemaining = 0;
+        }
+        else
+        {
+            spilloverSamplesRemaining -= nframes;
         }
     }
 
@@ -1459,9 +1746,11 @@ private:
 
             if (pedalboard != nullptr)
             {
+                ProcessScheduledMidiActions();
                 ProcessGlobalMidiInput();
             }
             ProcessLv2Pedalboard(nframes);
+            ProcessSpilloverPedalboard(nframes);
 
             if (pParameterRequests != nullptr)
             {

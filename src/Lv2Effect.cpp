@@ -418,6 +418,10 @@ void Lv2Effect::PreparePortIndices()
         else if (port->is_control_port())
         {
             controlIndex[port->symbol()] = portIndex;
+            if (port->is_output() && port->designation() == LV2_CORE__latency)
+            {
+                latencyControlIndex = portIndex;
+            }
             if (port->is_input())
             {
                 this->isInputControlPort.at(portIndex) = true;

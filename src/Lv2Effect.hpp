@@ -106,6 +106,7 @@ namespace pipedal
         std::vector<float> defaultInputControlValues;
         std::vector<bool> isInputTriggerControlPort;;
         int bypassControlIndex = -1;
+        int latencyControlIndex = -1;
 
         virtual std::string GetUri() const { return info->uri(); }
 
@@ -359,6 +360,17 @@ namespace pipedal
                 return this->bypass? 1: 0;
             }
             return controlValues[index];
+        }
+        virtual uint32_t GetLatencySamples() const override
+        {
+            if (latencyControlIndex < 0 ||
+                latencyControlIndex >= (int)controlValues.size())
+            {
+                return 0;
+            }
+            return (uint32_t)std::max(
+                0.0f,
+                std::round(controlValues[(size_t)latencyControlIndex]));
         }
 
 

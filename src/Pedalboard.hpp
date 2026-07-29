@@ -205,6 +205,116 @@ namespace pipedal
         }
     };
 
+    class PedalboardPath
+    {
+        std::string id_;
+        std::string name_;
+        bool enabled_ = true;
+        float inputVolumeDb_ = 0;
+        float outputVolumeDb_ = 0;
+        bool mute_ = false;
+        float pan_ = 0;
+        std::vector<int64_t> inputChannels_ = {0};
+        std::vector<PedalboardItem> items_;
+    public:
+        GETTER_SETTER_REF(id)
+        GETTER_SETTER_REF(name)
+        GETTER_SETTER(enabled)
+        GETTER_SETTER(inputVolumeDb)
+        GETTER_SETTER(outputVolumeDb)
+        GETTER_SETTER(mute)
+        GETTER_SETTER(pan)
+        GETTER_SETTER_VEC(inputChannels)
+        GETTER_SETTER_VEC(items)
+
+        DECLARE_JSON_MAP(PedalboardPath);
+    };
+
+    class SnapshotPathMix
+    {
+        std::string id_;
+        float inputVolumeDb_ = 0;
+        float outputVolumeDb_ = 0;
+        bool mute_ = false;
+        float pan_ = 0;
+    public:
+        GETTER_SETTER_REF(id)
+        GETTER_SETTER(inputVolumeDb)
+        GETTER_SETTER(outputVolumeDb)
+        GETTER_SETTER(mute)
+        GETTER_SETTER(pan)
+
+        DECLARE_JSON_MAP(SnapshotPathMix);
+    };
+
+    enum class MidiActionType : int
+    {
+        None = 0,
+        SetPluginControl = 1,
+        TogglePluginControl = 2,
+        TogglePluginBypass = 3,
+        SelectSnapshot = 4,
+        NextSnapshot = 5,
+        PreviousSnapshot = 6,
+        NextPreset = 7,
+        PreviousPreset = 8,
+        NextBank = 9,
+        PreviousBank = 10,
+        SetPathMute = 11,
+        TogglePathMute = 12,
+        ToggleGlobalEq = 13,
+        SendMidiControl = 14,
+        SendMidiProgram = 15
+    };
+
+    enum class MidiActionGesture : int
+    {
+        Press = 0,
+        Release = 1,
+        AnyValue = 2,
+        LongPress = 3,
+        DoublePress = 4
+    };
+
+    class MidiAction
+    {
+        bool enabled_ = true;
+        int bindingType_ = BINDING_TYPE_CONTROL;
+        int channel_ = -1;
+        int number_ = 0;
+        int gesture_ = (int)MidiActionGesture::Press;
+        int actionType_ = (int)MidiActionType::None;
+        int outputChannel_ = 0;
+        int actionNumber_ = 0;
+        int64_t targetId_ = -1;
+        std::string symbol_;
+        float value_ = 1;
+        float alternateValue_ = 0;
+        int togglePosition_ = 0;
+        int toggleGroup_ = 0;
+        int resetGroup_ = 0;
+        uint32_t delayMs_ = 0;
+    public:
+        GETTER_SETTER(enabled)
+        GETTER_SETTER(bindingType)
+        GETTER_SETTER(channel)
+        GETTER_SETTER(number)
+        GETTER_SETTER(gesture)
+        GETTER_SETTER(actionType)
+        GETTER_SETTER(outputChannel)
+        GETTER_SETTER(actionNumber)
+        GETTER_SETTER(targetId)
+        GETTER_SETTER_REF(symbol)
+        GETTER_SETTER(value)
+        GETTER_SETTER(alternateValue)
+        GETTER_SETTER(togglePosition)
+        GETTER_SETTER(toggleGroup)
+        GETTER_SETTER(resetGroup)
+        GETTER_SETTER(delayMs)
+
+        DECLARE_JSON_MAP(MidiAction);
+    };
+
     class Snapshot
     {
     public:
@@ -228,6 +338,7 @@ namespace pipedal
         float globalEqMidFrequencyHz_ = 800;
         float globalEqHighGainDb_ = 0;
         float globalEqHighCutHz_ = 20000;
+        std::vector<SnapshotPathMix> additionalPathMixes_;
 
         DECLARE_JSON_MAP(Snapshot);
     };
@@ -251,6 +362,8 @@ namespace pipedal
         float pathBPan_ = 0;
         std::vector<int64_t> pathBInputChannels_ = {0};
         std::vector<PedalboardItem> pathBItems_;
+        std::vector<PedalboardPath> additionalPaths_;
+        std::vector<MidiAction> midiActions_;
         bool globalEqEnabled_ = false;
         float globalEqLowCutHz_ = 20;
         float globalEqLowGainDb_ = 0;
@@ -312,6 +425,8 @@ namespace pipedal
         GETTER_SETTER(pathBPan)
         GETTER_SETTER_VEC(pathBInputChannels)
         GETTER_SETTER_VEC(pathBItems)
+        GETTER_SETTER_VEC(additionalPaths)
+        GETTER_SETTER_VEC(midiActions)
         GETTER_SETTER(globalEqEnabled)
         GETTER_SETTER(globalEqLowCutHz)
         GETTER_SETTER(globalEqLowGainDb)

@@ -66,6 +66,20 @@ function arrayEquals(a: number[], b: number[]): boolean {
     return true;
 }
 
+export class OutputRoute {
+    deserialize(obj: any): OutputRoute {
+        this.sourceChannel = obj.sourceChannel ?? 0;
+        this.outputChannel = obj.outputChannel ?? 0;
+        this.gainDb = obj.gainDb ?? 0;
+        this.mute = obj.mute ?? false;
+        return this;
+    }
+    sourceChannel: number = 0;
+    outputChannel: number = 0;
+    gainDb: number = 0;
+    mute: boolean = false;
+}
+
 export default class ChannelRouterSettings {
     configured: boolean = false;
     modified: boolean = false;
@@ -76,6 +90,7 @@ export default class ChannelRouterSettings {
 
     auxInputChannels: number[] = [0, 0];
     auxOutputChannels: number[] = [-1, -1];
+    outputRoutes: OutputRoute[] = [];
 
     // Inserts...
 
@@ -87,6 +102,8 @@ export default class ChannelRouterSettings {
         this.mainOutputChannels = obj.mainOutputChannels.slice();
         this.auxInputChannels = obj.auxInputChannels.slice();
         this.auxOutputChannels = obj.auxOutputChannels.slice();
+        this.outputRoutes = (obj.outputRoutes ?? [])
+            .map((route: any) => new OutputRoute().deserialize(route));
         return this;
     }
     clone() : ChannelRouterSettings {
@@ -163,6 +180,12 @@ export default class ChannelRouterSettings {
         }
         for (let ch of this.auxOutputChannels) {
             if (ch >= maxOutputChannels) {
+                return false;
+            }
+        }
+        for (const route of this.outputRoutes) {
+            if (route.sourceChannel < 0 || route.sourceChannel > 1 ||
+                route.outputChannel < 0 || route.outputChannel >= maxOutputChannels) {
                 return false;
             }
         }

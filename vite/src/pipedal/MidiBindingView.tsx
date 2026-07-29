@@ -168,6 +168,11 @@ const MidiBindingView =
                 this.validateSwitchControlType(newBinding);
                 this.props.onChange(this.props.instanceId, newBinding);
             }
+            handleChannelChange(e: any) {
+                let newBinding = this.props.midiBinding.clone();
+                newBinding.channel = parseInt(e.target.value);
+                this.props.onChange(this.props.instanceId, newBinding);
+            }
             handleLatchControlTypeChange(e: any, extra: any) {
                 let newValue = parseInt(e.target.value);
                 let newBinding = this.props.midiBinding.clone();
@@ -357,6 +362,7 @@ const MidiBindingView =
                 } else {
                     return;
                 }
+                newBinding.channel = midiMessage.cc0 & 0x0F;
                 this.props.onChange(this.props.instanceId, newBinding);
                 this.cancelListenForControl();
             }
@@ -529,6 +535,25 @@ const MidiBindingView =
                                 </div>
                             )
                         }
+                        {midiBinding.bindingType !== MidiBinding.BINDING_TYPE_NONE && (
+                            <div className={classes.controlDiv}>
+                                <Select
+                                    variant="standard"
+                                    value={midiBinding.channel}
+                                    onChange={(e) => this.handleChannelChange(e)}
+                                    renderValue={(value) =>
+                                        Number(value) < 0 ? "Omni" : `Ch ${Number(value) + 1}`}
+                                    aria-label="MIDI channel"
+                                >
+                                    <MenuItem value={-1}>Omni</MenuItem>
+                                    {Array.from({ length: 16 }, (_, channel) => (
+                                        <MenuItem key={channel} value={channel}>
+                                            Channel {channel + 1}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </div>
+                        )}
                         {midiBinding.bindingType === MidiBinding.BINDING_TYPE_NONE &&
                             (
                                 <IconButtonEx

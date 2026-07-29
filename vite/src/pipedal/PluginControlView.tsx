@@ -1064,6 +1064,14 @@ const PluginControlView =
                     pedalboardItem = pedalboard.makePathBStartItem();
                 } else if (this.props.instanceId === Pedalboard.AUX_END_CONTROL_ID) {
                     pedalboardItem = pedalboard.makePathBEndItem();
+                } else if (this.props.instanceId === Pedalboard.PATH_C_START_CONTROL_ID) {
+                    pedalboardItem = pedalboard.makeAdditionalPathTerminalItem("C", true);
+                } else if (this.props.instanceId === Pedalboard.PATH_C_END_CONTROL_ID) {
+                    pedalboardItem = pedalboard.makeAdditionalPathTerminalItem("C", false);
+                } else if (this.props.instanceId === Pedalboard.PATH_D_START_CONTROL_ID) {
+                    pedalboardItem = pedalboard.makeAdditionalPathTerminalItem("D", true);
+                } else if (this.props.instanceId === Pedalboard.PATH_D_END_CONTROL_ID) {
+                    pedalboardItem = pedalboard.makeAdditionalPathTerminalItem("D", false);
                 } else {
                     pedalboardItem = pedalboard.getItem(this.props.instanceId);
                 }

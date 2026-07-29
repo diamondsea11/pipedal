@@ -32,6 +32,19 @@ namespace pipedal {
         Snapshot4,
         Snapshot5,
         Snapshot6,
+        PathAToggle,
+        PathAOn,
+        PathAOff,
+        PathBToggle,
+        PathBOn,
+        PathBOff,
+        PathCToggle,
+        PathCOn,
+        PathCOff,
+        PathDToggle,
+        PathDOn,
+        PathDOff,
+        GlobalEqToggle,
 
     };
 

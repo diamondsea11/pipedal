@@ -2018,6 +2018,34 @@ namespace pipedal
                 AddMixCopyOp(this->mainPlaybackBuffers[i],this->devicePlaybackBuffers[outputChannel]);
                 usedOutputChannels.insert(outputChannel);
             }
+            for (const auto &route : channelSelection.outputRoutes())
+            {
+                if (route.mute() ||
+                    route.sourceChannel() < 0 ||
+                    route.outputChannel() < 0 ||
+                    (size_t)route.sourceChannel() >= mainPlaybackBuffers.size() ||
+                    (size_t)route.outputChannel() >= devicePlaybackBuffers.size())
+                {
+                    continue;
+                }
+                const size_t outputChannel = (size_t)route.outputChannel();
+                const float scale = std::pow(10.0f, route.gainDb() / 20.0f);
+                if (usedOutputChannels.contains(outputChannel))
+                {
+                    AddMixAddOp(
+                        scale,
+                        mainPlaybackBuffers[(size_t)route.sourceChannel()],
+                        devicePlaybackBuffers[outputChannel]);
+                }
+                else
+                {
+                    AddMixCopyOp(
+                        scale,
+                        mainPlaybackBuffers[(size_t)route.sourceChannel()],
+                        devicePlaybackBuffers[outputChannel]);
+                }
+                usedOutputChannels.insert(outputChannel);
+            }
             if (channelSelection.auxInputChannels().size() <= channelSelection.auxOutputChannels().size())
             {
                 for (size_t i = 0; i < this->channelSelection.auxOutputChannels().size(); ++i)

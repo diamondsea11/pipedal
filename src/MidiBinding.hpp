@@ -54,6 +54,7 @@ class MapFeature;
     const int BINDING_TYPE_NOTE = 1;
     const int BINDING_TYPE_CONTROL = 2;
     const int BINDING_TYPE_TAP_TEMPO = 3;
+    const int BINDING_TYPE_PROGRAM = 4;
 
     const int LINEAR_CONTROL_TYPE = 0;
     const int  CIRCULAR_CONTROL_TYPE = 1;

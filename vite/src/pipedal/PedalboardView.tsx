@@ -1519,10 +1519,64 @@ const PedalboardView =
                         pathBSize.height += PATH_HEADER_HEIGHT;
                     }
 
-                    this.currentLayout = layoutChain.concat(pathBLayout);
-                    let frameWidth = Math.max(680, layoutSize.width, pathBSize.width);
-                    let frameHeight = layoutSize.height +
+                    let additionalPathLayouts: {
+                        id: "C" | "D";
+                        name: string;
+                        inputChannels: number[];
+                        mute: boolean;
+                        pan: number;
+                        layout: PedalLayout[];
+                        size: LayoutSize;
+                        top: number;
+                        startId: number;
+                        endId: number;
+                    }[] = [];
+                    let nextPathTop = layoutSize.height +
                         (pathBLayout.length === 0 ? 0 : PATH_GAP + pathBSize.height);
+                    for (const path of pedalboard?.additionalPaths ?? []) {
+                        if (!path.enabled || (path.id !== "C" && path.id !== "D")) continue;
+                        const id = path.id as "C" | "D";
+                        const pathLayout = makeChain(this.model, path.items);
+                        const inputCount = Math.max(1, Math.min(2, path.inputChannels.length));
+                        const startId = id === "C"
+                            ? Pedalboard.PATH_C_START_CONTROL_ID
+                            : Pedalboard.PATH_D_START_CONTROL_ID;
+                        const endId = id === "C"
+                            ? Pedalboard.PATH_C_END_CONTROL_ID
+                            : Pedalboard.PATH_D_END_CONTROL_ID;
+                        if (pathLayout.length !== 0) {
+                            pathLayout.splice(0, 0, PedalLayout.Start(startId, inputCount));
+                            pathLayout.push(PedalLayout.End(endId, 2));
+                            this.markStereoOutputs(pathLayout, inputCount, 2);
+                        }
+                        const pathSize = this.doLayout(pathLayout);
+                        const top = nextPathTop + PATH_GAP;
+                        this.offsetLayout_(pathLayout, top + PATH_HEADER_HEIGHT);
+                        pathSize.height += PATH_HEADER_HEIGHT;
+                        additionalPathLayouts.push({
+                            id,
+                            name: path.name,
+                            inputChannels: path.inputChannels,
+                            mute: path.mute,
+                            pan: path.pan,
+                            layout: pathLayout,
+                            size: pathSize,
+                            top,
+                            startId,
+                            endId,
+                        });
+                        nextPathTop = top + pathSize.height;
+                    }
+
+                    this.currentLayout = layoutChain
+                        .concat(pathBLayout)
+                        .concat(...additionalPathLayouts.map((path) => path.layout));
+                    let frameWidth = Math.max(
+                        680,
+                        layoutSize.width,
+                        pathBSize.width,
+                        ...additionalPathLayouts.map((path) => path.size.width));
+                    let frameHeight = nextPathTop;
                     let inputPorts = this.model.jackConfiguration.get().inputAudioPorts;
                     let pathAInput = pedalboard?.pathAInputChannels[0]
                         ?? this.model.channelRouterSettings.get().mainInputChannels[0]
@@ -1531,6 +1585,13 @@ const PedalboardView =
                         pathAInput = 0;
                     }
                     let pathBInput = pedalboard?.pathBInputChannels[0] ?? 0;
+                    const enabledAdditionalPathIds = new Set(
+                        (pedalboard?.additionalPaths ?? [])
+                            .filter((path) => path.enabled)
+                            .map((path) => path.id));
+                    const nextAdditionalPathId = !enabledAdditionalPathIds.has("C")
+                        ? "C"
+                        : (!enabledAdditionalPathIds.has("D") ? "D" : null);
                     let outputChannels = this.model.channelRouterSettings.get().mainOutputChannels
                         .filter((channel) => channel >= 0)
                         .map((channel) => `OUT ${channel + 1}`)
@@ -1613,11 +1674,18 @@ const PedalboardView =
                                     <Typography variant="caption" color="textSecondary">
                                         {outputChannels}
                                     </Typography>
-                                    {!pedalboard?.pathBEnabled && (
+                                    {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
                                         <Button
                                             size="small"
                                             startIcon={<AddIcon />}
-                                            onClick={() => this.model.configurePathB(true, 0, "Vocal")}
+                                            onClick={() => {
+                                                if (!pedalboard?.pathBEnabled) {
+                                                    this.model.configurePathB(true, 0, "Path B");
+                                                } else if (nextAdditionalPathId !== null) {
+                                                    this.model.configureAdditionalPath(
+                                                        nextAdditionalPathId, true, 0);
+                                                }
+                                            }}
                                             style={{ marginLeft: "auto" }}
                                         >
                                             Add path
@@ -1688,6 +1756,84 @@ const PedalboardView =
                                         })}
                                     </>
                                 )}
+                                {additionalPathLayouts.map((path) => (
+                                    <React.Fragment key={path.id}>
+                                        <div
+                                            className={classes.pathHeader}
+                                            style={{ top: path.top }}
+                                        >
+                                            <Typography variant="subtitle2" style={{ minWidth: 54 }}>
+                                                Path {path.id}
+                                            </Typography>
+                                            <Select
+                                                size="small"
+                                                value={path.inputChannels[0] ?? 0}
+                                                onChange={(event) =>
+                                                    this.model.configureAdditionalPath(
+                                                        path.id,
+                                                        true,
+                                                        Number(event.target.value),
+                                                        path.mute,
+                                                        path.pan)}
+                                                aria-label={`Path ${path.id} input`}
+                                                style={{ height: 28, minWidth: 82 }}
+                                            >
+                                                {inputPorts.map((_port, index) => (
+                                                    <MenuItem key={index} value={index}>
+                                                        IN {index + 1}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                            <Typography variant="caption" color="textSecondary">
+                                                {path.name}
+                                            </Typography>
+                                            <IconButton
+                                                size="small"
+                                                color={path.mute ? "primary" : "default"}
+                                                title={`Mute Path ${path.id}`}
+                                                aria-label={`Mute Path ${path.id}`}
+                                                onClick={() => this.model.configureAdditionalPath(
+                                                    path.id,
+                                                    true,
+                                                    path.inputChannels[0] ?? 0,
+                                                    !path.mute,
+                                                    path.pan)}
+                                            >
+                                                <VolumeOffIcon fontSize="small" />
+                                            </IconButton>
+                                            <Select
+                                                size="small"
+                                                value={path.pan}
+                                                onChange={(event) => this.model.configureAdditionalPath(
+                                                    path.id,
+                                                    true,
+                                                    path.inputChannels[0] ?? 0,
+                                                    path.mute,
+                                                    Number(event.target.value))}
+                                                aria-label={`Path ${path.id} pan`}
+                                                style={{ height: 28, minWidth: 58 }}
+                                            >
+                                                <MenuItem value={-1}>L</MenuItem>
+                                                <MenuItem value={0}>C</MenuItem>
+                                                <MenuItem value={1}>R</MenuItem>
+                                            </Select>
+                                            <IconButton
+                                                size="small"
+                                                title={`Remove Path ${path.id}`}
+                                                aria-label={`Remove Path ${path.id}`}
+                                                onClick={() => this.model.configureAdditionalPath(
+                                                    path.id, false)}
+                                                style={{ marginLeft: "auto" }}
+                                            >
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        </div>
+                                        {this.renderChain(path.layout, {
+                                            width: frameWidth,
+                                            height: frameHeight,
+                                        })}
+                                    </React.Fragment>
+                                ))}
                             </div>
                             <Dialog
                                 open={this.state.globalEqDialogOpen}

@@ -304,6 +304,8 @@ export class Snapshot {
         this.globalEqMidFrequencyHz = input.globalEqMidFrequencyHz ?? 800;
         this.globalEqHighGainDb = input.globalEqHighGainDb ?? 0;
         this.globalEqHighCutHz = input.globalEqHighCutHz ?? 20000;
+        this.additionalPathMixes = (input.additionalPathMixes ?? [])
+            .map((value: any) => new SnapshotPathMix().deserialize(value));
         return this;
     }
     static deserializeArray(input: any): (Snapshot| null)[] {
@@ -355,7 +357,116 @@ export class Snapshot {
     globalEqMidFrequencyHz: number = 800;
     globalEqHighGainDb: number = 0;
     globalEqHighCutHz: number = 20000;
+    additionalPathMixes: SnapshotPathMix[] = [];
 };
+
+export class SnapshotPathMix {
+    deserialize(input: any): SnapshotPathMix {
+        this.id = input.id ?? "";
+        this.inputVolumeDb = input.inputVolumeDb ?? 0;
+        this.outputVolumeDb = input.outputVolumeDb ?? 0;
+        this.mute = input.mute ?? false;
+        this.pan = input.pan ?? 0;
+        return this;
+    }
+    id: string = "";
+    inputVolumeDb: number = 0;
+    outputVolumeDb: number = 0;
+    mute: boolean = false;
+    pan: number = 0;
+}
+
+export class PedalboardPath {
+    deserialize(input: any): PedalboardPath {
+        this.id = input.id ?? "";
+        this.name = input.name ?? this.id;
+        this.enabled = input.enabled ?? true;
+        this.inputVolumeDb = input.inputVolumeDb ?? 0;
+        this.outputVolumeDb = input.outputVolumeDb ?? 0;
+        this.mute = input.mute ?? false;
+        this.pan = input.pan ?? 0;
+        this.inputChannels = input.inputChannels?.slice() ?? [0];
+        this.items = PedalboardItem.deserializeArray(input.items ?? []);
+        return this;
+    }
+    id: string = "";
+    name: string = "";
+    enabled: boolean = true;
+    inputVolumeDb: number = 0;
+    outputVolumeDb: number = 0;
+    mute: boolean = false;
+    pan: number = 0;
+    inputChannels: number[] = [0];
+    items: PedalboardItem[] = [];
+}
+
+export enum MidiActionType {
+    None = 0,
+    SetPluginControl = 1,
+    TogglePluginControl = 2,
+    TogglePluginBypass = 3,
+    SelectSnapshot = 4,
+    NextSnapshot = 5,
+    PreviousSnapshot = 6,
+    NextPreset = 7,
+    PreviousPreset = 8,
+    NextBank = 9,
+    PreviousBank = 10,
+    SetPathMute = 11,
+    TogglePathMute = 12,
+    ToggleGlobalEq = 13,
+    SendMidiControl = 14,
+    SendMidiProgram = 15,
+}
+
+export enum MidiActionGesture {
+    Press = 0,
+    Release = 1,
+    AnyValue = 2,
+    LongPress = 3,
+    DoublePress = 4,
+}
+
+export class MidiAction {
+    deserialize(input: any): MidiAction {
+        this.enabled = input.enabled ?? true;
+        this.bindingType = input.bindingType ?? MidiBinding.BINDING_TYPE_CONTROL;
+        this.channel = input.channel ?? -1;
+        this.number = input.number ?? 0;
+        this.gesture = input.gesture ?? MidiActionGesture.Press;
+        this.actionType = input.actionType ?? MidiActionType.None;
+        this.outputChannel = input.outputChannel ?? 0;
+        this.actionNumber = input.actionNumber ?? 0;
+        this.targetId = input.targetId ?? -1;
+        this.symbol = input.symbol ?? "";
+        this.value = input.value ?? 1;
+        this.alternateValue = input.alternateValue ?? 0;
+        this.togglePosition = input.togglePosition ?? 0;
+        this.toggleGroup = input.toggleGroup ?? 0;
+        this.resetGroup = input.resetGroup ?? 0;
+        this.delayMs = input.delayMs ?? 0;
+        return this;
+    }
+    clone(): MidiAction {
+        return new MidiAction().deserialize(this);
+    }
+    enabled: boolean = true;
+    bindingType: number = MidiBinding.BINDING_TYPE_CONTROL;
+    channel: number = -1;
+    number: number = 0;
+    gesture: MidiActionGesture = MidiActionGesture.Press;
+    actionType: MidiActionType = MidiActionType.None;
+    outputChannel: number = 0;
+    actionNumber: number = 0;
+    targetId: number = -1;
+    symbol: string = "";
+    value: number = 1;
+    alternateValue: number = 0;
+    togglePosition: number = 0;
+    toggleGroup: number = 0;
+    resetGroup: number = 0;
+    delayMs: number = 0;
+}
 
 export enum SplitType {
     Ab = 0,
@@ -431,6 +542,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     static readonly END_CONTROL_ID = -3; // synthetic PedalboardItem for output volume.
     static readonly AUX_START_CONTROL_ID = -4;
     static readonly AUX_END_CONTROL_ID = -5;
+    static readonly PATH_C_START_CONTROL_ID = -6;
+    static readonly PATH_C_END_CONTROL_ID = -7;
+    static readonly PATH_D_START_CONTROL_ID = -8;
+    static readonly PATH_D_END_CONTROL_ID = -9;
 
 
     static readonly START_PEDALBOARD_ITEM_URI = "uri://two-play/pipedal/pedalboard#Start";
@@ -459,6 +574,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         this.pathBItems = input.pathBItems
             ? PedalboardItem.deserializeArray(input.pathBItems)
             : [];
+        this.additionalPaths = (input.additionalPaths ?? [])
+            .map((path: any) => new PedalboardPath().deserialize(path));
+        this.midiActions = (input.midiActions ?? [])
+            .map((action: any) => new MidiAction().deserialize(action));
         this.globalEqEnabled = input.globalEqEnabled ?? false;
         this.globalEqLowCutHz = input.globalEqLowCutHz ?? 20;
         this.globalEqLowGainDb = input.globalEqLowGainDb ?? 0;
@@ -494,6 +613,8 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     pathBPan: number = 0;
     pathBInputChannels: number[] = [0];
     pathBItems: PedalboardItem[] = [];
+    additionalPaths: PedalboardPath[] = [];
+    midiActions: MidiAction[] = [];
     globalEqEnabled: boolean = false;
     globalEqLowCutHz: number = 20;
     globalEqLowGainDb: number = 0;
@@ -534,7 +655,11 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     }
 
     getRootItemCollections(): PedalboardItem[][] {
-        return this.pathBEnabled ? [this.items, this.pathBItems] : [this.items];
+        const result = this.pathBEnabled ? [this.items, this.pathBItems] : [this.items];
+        for (const path of this.additionalPaths) {
+            if (path.enabled) result.push(path.items);
+        }
+        return result;
     }
 
     getPathRootItems(instanceId: number): PedalboardItem[] | null {
@@ -546,11 +671,24 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             instanceId === Pedalboard.AUX_END_CONTROL_ID) {
             return this.pathBItems;
         }
+        if (instanceId === Pedalboard.PATH_C_START_CONTROL_ID ||
+            instanceId === Pedalboard.PATH_C_END_CONTROL_ID) {
+            return this.additionalPaths.find((path) => path.id === "C")?.items ?? null;
+        }
+        if (instanceId === Pedalboard.PATH_D_START_CONTROL_ID ||
+            instanceId === Pedalboard.PATH_D_END_CONTROL_ID) {
+            return this.additionalPaths.find((path) => path.id === "D")?.items ?? null;
+        }
         if (Pedalboard.containsItem_(this.items, instanceId)) {
             return this.items;
         }
         if (Pedalboard.containsItem_(this.pathBItems, instanceId)) {
             return this.pathBItems;
+        }
+        for (const path of this.additionalPaths) {
+            if (Pedalboard.containsItem_(path.items, instanceId)) {
+                return path.items;
+            }
         }
         return null;
     }
@@ -587,6 +725,15 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         result.globalEqMidFrequencyHz = this.globalEqMidFrequencyHz;
         result.globalEqHighGainDb = this.globalEqHighGainDb;
         result.globalEqHighCutHz = this.globalEqHighCutHz;
+        result.additionalPathMixes = this.additionalPaths.map((path) => {
+            const mix = new SnapshotPathMix();
+            mix.id = path.id;
+            mix.inputVolumeDb = path.inputVolumeDb;
+            mix.outputVolumeDb = path.outputVolumeDb;
+            mix.mute = path.mute;
+            mix.pan = path.pan;
+            return mix;
+        });
         let it = this.itemsGenerator();
         while (true)
         {
@@ -673,6 +820,24 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         result.uri = Pedalboard.END_PEDALBOARD_ITEM_URI;
         result.isEnabled = true;
         result.controlValues = [new ControlValue("volume_db", this.pathBOutputVolumeDb)];
+        return result;
+    }
+    makeAdditionalPathTerminalItem(id: "C" | "D", input: boolean): PedalboardItem {
+        const path = this.additionalPaths.find((value) => value.id === id);
+        const result = new PedalboardItem();
+        result.pluginName = `${path?.name ?? `Path ${id}`} ${input ? "Input" : "Output"}`;
+        result.instanceId = id === "C"
+            ? (input ? Pedalboard.PATH_C_START_CONTROL_ID : Pedalboard.PATH_C_END_CONTROL_ID)
+            : (input ? Pedalboard.PATH_D_START_CONTROL_ID : Pedalboard.PATH_D_END_CONTROL_ID);
+        result.uri = input
+            ? Pedalboard.START_PEDALBOARD_ITEM_URI
+            : Pedalboard.END_PEDALBOARD_ITEM_URI;
+        result.isEnabled = true;
+        result.controlValues = [
+            new ControlValue("volume_db", input
+                ? path?.inputVolumeDb ?? 0
+                : path?.outputVolumeDb ?? 0)
+        ];
         return result;
     }
 
@@ -764,14 +929,22 @@ export class Pedalboard implements Deserializable<Pedalboard> {
 
     canDeleteItem(instanceId: number): boolean 
     {
-        return this.canDeleteItem_(instanceId,this.items) ||
-            this.canDeleteItem_(instanceId, this.pathBItems);
+        if (this.canDeleteItem_(instanceId,this.items) ||
+            this.canDeleteItem_(instanceId, this.pathBItems)) {
+            return true;
+        }
+        return this.additionalPaths.some((path) =>
+            this.canDeleteItem_(instanceId, path.items));
     }
     // Returns the next selected instanceId, or null if no deletion occurred.
     deleteItem(instanceId: number): number | null {
         let result = this.deleteItem_(instanceId,this.items);
         if (result === null) {
             result = this.deleteItem_(instanceId, this.pathBItems);
+        }
+        for (const path of this.additionalPaths) {
+            if (result !== null) break;
+            result = this.deleteItem_(instanceId, path.items);
         }
         return result;
     }
@@ -792,16 +965,12 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     }
     addToPathStart(item: PedalboardItem, terminalInstanceId: number)
     {
-        let items = terminalInstanceId === Pedalboard.AUX_START_CONTROL_ID
-            ? this.pathBItems
-            : this.items;
+        let items = this.getPathRootItems(terminalInstanceId) ?? this.items;
         items.splice(0, 0, item);
     }
     addToPathEnd(item: PedalboardItem, terminalInstanceId: number)
     {
-        let items = terminalInstanceId === Pedalboard.AUX_END_CONTROL_ID
-            ? this.pathBItems
-            : this.items;
+        let items = this.getPathRootItems(terminalInstanceId) ?? this.items;
         items.splice(items.length, 0, item);
     }
     static _addRelative(items: PedalboardItem[],newItem: PedalboardItem, instanceId: number, addBefore: boolean): boolean
@@ -843,6 +1012,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         if (!result) {
             result = Pedalboard._addRelative(this.pathBItems, item, instanceId, true);
         }
+        for (const path of this.additionalPaths) {
+            if (result) break;
+            result = Pedalboard._addRelative(path.items, item, instanceId, true);
+        }
         if (!result) {
             throw new PiPedalArgumentError("instanceId not found.");
         }
@@ -854,6 +1027,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         let result = Pedalboard._addRelative(this.items,item, instanceId, false);
         if (!result) {
             result = Pedalboard._addRelative(this.pathBItems, item, instanceId, false);
+        }
+        for (const path of this.additionalPaths) {
+            if (result) break;
+            result = Pedalboard._addRelative(path.items, item, instanceId, false);
         }
         if (!result) {
             throw new PiPedalArgumentError("instanceId not found.");
@@ -1006,6 +1183,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         if (!result) {
             result = this._replaceItem(this.pathBItems, instanceId, newItem);
         }
+        for (const path of this.additionalPaths) {
+            if (result) break;
+            result = this._replaceItem(path.items, instanceId, newItem);
+        }
         if (!result)
         {
             throw new PiPedalArgumentError("instanceId not found.");
@@ -1046,9 +1227,32 @@ export class Pedalboard implements Deserializable<Pedalboard> {
 
     addItem(newItem: PedalboardItem, instanceId: number, append: boolean): void
     {
-        if (!this._addItem(this.items,newItem,instanceId,append)) {
-            this._addItem(this.pathBItems,newItem,instanceId,append);
+        let added = this._addItem(this.items,newItem,instanceId,append);
+        if (!added) {
+            added = this._addItem(this.pathBItems,newItem,instanceId,append);
         }
+        for (const path of this.additionalPaths) {
+            if (added) break;
+            added = this._addItem(path.items,newItem,instanceId,append);
+        }
+    }
+
+    addAdditionalPath(id: "C" | "D", inputChannel: number): void {
+        let path = this.additionalPaths.find((value) => value.id === id);
+        if (!path) {
+            path = new PedalboardPath();
+            path.id = id;
+            path.name = `Path ${id}`;
+            path.items = [this.createEmptyItem()];
+            this.additionalPaths.push(path);
+        }
+        path.enabled = true;
+        path.inputChannels = [inputChannel];
+    }
+
+    removeAdditionalPath(id: "C" | "D"): void {
+        const path = this.additionalPaths.find((value) => value.id === id);
+        if (path) path.enabled = false;
     }
 
     enablePathB(inputChannel: number = 0): void {

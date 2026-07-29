@@ -37,10 +37,12 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 //import ArrowRightOutlined from '@mui/icons-material/ArrowRight';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Button from '@mui/material/Button';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import { isDarkMode } from './DarkMode';
 import { BankIndex } from './Banks';
 import SnapshotEditor from './SnapshotEditor';
-import { Snapshot } from './Pedalboard';
+import { Pedalboard, Snapshot } from './Pedalboard';
 import JackStatusView from './JackStatusView';
 import { IDialogStackable, popDialogStack, pushDialogStack } from './DialogStack';
 import { css } from '@emotion/react';
@@ -88,6 +90,7 @@ interface PerformanceViewState {
     showStatusMonitor: boolean;
     snapshotEditorIndex: number;
     presetModified: boolean;
+    pedalboard: Pedalboard;
 }
 
 
@@ -111,11 +114,14 @@ export const PerformanceView =
                     showStatusMonitor: this.model.showStatusMonitor.get(),
                     snapshotEditorIndex: 0,
                     presetModified: this.model.presetChanged.get()
+                    ,
+                    pedalboard: this.model.pedalboard.get()
                 };
                 this.onPresetsChanged = this.onPresetsChanged.bind(this);
                 this.onBanksChanged = this.onBanksChanged.bind(this);
                 this.onPresetChangedChanged = this.onPresetChangedChanged.bind(this);
                 this.showStatusMonitorHandler = this.showStatusMonitorHandler.bind(this);
+                this.onPedalboardChanged = this.onPedalboardChanged.bind(this);
 
             }
 
@@ -169,6 +175,9 @@ export const PerformanceView =
             onPresetChangedChanged(newValue: boolean) {
                 this.setState({ presetModified: newValue });
             }
+            onPedalboardChanged(newValue: Pedalboard) {
+                this.setState({ pedalboard: newValue });
+            }
 
             private mounted: boolean = false;
             componentDidMount(): void {
@@ -178,6 +187,7 @@ export const PerformanceView =
                 this.model.banks.addOnChangedHandler(this.onBanksChanged);
                 this.model.presetChanged.addOnChangedHandler(this.onPresetChangedChanged)
                 this.model.showStatusMonitor.addOnChangedHandler(this.showStatusMonitorHandler);
+                this.model.pedalboard.addOnChangedHandler(this.onPedalboardChanged);
 
                 this.setState({
                     presets: this.model.presets.get(),
@@ -197,6 +207,7 @@ export const PerformanceView =
                 this.model.presets.removeOnChangedHandler(this.onPresetsChanged);
                 this.model.banks.removeOnChangedHandler(this.onBanksChanged);
                 this.model.banks.removeOnChangedHandler(this.showStatusMonitorHandler);
+                this.model.pedalboard.removeOnChangedHandler(this.onPedalboardChanged);
 
 
                 this.mounted = false;
@@ -252,6 +263,37 @@ export const PerformanceView =
                 let presets = this.state.presets;
                 let banks = this.state.banks;
                 let appBarIconSize: "large" | undefined = this.state.largeAppBar ? undefined : "large";
+                const pedalboard = this.state.pedalboard;
+                const inputPorts = this.model.jackConfiguration.get().inputAudioPorts;
+                const pathControls = [
+                    {
+                        id: "A",
+                        input: pedalboard.pathAInputChannels[0] ?? 0,
+                        mute: pedalboard.pathAMute,
+                        onToggle: () => this.model.configurePathMix(
+                            "A", !pedalboard.pathAMute, pedalboard.pathAPan),
+                    },
+                    ...(pedalboard.pathBEnabled ? [{
+                        id: "B",
+                        input: pedalboard.pathBInputChannels[0] ?? 0,
+                        mute: pedalboard.pathBMute,
+                        onToggle: () => this.model.configurePathMix(
+                            "B", !pedalboard.pathBMute, pedalboard.pathBPan),
+                    }] : []),
+                    ...pedalboard.additionalPaths
+                        .filter((path) => path.enabled)
+                        .map((path) => ({
+                            id: path.id,
+                            input: path.inputChannels[0] ?? 0,
+                            mute: path.mute,
+                            onToggle: () => this.model.configureAdditionalPath(
+                                path.id as "C" | "D",
+                                true,
+                                path.inputChannels[0] ?? 0,
+                                !path.mute,
+                                path.pan),
+                        })),
+                ];
                 return (
                     <div className={classes.frame} style={{ overflow: "clip", height: "100%" }} >
                         <div className={classes.frame} style={{ overflow: "clip", height: "100%" }} >
@@ -358,7 +400,7 @@ export const PerformanceView =
                                                         <Typography noWrap style={{ flex: "1 1 auto", textAlign: "left" }}
                                                             variant="body2"
                                                         >
-                                                            {entry ? entry.name : "-"}
+                                                            Setlist: {entry ? entry.name : "-"}
                                                         </Typography>
                                                     </div>;
                                                 }}
@@ -419,7 +461,7 @@ export const PerformanceView =
                                                     <Typography noWrap style={{ flex: "1 1 auto", textAlign: "left" }}
                                                         variant="body2"
                                                     >
-                                                        {entry ? entry.name : "-"}
+                                                        Setlist: {entry ? entry.name : "-"}
                                                     </Typography>
                                                 </div>;
                                             }}
@@ -518,7 +560,35 @@ export const PerformanceView =
 
                                 )}
                             </div >
-                            <div style={{ flex: "1 0 auto", display: "flex", marginTop: 16, marginBottom: 20 }}>
+                            <div style={{
+                                flex: "0 0 auto",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "10px 16px 0",
+                                overflowX: "auto",
+                            }}>
+                                <Typography variant="overline" color="textSecondary" style={{ marginRight: 4 }}>
+                                    Paths
+                                </Typography>
+                                {pathControls.map((path) => (
+                                    <Button
+                                        key={path.id}
+                                        variant={path.mute ? "contained" : "outlined"}
+                                        color={path.mute ? "warning" : "inherit"}
+                                        startIcon={<VolumeOffIcon />}
+                                        onClick={path.onToggle}
+                                        style={{ minWidth: 104, flexShrink: 0 }}
+                                    >
+                                        {path.id} · {inputPorts[path.input] ?? `IN ${path.input + 1}`}
+                                    </Button>
+                                ))}
+                            </div>
+                            <Typography variant="overline" color="textSecondary"
+                                style={{ padding: "8px 16px 0" }}>
+                                Scenes
+                            </Typography>
+                            <div style={{ flex: "1 0 auto", display: "flex", marginTop: 4, marginBottom: 20 }}>
                                 <SnapshotPanel onEdit={(index) => { return this.handleOnEdit(index); }} />
                             </div>
 
@@ -544,4 +614,3 @@ export const PerformanceView =
         },
         styles
     );
-

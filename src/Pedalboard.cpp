@@ -65,6 +65,13 @@ std::vector<PedalboardItem*> Pedalboard::GetAllPlugins()
     std::vector<PedalboardItem*> result;
     GetAllItems(result,this->items());
     GetAllItems(result,this->pathBItems());
+    for (auto &path : additionalPaths())
+    {
+        if (path.enabled())
+        {
+            GetAllItems(result, path.items());
+        }
+    }
     return result;
 }
 
@@ -76,11 +83,20 @@ const PedalboardItem*Pedalboard::GetItem(int64_t pedalItemId) const
     {
         result = GetItem_(this->pathBItems(), pedalItemId);
     }
+    for (const auto &path : additionalPaths_)
+    {
+        if (result != nullptr)
+        {
+            break;
+        }
+        result = GetItem_(path.items(), pedalItemId);
+    }
     return result;
 }
 PedalboardItem*Pedalboard::GetItem(int64_t pedalItemId)
  {
-     return const_cast<PedalboardItem*>(GetItem_(this->items(),pedalItemId));
+     return const_cast<PedalboardItem*>(
+         static_cast<const Pedalboard *>(this)->GetItem(pedalItemId));
  }
 
 
@@ -274,6 +290,20 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
         globalEqMidFrequencyHz_ = snapshot->globalEqMidFrequencyHz_;
         globalEqHighGainDb_ = snapshot->globalEqHighGainDb_;
         globalEqHighCutHz_ = snapshot->globalEqHighCutHz_;
+        for (const auto &mix : snapshot->additionalPathMixes_)
+        {
+            for (auto &path : additionalPaths_)
+            {
+                if (path.id() == mix.id())
+                {
+                    path.inputVolumeDb(mix.inputVolumeDb());
+                    path.outputVolumeDb(mix.outputVolumeDb());
+                    path.mute(mix.mute());
+                    path.pan(mix.pan());
+                    break;
+                }
+            }
+        }
     }
 
     for (auto &value: snapshot->values_)
@@ -393,7 +423,8 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
         this->globalEqMidFrequencyHz_ != other.globalEqMidFrequencyHz_ ||
         this->globalEqHighGainDb_ != other.globalEqHighGainDb_ ||
         this->globalEqHighCutHz_ != other.globalEqHighCutHz_ ||
-        this->pathBItems_.size() != other.pathBItems_.size())
+        this->pathBItems_.size() != other.pathBItems_.size() ||
+        this->additionalPaths_.size() != other.additionalPaths_.size())
     {
         return false;
     }
@@ -402,6 +433,25 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
         if (!this->pathBItems_[i].IsStructurallyIdentical(other.pathBItems_[i]))
         {
             return false;
+        }
+    }
+    for (size_t pathIndex = 0; pathIndex < additionalPaths_.size(); ++pathIndex)
+    {
+        const auto &leftPath = additionalPaths_[pathIndex];
+        const auto &rightPath = other.additionalPaths_[pathIndex];
+        if (leftPath.id() != rightPath.id() ||
+            leftPath.enabled() != rightPath.enabled() ||
+            leftPath.inputChannels() != rightPath.inputChannels() ||
+            leftPath.items().size() != rightPath.items().size())
+        {
+            return false;
+        }
+        for (size_t itemIndex = 0; itemIndex < leftPath.items().size(); ++itemIndex)
+        {
+            if (!leftPath.items()[itemIndex].IsStructurallyIdentical(rightPath.items()[itemIndex]))
+            {
+                return false;
+            }
         }
     }
     return true;
@@ -569,6 +619,16 @@ Snapshot Pedalboard::MakeSnapshotFromCurrentSettings(const Pedalboard &previousP
     snapshot.globalEqMidFrequencyHz_ = globalEqMidFrequencyHz_;
     snapshot.globalEqHighGainDb_ = globalEqHighGainDb_;
     snapshot.globalEqHighCutHz_ = globalEqHighCutHz_;
+    for (const auto &path : additionalPaths_)
+    {
+        SnapshotPathMix mix;
+        mix.id(path.id());
+        mix.inputVolumeDb(path.inputVolumeDb());
+        mix.outputVolumeDb(path.outputVolumeDb());
+        mix.mute(path.mute());
+        mix.pan(path.pan());
+        snapshot.additionalPathMixes_.push_back(std::move(mix));
+    }
     // name and color don't matter. this is strictly for loading purposes.
     auto items = this->GetAllPlugins();
     for (auto item : items)
@@ -638,6 +698,8 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,pathBPan)
     JSON_MAP_REFERENCE(Pedalboard,pathBInputChannels)
     JSON_MAP_REFERENCE(Pedalboard,pathBItems)
+    JSON_MAP_REFERENCE(Pedalboard,additionalPaths)
+    JSON_MAP_REFERENCE(Pedalboard,midiActions)
     JSON_MAP_REFERENCE(Pedalboard,globalEqEnabled)
     JSON_MAP_REFERENCE(Pedalboard,globalEqLowCutHz)
     JSON_MAP_REFERENCE(Pedalboard,globalEqLowGainDb)
@@ -649,6 +711,45 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,snapshots)
     JSON_MAP_REFERENCE(Pedalboard,selectedSnapshot)
     JSON_MAP_REFERENCE(Pedalboard,selectedPlugin)
+JSON_MAP_END()
+
+JSON_MAP_BEGIN(MidiAction)
+    JSON_MAP_REFERENCE(MidiAction,enabled)
+    JSON_MAP_REFERENCE(MidiAction,bindingType)
+    JSON_MAP_REFERENCE(MidiAction,channel)
+    JSON_MAP_REFERENCE(MidiAction,number)
+    JSON_MAP_REFERENCE(MidiAction,gesture)
+    JSON_MAP_REFERENCE(MidiAction,actionType)
+    JSON_MAP_REFERENCE(MidiAction,outputChannel)
+    JSON_MAP_REFERENCE(MidiAction,actionNumber)
+    JSON_MAP_REFERENCE(MidiAction,targetId)
+    JSON_MAP_REFERENCE(MidiAction,symbol)
+    JSON_MAP_REFERENCE(MidiAction,value)
+    JSON_MAP_REFERENCE(MidiAction,alternateValue)
+    JSON_MAP_REFERENCE(MidiAction,togglePosition)
+    JSON_MAP_REFERENCE(MidiAction,toggleGroup)
+    JSON_MAP_REFERENCE(MidiAction,resetGroup)
+    JSON_MAP_REFERENCE(MidiAction,delayMs)
+JSON_MAP_END()
+
+JSON_MAP_BEGIN(PedalboardPath)
+    JSON_MAP_REFERENCE(PedalboardPath,id)
+    JSON_MAP_REFERENCE(PedalboardPath,name)
+    JSON_MAP_REFERENCE(PedalboardPath,enabled)
+    JSON_MAP_REFERENCE(PedalboardPath,inputVolumeDb)
+    JSON_MAP_REFERENCE(PedalboardPath,outputVolumeDb)
+    JSON_MAP_REFERENCE(PedalboardPath,mute)
+    JSON_MAP_REFERENCE(PedalboardPath,pan)
+    JSON_MAP_REFERENCE(PedalboardPath,inputChannels)
+    JSON_MAP_REFERENCE(PedalboardPath,items)
+JSON_MAP_END()
+
+JSON_MAP_BEGIN(SnapshotPathMix)
+    JSON_MAP_REFERENCE(SnapshotPathMix,id)
+    JSON_MAP_REFERENCE(SnapshotPathMix,inputVolumeDb)
+    JSON_MAP_REFERENCE(SnapshotPathMix,outputVolumeDb)
+    JSON_MAP_REFERENCE(SnapshotPathMix,mute)
+    JSON_MAP_REFERENCE(SnapshotPathMix,pan)
 JSON_MAP_END()
 
 JSON_MAP_BEGIN(SnapshotValue)
@@ -680,4 +781,5 @@ JSON_MAP_BEGIN(Snapshot)
     JSON_MAP_REFERENCE(Snapshot,globalEqMidFrequencyHz)
     JSON_MAP_REFERENCE(Snapshot,globalEqHighGainDb)
     JSON_MAP_REFERENCE(Snapshot,globalEqHighCutHz)
+    JSON_MAP_REFERENCE(Snapshot,additionalPathMixes)
 JSON_MAP_END()

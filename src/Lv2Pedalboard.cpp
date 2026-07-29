@@ -446,7 +446,12 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         this->pedalboardInputBuffers.push_back(bufferPool.AllocateBuffer<float>(pHost->GetMaxAudioBufferSize()));
     }
 
+    size_t effectStart = effects.size();
     auto outputs = PrepareItems(pedalboard.items(), this->pedalboardInputBuffers, errorList, existingEffects);
+    for (size_t effectIndex = effectStart; effectIndex < effects.size(); ++effectIndex)
+    {
+        pathALatencyEffects.push_back(effects[effectIndex].get());
+    }
     size_t nOutputs = GetNumberOfAudioOutputChannels();
     if (nOutputs == 1)
     {
@@ -472,11 +477,16 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
     {
         size_t nPathBInputs = std::max(this->pathBInputChannels.size(), (size_t)1);
         this->pathBInputBuffers = AllocateAudioBuffers((int)nPathBInputs);
+        effectStart = effects.size();
         auto pathBOutputs = PrepareItems(
             pedalboard.pathBItems(),
             this->pathBInputBuffers,
             errorList,
             existingEffects);
+        for (size_t effectIndex = effectStart; effectIndex < effects.size(); ++effectIndex)
+        {
+            pathBLatencyEffects.push_back(effects[effectIndex].get());
+        }
 
         if (nOutputs == 1)
         {
@@ -491,6 +501,64 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         {
             this->pathBOutputBuffers.push_back(pathBOutputs[0]);
             this->pathBOutputBuffers.push_back(pathBOutputs[1]);
+        }
+    }
+    for (auto &path : pedalboard.additionalPaths())
+    {
+        if (!path.enabled() || additionalPaths.size() >= 2)
+        {
+            continue;
+        }
+        auto runtimePath = std::make_unique<AdditionalPathRuntime>();
+        runtimePath->id = path.id();
+        runtimePath->inputChannels = path.inputChannels();
+        runtimePath->mute = path.mute();
+        runtimePath->pan = std::max(-1.0f, std::min(1.0f, path.pan()));
+        runtimePath->inputVolume.SetSampleRate((float)this->pHost->GetSampleRate());
+        runtimePath->outputVolume.SetSampleRate((float)this->pHost->GetSampleRate());
+        runtimePath->inputVolume.SetMinDb(-60);
+        runtimePath->outputVolume.SetMinDb(-60);
+        runtimePath->inputVolume.SetTarget(path.inputVolumeDb());
+        runtimePath->outputVolume.SetTarget(path.outputVolumeDb());
+
+        const size_t pathInputCount = std::max(runtimePath->inputChannels.size(), (size_t)1);
+        runtimePath->inputBuffers = AllocateAudioBuffers((int)pathInputCount);
+        effectStart = effects.size();
+        auto pathOutputs = PrepareItems(
+            path.items(), runtimePath->inputBuffers, errorList, existingEffects);
+        for (size_t effectIndex = effectStart; effectIndex < effects.size(); ++effectIndex)
+        {
+            runtimePath->latencyEffects.push_back(effects[effectIndex].get());
+        }
+        if (nOutputs == 1)
+        {
+            runtimePath->outputBuffers.push_back(pathOutputs[0]);
+        }
+        else if (pathOutputs.size() == 1)
+        {
+            runtimePath->outputBuffers.push_back(pathOutputs[0]);
+            runtimePath->outputBuffers.push_back(pathOutputs[0]);
+        }
+        else
+        {
+            runtimePath->outputBuffers.push_back(pathOutputs[0]);
+            runtimePath->outputBuffers.push_back(pathOutputs[1]);
+        }
+        additionalPaths.push_back(std::move(runtimePath));
+    }
+    const size_t delayCapacity =
+        std::max((size_t)2, (size_t)this->pHost->GetSampleRate() * 2 + 1);
+    pathADelay.Prepare(delayCapacity);
+    pathBDelay.Prepare(delayCapacity);
+    for (auto &path : additionalPaths)
+    {
+        path->delay.Prepare(delayCapacity);
+    }
+    for (const auto &action : pedalboard.midiActions())
+    {
+        if (action.enabled())
+        {
+            midiActions.push_back(RuntimeMidiAction{action, 0});
         }
     }
     PrepareMidiMap(pedalboard);
@@ -612,6 +680,17 @@ void Lv2Pedalboard::PrepareMidiMap(const Pedalboard &pedalboard)
             PrepareMidiMap(item);
         }
     }
+    for (const auto &path : pedalboard.additionalPaths())
+    {
+        if (!path.enabled())
+        {
+            continue;
+        }
+        for (const auto &item : path.items())
+        {
+            PrepareMidiMap(item);
+        }
+    }
     std::sort(this->midiMappings.begin(), this->midiMappings.end(),
               [](const MidiMapping &left, const MidiMapping &right)
               { return left.key < right.key; });
@@ -658,6 +737,8 @@ bool Lv2Pedalboard::Run(
     float **inputBuffers,
     float **outputBuffers,
     float **pathBHardwareInputBuffers,
+    float *const *const *additionalPathHardwareInputBuffers,
+    size_t additionalPathHardwareInputCount,
     uint32_t samples,
     RealtimeRingBufferWriter *ringBufferWriter)
 {
@@ -694,6 +775,24 @@ bool Lv2Pedalboard::Run(
             }
         }
     }
+    for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
+    {
+        auto &path = *additionalPaths[pathIndex];
+        float *const *hardwareInputs =
+            additionalPathHardwareInputBuffers != nullptr &&
+            pathIndex < additionalPathHardwareInputCount
+                ? additionalPathHardwareInputBuffers[pathIndex]
+                : nullptr;
+        for (size_t i = 0; i < samples; ++i)
+        {
+            float volume = path.inputVolume.Tick();
+            for (size_t channel = 0; channel < path.inputBuffers.size(); ++channel)
+            {
+                float *source = hardwareInputs == nullptr ? nullptr : hardwareInputs[channel];
+                path.inputBuffers[channel][i] = source == nullptr ? 0 : source[i] * volume;
+            }
+        }
+    }
     for (int i = 0; i < this->processActions.size(); ++i)
     {
         processActions[i](samples);
@@ -706,10 +805,38 @@ bool Lv2Pedalboard::Run(
             ringBufferWriter->WriteLv2ErrorMessage(effect->GetInstanceId(), effect->TakeErrorMessage());
         }
     }
+    auto getPathLatency = [](const std::vector<IEffect *> &pathEffects)
+    {
+        uint64_t result = 0;
+        for (const auto *effect : pathEffects)
+        {
+            result += effect->GetLatencySamples();
+        }
+        return (uint32_t)std::min(result, (uint64_t)UINT32_MAX);
+    };
+    const uint32_t pathALatency = getPathLatency(pathALatencyEffects);
+    const uint32_t pathBLatency =
+        pathBEnabled ? getPathLatency(pathBLatencyEffects) : 0;
+    std::array<uint32_t, 2> additionalPathLatencies = {0, 0};
+    uint32_t maximumPathLatency = std::max(pathALatency, pathBLatency);
+    for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
+    {
+        additionalPathLatencies[pathIndex] =
+            getPathLatency(additionalPaths[pathIndex]->latencyEffects);
+        maximumPathLatency = std::max(
+            maximumPathLatency,
+            additionalPathLatencies[pathIndex]);
+    }
     for (size_t i = 0; i < samples; ++i)
     {
         float volume = this->pathAMute ? 0 : outputVolume.Tick();
         float pathBVolume = this->pathBEnabled && !this->pathBMute ? pathBOutputVolume.Tick() : 0;
+        std::array<float, 2> additionalPathVolumes = {0, 0};
+        for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
+        {
+            auto &path = *additionalPaths[pathIndex];
+            additionalPathVolumes[pathIndex] = path.mute ? 0 : path.outputVolume.Tick();
+        }
         for (size_t c = 0; c < this->pedalboardOutputBuffers.size(); ++c)
         {
             if (outputBuffers[c] == nullptr) {
@@ -721,10 +848,32 @@ bool Lv2Pedalboard::Run(
             float pathBGain = c == 0
                 ? (this->pathBPan > 0 ? 1.0f - this->pathBPan : 1.0f)
                 : (this->pathBPan < 0 ? 1.0f + this->pathBPan : 1.0f);
-            float pathBOutput = this->pathBEnabled
+            const float pathARaw =
+                this->pedalboardOutputBuffers[c][i] * volume * pathAGain;
+            const float pathBRaw = this->pathBEnabled
                 ? this->pathBOutputBuffers[c][i] * pathBVolume * pathBGain
                 : 0;
-            float value = this->pedalboardOutputBuffers[c][i] * volume * pathAGain + pathBOutput;
+            float value = pathADelay.Process(
+                c, pathARaw, maximumPathLatency - pathALatency);
+            value += pathBDelay.Process(
+                c, pathBRaw, maximumPathLatency - pathBLatency);
+            for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
+            {
+                auto &path = *additionalPaths[pathIndex];
+                float pathGain = c == 0
+                    ? (path.pan > 0 ? 1.0f - path.pan : 1.0f)
+                    : (path.pan < 0 ? 1.0f + path.pan : 1.0f);
+                const float pathRaw =
+                    c < path.outputBuffers.size()
+                        ? path.outputBuffers[c][i] *
+                            additionalPathVolumes[pathIndex] *
+                            pathGain
+                        : 0;
+                value += path.delay.Process(
+                    c,
+                    pathRaw,
+                    maximumPathLatency - additionalPathLatencies[pathIndex]);
+            }
             if (this->globalEqEnabled && c < this->globalEq.size())
             {
                 for (auto &filter : this->globalEq[c])
@@ -733,6 +882,12 @@ bool Lv2Pedalboard::Run(
                 }
             }
             outputBuffers[c][i] = value;
+        }
+        pathADelay.Advance();
+        pathBDelay.Advance();
+        for (auto &path : additionalPaths)
+        {
+            path->delay.Advance();
         }
     }
     this->currentFrameOffset += samples;
@@ -951,6 +1106,277 @@ void Lv2Pedalboard::GatherPatchProperties(RealtimePatchPropertyRequest *pParamet
 
         pParameterRequests = pParameterRequests->pNext;
     }
+}
+
+size_t Lv2Pedalboard::CollectTriggeredMidiActions(
+    const MidiEvent &event,
+    const MidiAction **result,
+    size_t capacity)
+{
+    if (event.size < 2 || capacity == 0)
+    {
+        return 0;
+    }
+    const uint8_t status = event.buffer[0];
+    const int channel = status & 0x0F;
+    const int command = status & 0xF0;
+    const int number = event.buffer[1] & 0x7F;
+    const uint8_t value = event.size >= 3 ? event.buffer[2] & 0x7F : 127;
+    const bool notePress = command == 0x90 && value != 0;
+    const bool noteRelease = command == 0x80 || (command == 0x90 && value == 0);
+    const bool control = command == 0xB0;
+    const bool program = command == 0xC0;
+    size_t count = 0;
+    int toggleKey = -1;
+    int togglePosition = 1;
+    int toggleGroup = 0;
+    int resetGroup = 0;
+    bool usesToggle = false;
+
+    for (auto &runtimeAction : midiActions)
+    {
+        auto &action = runtimeAction.action;
+        if ((action.channel() >= 0 && action.channel() != channel) ||
+            action.number() != number)
+        {
+            continue;
+        }
+        bool bindingMatches =
+            (action.bindingType() == BINDING_TYPE_NOTE && (notePress || noteRelease)) ||
+            (action.bindingType() == BINDING_TYPE_CONTROL && control) ||
+            (action.bindingType() == BINDING_TYPE_PROGRAM && program);
+        if (!bindingMatches)
+        {
+            continue;
+        }
+
+        bool triggered = false;
+        auto gesture = (MidiActionGesture)action.gesture();
+        bool actionPress = false;
+        bool actionRelease = false;
+        if (action.bindingType() == BINDING_TYPE_NOTE)
+        {
+            actionPress = notePress;
+            actionRelease = noteRelease;
+            triggered =
+                (gesture == MidiActionGesture::Press && notePress) ||
+                (gesture == MidiActionGesture::Release && noteRelease) ||
+                gesture == MidiActionGesture::AnyValue;
+        }
+        else if (action.bindingType() == BINDING_TYPE_CONTROL)
+        {
+            actionPress = value >= 64 && runtimeAction.lastValue < 64;
+            actionRelease = value < 64 && runtimeAction.lastValue >= 64;
+            triggered =
+                (gesture == MidiActionGesture::Press && actionPress) ||
+                (gesture == MidiActionGesture::Release && actionRelease) ||
+                gesture == MidiActionGesture::AnyValue;
+            runtimeAction.lastValue = value;
+        }
+        else
+        {
+            actionPress = true;
+            triggered = true;
+        }
+        if (gesture == MidiActionGesture::LongPress)
+        {
+            if (actionPress)
+            {
+                runtimeAction.pressed = true;
+                runtimeAction.longPressTriggered = false;
+                runtimeAction.pressFrame = currentFrameOffset;
+            }
+            else if (actionRelease)
+            {
+                runtimeAction.pressed = false;
+            }
+            triggered = false;
+        }
+        else if (gesture == MidiActionGesture::DoublePress)
+        {
+            triggered = actionPress &&
+                runtimeAction.previousPressFrame != 0 &&
+                currentFrameOffset + 1 - runtimeAction.previousPressFrame <=
+                    (uint64_t)(pHost->GetSampleRate() * 0.4);
+            if (actionPress)
+            {
+                runtimeAction.previousPressFrame = currentFrameOffset + 1;
+            }
+        }
+        if (!triggered)
+        {
+            continue;
+        }
+
+        const int key =
+            ((action.bindingType() & 0xFF) << 16) |
+            (((action.channel() + 1) & 0x1F) << 8) |
+            (action.number() & 0x7F);
+        if (toggleKey == -1)
+        {
+            toggleKey = key;
+            for (const auto &state : midiActionToggleStates)
+            {
+                if (state.valid && state.key == key)
+                {
+                    togglePosition = state.position;
+                    break;
+                }
+            }
+        }
+        if (action.togglePosition() != 0)
+        {
+            usesToggle = true;
+            if (action.toggleGroup() != 0) toggleGroup = action.toggleGroup();
+            if (action.resetGroup() != 0) resetGroup = action.resetGroup();
+        }
+        if ((action.togglePosition() == 0 ||
+             action.togglePosition() == togglePosition) &&
+            count < capacity)
+        {
+            result[count++] = &action;
+        }
+    }
+
+    if (usesToggle && toggleKey != -1)
+    {
+        MidiActionToggleState *target = nullptr;
+        for (auto &state : midiActionToggleStates)
+        {
+            if (state.valid && resetGroup != 0 &&
+                state.group == resetGroup && state.key != toggleKey)
+            {
+                state.position = 1;
+            }
+            if (state.valid && state.key == toggleKey)
+            {
+                target = &state;
+            }
+            else if (!state.valid && target == nullptr)
+            {
+                target = &state;
+            }
+        }
+        if (target != nullptr)
+        {
+            target->valid = true;
+            target->key = toggleKey;
+            target->position = togglePosition == 1 ? 2 : 1;
+            target->group = toggleGroup;
+            if (toggleGroup != 0)
+            {
+                for (auto &state : midiActionToggleStates)
+                {
+                    if (state.valid && state.group == toggleGroup)
+                    {
+                        state.position = target->position;
+                    }
+                }
+            }
+        }
+    }
+    return count;
+}
+
+size_t Lv2Pedalboard::CollectTimedMidiActions(
+    const MidiAction **result,
+    size_t capacity)
+{
+    size_t count = 0;
+    const uint64_t longPressFrames =
+        (uint64_t)(pHost->GetSampleRate() * 0.6);
+    for (auto &runtimeAction : midiActions)
+    {
+        if (count >= capacity)
+        {
+            break;
+        }
+        if ((MidiActionGesture)runtimeAction.action.gesture() ==
+                MidiActionGesture::LongPress &&
+            runtimeAction.pressed &&
+            !runtimeAction.longPressTriggered &&
+            currentFrameOffset - runtimeAction.pressFrame >= longPressFrames)
+        {
+            runtimeAction.longPressTriggered = true;
+            if (runtimeAction.action.togglePosition() == 0 ||
+                runtimeAction.action.togglePosition() == 1)
+            {
+                result[count++] = &runtimeAction.action;
+            }
+        }
+    }
+    return count;
+}
+
+bool Lv2Pedalboard::ExecuteInternalMidiAction(
+    const MidiAction &action,
+    void *callbackHandle,
+    MidiCallbackFn *pfnCallback)
+{
+    const auto actionType = (MidiActionType)action.actionType();
+    if (actionType == MidiActionType::SetPluginControl ||
+        actionType == MidiActionType::TogglePluginControl ||
+        actionType == MidiActionType::TogglePluginBypass)
+    {
+        const int effectIndex = GetIndexOfInstanceId(action.targetId());
+        if (effectIndex < 0)
+        {
+            return true;
+        }
+        int controlIndex = -1;
+        if (actionType != MidiActionType::TogglePluginBypass)
+        {
+            controlIndex = GetControlIndex(action.targetId(), action.symbol());
+            if (controlIndex < 0)
+            {
+                return true;
+            }
+        }
+        IEffect *effect = realtimeEffects[effectIndex];
+        float value = action.value();
+        if (actionType == MidiActionType::TogglePluginControl ||
+            actionType == MidiActionType::TogglePluginBypass)
+        {
+            const float currentValue = effect->GetControlValue(controlIndex);
+            value = currentValue == action.value()
+                ? action.alternateValue()
+                : action.value();
+        }
+        effect->SetControl(controlIndex, value);
+        pfnCallback(callbackHandle, action.targetId(), controlIndex, value);
+        return true;
+    }
+    if (actionType == MidiActionType::SetPathMute ||
+        actionType == MidiActionType::TogglePathMute)
+    {
+        bool *mute = nullptr;
+        if (action.symbol() == "A") mute = &pathAMute;
+        else if (action.symbol() == "B") mute = &pathBMute;
+        else
+        {
+            for (auto &path : additionalPaths)
+            {
+                if (path->id == action.symbol())
+                {
+                    mute = &path->mute;
+                    break;
+                }
+            }
+        }
+        if (mute != nullptr)
+        {
+            *mute = actionType == MidiActionType::TogglePathMute
+                ? !*mute
+                : action.value() != 0;
+        }
+        return true;
+    }
+    if (actionType == MidiActionType::ToggleGlobalEq)
+    {
+        globalEqEnabled = !globalEqEnabled;
+        return true;
+    }
+    return false;
 }
 
 void Lv2Pedalboard::OnMidiMessage(

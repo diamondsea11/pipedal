@@ -325,6 +325,7 @@ namespace pipedal
         // Read a single MIDI message from the sequencer input port. A timeout of -1 blocks indefinitely.
         // A timeout of 0 returns immediately.
         virtual bool ReadMessage(AlsaMidiMessage &message, int timeoutMs = -1) = 0;
+        virtual bool SendMessage(const uint8_t *data, size_t size) = 0;
 
         // currently non-functional
         virtual bool GetQueueRealtime(uint64_t *sec, uint32_t *nsec) = 0;

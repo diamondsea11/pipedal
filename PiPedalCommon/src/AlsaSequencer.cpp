@@ -65,6 +65,7 @@ namespace pipedal
             // Read a single MIDI message from the sequencer input port. A timeout of -1 blocks indefinitely.
             // A timeout of 0 returns immediately.
             virtual bool ReadMessage(AlsaMidiMessage &message, int timeoutMs = -1) override;
+            virtual bool SendMessage(const uint8_t *data, size_t size) override;
 
             // Get current real-time from the queue (useful for calculating precise timing)
             virtual bool GetQueueRealtime(uint64_t *sec, uint32_t *nsec) override;
@@ -72,7 +73,7 @@ namespace pipedal
             virtual void RemoveAllConnections() override;
 
         private:
-            void ModifyConnection(int clientId, int portId, ConnectAction action);
+            void ModifyConnection(int clientId, int portId, bool output, ConnectAction action);
 
             // Get the current queue ID (returns -1 if no queue is active)
             int GetQueueId() const { return queueId; }
@@ -85,6 +86,7 @@ namespace pipedal
             {
                 int clientId;
                 int portId;
+                bool output;
             };
 
             int myClientId = -1;
@@ -94,6 +96,7 @@ namespace pipedal
             std::vector<struct pollfd> pollFds; // For polling input events
             snd_seq_t *seqHandle = nullptr;
             int inPort = -1;
+            int outPort = -1;
             int queueId = -1; // Queue for real-time timestamps
         };
 
@@ -286,6 +289,16 @@ namespace pipedal
             // convert rc to message
             throw std::runtime_error(SS("Failed to open ALSA sequencer:" << snd_strerror(inPort)));
         }
+        outPort = snd_seq_create_simple_port(seqHandle, "PiPedal:out",
+                                             SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ,
+                                             SND_SEQ_PORT_TYPE_MIDI_GENERIC |
+                                                 SND_SEQ_PORT_TYPE_MIDI_GM |
+                                                 SND_SEQ_PORT_TYPE_APPLICATION);
+        if (outPort < 0)
+        {
+            throw std::runtime_error(SS("Failed to open ALSA sequencer output: "
+                                        << snd_strerror(outPort)));
+        }
         CreateRealtimeInputQueue();
 
         snd_seq_nonblock(seqHandle, 1); // Set sequencer to non-blocking mode
@@ -302,7 +315,11 @@ namespace pipedal
         while (connections.size() != 0)
         {
             auto connection = connections.back();
-            ModifyConnection(connection.clientId, connection.portId, ConnectAction::Unsubscribe);
+            ModifyConnection(
+                connection.clientId,
+                connection.portId,
+                connection.output,
+                ConnectAction::Unsubscribe);
         }
     }
     AlsaSequencerImpl::~AlsaSequencerImpl()
@@ -319,6 +336,11 @@ namespace pipedal
             snd_seq_delete_port(seqHandle, inPort);
             inPort = -1;
         }
+        if (outPort >= 0)
+        {
+            snd_seq_delete_port(seqHandle, outPort);
+            outPort = -1;
+        }
         if (seqHandle)
         {
             Lv2Log::debug("Closing ALSA Sequencer");
@@ -329,7 +351,7 @@ namespace pipedal
 
     void AlsaSequencerImpl::ConnectPort(int clientId, int portId)
     {
-        ModifyConnection(clientId, portId, ConnectAction::Subscribe);
+        ModifyConnection(clientId, portId, false, ConnectAction::Subscribe);
     }
 
     void AlsaSequencerImpl::ConnectPort(const std::string &id)
@@ -358,7 +380,16 @@ namespace pipedal
             {
                 if (port.id == id)
                 {
-                    ConnectPort(port.client, port.port);
+                    if (port.canReadSubscribe)
+                    {
+                        ModifyConnection(
+                            port.client, port.port, false, ConnectAction::Subscribe);
+                    }
+                    if (port.canWriteSubscribe)
+                    {
+                        ModifyConnection(
+                            port.client, port.port, true, ConnectAction::Subscribe);
+                    }
                     break;
                 }
             }
@@ -641,6 +672,43 @@ namespace pipedal
         }
     }
 
+    bool AlsaSequencerImpl::SendMessage(const uint8_t *data, size_t size)
+    {
+        if (seqHandle == nullptr || outPort < 0 || data == nullptr || size < 2)
+        {
+            return false;
+        }
+        snd_seq_event_t event;
+        snd_seq_ev_clear(&event);
+        snd_seq_ev_set_source(&event, outPort);
+        snd_seq_ev_set_subs(&event);
+        snd_seq_ev_set_direct(&event);
+
+        const uint8_t command = data[0] & 0xF0;
+        const uint8_t channel = data[0] & 0x0F;
+        switch (command)
+        {
+        case 0x80:
+            if (size < 3) return false;
+            snd_seq_ev_set_noteoff(&event, channel, data[1] & 0x7F, data[2] & 0x7F);
+            break;
+        case 0x90:
+            if (size < 3) return false;
+            snd_seq_ev_set_noteon(&event, channel, data[1] & 0x7F, data[2] & 0x7F);
+            break;
+        case 0xB0:
+            if (size < 3) return false;
+            snd_seq_ev_set_controller(&event, channel, data[1] & 0x7F, data[2] & 0x7F);
+            break;
+        case 0xC0:
+            snd_seq_ev_set_pgmchange(&event, channel, data[1] & 0x7F);
+            break;
+        default:
+            return false;
+        }
+        return snd_seq_event_output_direct(seqHandle, &event) >= 0;
+    }
+
     int AlsaSequencerImpl::CreateRealtimeInputQueue()
     {
         if (!seqHandle)
@@ -748,7 +816,11 @@ namespace pipedal
         return {};
     }
 
-    void AlsaSequencerImpl::ModifyConnection(int clientId, int portId, ConnectAction action)
+    void AlsaSequencerImpl::ModifyConnection(
+        int clientId,
+        int portId,
+        bool output,
+        ConnectAction action)
     {
         std::lock_guard<std::mutex> lock(connectionsMutex);
 
@@ -763,10 +835,20 @@ namespace pipedal
 
 
         snd_seq_addr_t sender, dest;
-        dest.client = myClientId;
-        dest.port = 0;
-        sender.client = clientId;
-        sender.port = portId;
+        if (output)
+        {
+            sender.client = myClientId;
+            sender.port = outPort;
+            dest.client = clientId;
+            dest.port = portId;
+        }
+        else
+        {
+            dest.client = myClientId;
+            dest.port = inPort;
+            sender.client = clientId;
+            sender.port = portId;
+        }
 
         snd_seq_port_subscribe_t *subs;
         int queue = this->queueId;
@@ -800,7 +882,9 @@ namespace pipedal
             }
             for (auto it = this->connections.begin(); it != this->connections.end(); ++it)
             {
-                if (it->clientId == clientId && it->portId == portId)
+                if (it->clientId == clientId &&
+                    it->portId == portId &&
+                    it->output == output)
                 {
                     it = this->connections.erase(it);
                     break;
@@ -822,7 +906,7 @@ namespace pipedal
                               snd_strerror(rc));
                 return;
             }
-            this->connections.push_back({clientId, portId});
+            this->connections.push_back({clientId, portId, output});
         }
     }
 

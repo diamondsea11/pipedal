@@ -27,10 +27,16 @@ import IconButtonEx from './IconButtonEx';
 import useWindowSize from "./UseWindowSize";
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ChannelRouterSettingsHelpDialog from './ChannelRouterSettingsHelpDialog';
 import SpeakerIcon from '@mui/icons-material/Speaker';
 import MicIcon from '@mui/icons-material/Mic';
-import ChannelRouterSettings from './ChannelRouterSettings';
+import ChannelRouterSettings, { OutputRoute } from './ChannelRouterSettings';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import Typography from '@mui/material/Typography';
@@ -724,13 +730,117 @@ function ChannelRouterSettingsDialog(props: ChannelRouterSettingsDialogProps) {
         );
     };
 
+    let updateOutputRoutes = (routes: OutputRoute[]) => {
+        const newSettings = settings.clone();
+        newSettings.outputRoutes = routes;
+        newSettings.channelRouterPresetId = -1;
+        newSettings.modified = true;
+        newSettings.configured = true;
+        model.setChannelRouterSettings(newSettings);
+    };
+
+    let OutputMatrix = () => (
+        <div style={{ marginTop: 20, minWidth: 0 }}>
+            <Divider style={{ marginBottom: 12 }} />
+            <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
+                <Typography variant="subtitle2">Additional output matrix</Typography>
+                <Button
+                    size="small"
+                    startIcon={<AddIcon />}
+                    style={{ marginLeft: "auto" }}
+                    onClick={() => {
+                        const route = new OutputRoute();
+                        const used = new Set(settings.outputRoutes.map((item) => item.outputChannel));
+                        route.outputChannel = Array.from(
+                            { length: config.outputAudioPorts.length },
+                            (_, index) => index).find((index) => !used.has(index)) ?? 0;
+                        updateOutputRoutes([...settings.outputRoutes, route]);
+                    }}
+                >
+                    Add route
+                </Button>
+            </div>
+            {settings.outputRoutes.map((route, index) => (
+                <div key={index} style={{
+                    display: "grid",
+                    gridTemplateColumns: "74px minmax(110px, 1fr) 92px 52px 40px",
+                    gap: 8,
+                    alignItems: "center",
+                    marginBottom: 8,
+                }}>
+                    <Select
+                        size="small"
+                        value={route.sourceChannel}
+                        onChange={(event) => {
+                            const routes = settings.outputRoutes.map((item) =>
+                                new OutputRoute().deserialize(item));
+                            routes[index].sourceChannel = Number(event.target.value);
+                            updateOutputRoutes(routes);
+                        }}
+                    >
+                        <MenuItem value={0}>Main L</MenuItem>
+                        <MenuItem value={1}>Main R</MenuItem>
+                    </Select>
+                    <Select
+                        size="small"
+                        value={route.outputChannel}
+                        onChange={(event) => {
+                            const routes = settings.outputRoutes.map((item) =>
+                                new OutputRoute().deserialize(item));
+                            routes[index].outputChannel = Number(event.target.value);
+                            updateOutputRoutes(routes);
+                        }}
+                    >
+                        {config.outputAudioPorts.map((name, outputIndex) => (
+                            <MenuItem key={outputIndex} value={outputIndex}>
+                                {name || `OUT ${outputIndex + 1}`}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                    <TextField
+                        size="small"
+                        type="number"
+                        label="Gain dB"
+                        value={route.gainDb}
+                        inputProps={{ min: -60, max: 12, step: 0.5 }}
+                        onChange={(event) => {
+                            const routes = settings.outputRoutes.map((item) =>
+                                new OutputRoute().deserialize(item));
+                            routes[index].gainDb = Math.max(
+                                -60, Math.min(12, Number(event.target.value)));
+                            updateOutputRoutes(routes);
+                        }}
+                    />
+                    <Switch
+                        checked={!route.mute}
+                        onChange={(event) => {
+                            const routes = settings.outputRoutes.map((item) =>
+                                new OutputRoute().deserialize(item));
+                            routes[index].mute = !event.target.checked;
+                            updateOutputRoutes(routes);
+                        }}
+                        inputProps={{ "aria-label": `Enable output route ${index + 1}` }}
+                    />
+                    <IconButton
+                        size="small"
+                        aria-label={`Delete output route ${index + 1}`}
+                        onClick={() => updateOutputRoutes(
+                            settings.outputRoutes.filter((_, routeIndex) => routeIndex !== index))}
+                    >
+                        <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                </div>
+            ))}
+        </div>
+    );
+
     return (
         <DialogEx tag="channelRouterSettings"
             onClose={handleClose}
             aria-labelledby="select-channel_mixer_settings"
             open={open}
             fullWidth
-            maxWidth={landscape ? "sm" : "xs"}
+            maxWidth={landscape ? "md" : "sm"}
             onEnterKey={handleClose}
             fullScreen={fullScreen}
         >
@@ -794,6 +904,7 @@ function ChannelRouterSettingsDialog(props: ChannelRouterSettingsDialogProps) {
                     :
                     PortraitView()
                 }
+                {OutputMatrix()}
             </DialogContent>
             {
                 showHelp && (

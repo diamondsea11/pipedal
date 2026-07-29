@@ -84,8 +84,58 @@ namespace pipedal
         std::vector<int64_t> pathBInputChannels;
         std::vector<float *> pathBInputBuffers;
         std::vector<float *> pathBOutputBuffers;
+        class DelayCompensator
+        {
+            std::array<std::vector<float>, 2> buffers;
+            size_t writeIndex = 0;
+        public:
+            void Prepare(size_t capacity)
+            {
+                for (auto &buffer : buffers)
+                {
+                    buffer.assign(capacity, 0);
+                }
+                writeIndex = 0;
+            }
+            float Process(size_t channel, float value, uint32_t delay)
+            {
+                auto &buffer = buffers[std::min(channel, (size_t)1)];
+                if (buffer.empty()) return value;
+                const size_t clampedDelay =
+                    std::min((size_t)delay, buffer.size() - 1);
+                buffer[writeIndex] = value;
+                const size_t readIndex =
+                    (writeIndex + buffer.size() - clampedDelay) % buffer.size();
+                return buffer[readIndex];
+            }
+            void Advance()
+            {
+                if (!buffers[0].empty())
+                {
+                    writeIndex = (writeIndex + 1) % buffers[0].size();
+                }
+            }
+        };
+        std::vector<IEffect *> pathALatencyEffects;
+        std::vector<IEffect *> pathBLatencyEffects;
+        DelayCompensator pathADelay;
+        DelayCompensator pathBDelay;
         bool pathBMute = false;
         float pathBPan = 0;
+        struct AdditionalPathRuntime
+        {
+            std::string id;
+            std::vector<int64_t> inputChannels;
+            std::vector<float *> inputBuffers;
+            std::vector<float *> outputBuffers;
+            DbDezipper inputVolume;
+            DbDezipper outputVolume;
+            bool mute = false;
+            float pan = 0;
+            std::vector<IEffect *> latencyEffects;
+            DelayCompensator delay;
+        };
+        std::vector<std::unique_ptr<AdditionalPathRuntime>> additionalPaths;
         bool globalEqEnabled = false;
         std::array<std::array<Biquad, 5>, 2> globalEq;
         float *pedalboardSidechainBuffer = nullptr;
@@ -134,6 +184,24 @@ namespace pipedal
         };
 
         std::vector<MidiMapping> midiMappings;
+        struct RuntimeMidiAction
+        {
+            MidiAction action;
+            uint8_t lastValue = 0;
+            bool pressed = false;
+            bool longPressTriggered = false;
+            uint64_t pressFrame = 0;
+            uint64_t previousPressFrame = 0;
+        };
+        struct MidiActionToggleState
+        {
+            bool valid = false;
+            int key = 0;
+            int position = 1;
+            int group = 0;
+        };
+        std::vector<RuntimeMidiAction> midiActions;
+        std::array<MidiActionToggleState, 64> midiActionToggleStates;
 
         std::vector<float *> PrepareItems(
             std::vector<PedalboardItem> &items,
@@ -188,6 +256,8 @@ namespace pipedal
             float **inputBuffers,
             float **outputBuffers,
             float **pathBHardwareInputBuffers,
+            float *const *const *additionalPathHardwareInputBuffers,
+            size_t additionalPathHardwareInputCount,
             uint32_t samples,
             RealtimeRingBufferWriter *realtimeWriter);
         bool Run(
@@ -196,7 +266,7 @@ namespace pipedal
             uint32_t samples,
             RealtimeRingBufferWriter *realtimeWriter)
         {
-            return Run(inputBuffers, outputBuffers, nullptr, samples, realtimeWriter);
+            return Run(inputBuffers, outputBuffers, nullptr, nullptr, 0, samples, realtimeWriter);
         }
 
         void ResetAtomBuffers();
@@ -210,6 +280,14 @@ namespace pipedal
         bool IsPathBEnabled() const { return this->pathBEnabled; }
         const std::vector<int64_t> &GetPathBInputChannels() const { return this->pathBInputChannels; }
         const std::vector<int64_t> &GetPathAInputChannels() const { return this->pathAInputChannels; }
+        size_t GetAdditionalPathCount() const
+        {
+            return this->additionalPaths.size();
+        }
+        const std::vector<int64_t> &GetAdditionalPathInputChannels(size_t index) const
+        {
+            return this->additionalPaths.at(index)->inputChannels;
+        }
 
         int GetControlIndex(uint64_t instanceId, const std::string &symbol);
         void SetControlValue(int effectIndex, int portIndex, float value);
@@ -226,6 +304,17 @@ namespace pipedal
         typedef void(MidiCallbackFn)(void *data, uint64_t intanceId, int controlIndex, float value);
         void OnMidiMessage(
             const MidiEvent&message,
+            void *callbackHandle,
+            MidiCallbackFn *pfnCallback);
+        size_t CollectTriggeredMidiActions(
+            const MidiEvent &message,
+            const MidiAction **result,
+            size_t capacity);
+        size_t CollectTimedMidiActions(
+            const MidiAction **result,
+            size_t capacity);
+        bool ExecuteInternalMidiAction(
+            const MidiAction &action,
             void *callbackHandle,
             MidiCallbackFn *pfnCallback);
 private:

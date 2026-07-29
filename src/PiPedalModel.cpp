@@ -3501,6 +3501,56 @@ void PiPedalModel::OnNotifyMidiRealtimeEvent(RealtimeMidiEventType eventType)
             this->SetWifiConfigSettings(settings);
         }
         break;
+        case RealtimeMidiEventType::PathAToggle:
+        case RealtimeMidiEventType::PathAOn:
+        case RealtimeMidiEventType::PathAOff:
+        case RealtimeMidiEventType::PathBToggle:
+        case RealtimeMidiEventType::PathBOn:
+        case RealtimeMidiEventType::PathBOff:
+        case RealtimeMidiEventType::PathCToggle:
+        case RealtimeMidiEventType::PathCOn:
+        case RealtimeMidiEventType::PathCOff:
+        case RealtimeMidiEventType::PathDToggle:
+        case RealtimeMidiEventType::PathDOn:
+        case RealtimeMidiEventType::PathDOff:
+        {
+            const int event = (int)eventType - (int)RealtimeMidiEventType::PathAToggle;
+            const int pathIndex = event / 3;
+            const int operation = event % 3;
+            auto apply = [operation](bool current)
+            {
+                if (operation == 0) return !current;
+                return operation == 1;
+            };
+            if (pathIndex == 0)
+            {
+                pedalboard.pathAMute(apply(pedalboard.pathAMute()));
+            }
+            else if (pathIndex == 1)
+            {
+                pedalboard.pathBMute(apply(pedalboard.pathBMute()));
+            }
+            else
+            {
+                const std::string id = pathIndex == 2 ? "C" : "D";
+                for (auto &path : pedalboard.additionalPaths())
+                {
+                    if (path.id() == id)
+                    {
+                        path.mute(apply(path.mute()));
+                        break;
+                    }
+                }
+            }
+            SetPresetChanged(-1, true, true);
+            FirePedalboardChanged(-1, false);
+        }
+        break;
+        case RealtimeMidiEventType::GlobalEqToggle:
+            pedalboard.globalEqEnabled(!pedalboard.globalEqEnabled());
+            SetPresetChanged(-1, true, true);
+            FirePedalboardChanged(-1, false);
+            break;
 
         default:
             break;

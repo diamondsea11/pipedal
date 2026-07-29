@@ -315,6 +315,7 @@ namespace pipedal
         LV2_PROPERTY_GETSET_SCALAR(units);
         LV2_PROPERTY_GETSET(custom_units);
         LV2_PROPERTY_GETSET(pipedal_ledColor);
+        LV2_PROPERTY_GETSET(designation);
 
         LV2_PROPERTY_GETSET(buffer_type);
 

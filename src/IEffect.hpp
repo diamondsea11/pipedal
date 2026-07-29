@@ -48,6 +48,7 @@ namespace pipedal {
         virtual float GetControlValue(int index) const = 0;
         virtual void SetBypass(bool enable)  = 0;
         virtual float GetOutputControlValue(int controlIndex) const = 0;
+        virtual uint32_t GetLatencySamples() const { return 0; }
 
         virtual int GetNumberOfInputAudioPorts() const = 0; // as declared
         virtual int GetNumberOfOutputAudioPorts() const = 0; // as declared.

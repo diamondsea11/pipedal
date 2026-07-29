@@ -389,6 +389,14 @@ export const MainPage =
                         return pedalboard.makePathBStartItem();
                     } else if (selectedId === Pedalboard.AUX_END_CONTROL_ID) {
                         return pedalboard.makePathBEndItem();
+                    } else if (selectedId === Pedalboard.PATH_C_START_CONTROL_ID) {
+                        return pedalboard.makeAdditionalPathTerminalItem("C", true);
+                    } else if (selectedId === Pedalboard.PATH_C_END_CONTROL_ID) {
+                        return pedalboard.makeAdditionalPathTerminalItem("C", false);
+                    } else if (selectedId === Pedalboard.PATH_D_START_CONTROL_ID) {
+                        return pedalboard.makeAdditionalPathTerminalItem("D", true);
+                    } else if (selectedId === Pedalboard.PATH_D_END_CONTROL_ID) {
+                        return pedalboard.makeAdditionalPathTerminalItem("D", false);
                     }
 
                     let it = pedalboard.itemsGenerator();
