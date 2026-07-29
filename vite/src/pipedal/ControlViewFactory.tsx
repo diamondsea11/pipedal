@@ -36,6 +36,7 @@ import ToobPlayerFactory from './ToobPlayerView';
 import ToobNamViewFactory from './ToobNamView';
 import ToobParametericEqViewFactory from './ToobParametricEqView';
 import {ToobParametricEqViewFactoryStereo} from './ToobParametricEqView';
+import { dragonflyViewFactories } from './DragonflyView';
 
 
 let pluginFactories: IControlViewFactory[] = [
@@ -48,6 +49,7 @@ let pluginFactories: IControlViewFactory[] = [
     new ToobNamViewFactory(),
     new ToobParametericEqViewFactory(),
     new ToobParametricEqViewFactoryStereo(),
+    ...dragonflyViewFactories,
 ];
 
 
@@ -101,4 +103,3 @@ export function GetControlView(
         }
     }
 }
-

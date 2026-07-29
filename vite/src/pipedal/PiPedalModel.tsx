@@ -1370,7 +1370,23 @@ export class PiPedalModel //implements PiPedalModel
         try {
             const myRequest = new Request(this.varRequest('config.json'));
             let response: Response = await fetch(myRequest);
-            let data = await response.json();
+            if (response.status !== 200) {
+                if (response.status === 500) {
+
+                    window.location.href = this.varRequest('config.json');
+                    return false;
+                } else {
+                    this.setError("Can't connect to server. (" + response.status.toString() + " " + response.statusText + ")");
+                    return false;
+                }
+            }
+            let data: any 
+            try {
+                data = await response.json();
+            } catch (error) {
+                this.setError("Failed to connect to server. " + getErrorMessage(error));
+                return false;
+            }
 
             this.tone3000_A2_models = data.tone3000_A2_models ?? true;
             this.enableAutoUpdate = !!data.enable_auto_update;
@@ -2285,6 +2301,35 @@ export class PiPedalModel //implements PiPedalModel
         this.setModelPedalboard(newPedalboard);
         this.updateServerPedalboard();
         return newItem.instanceId;
+    }
+    insertPedalboardItemCopy(instanceId: number, sourceItem: PedalboardItem, append: boolean): number {
+        let pedalboard = this.pedalboard.get();
+        if (instanceId === Pedalboard.START_CONTROL_ID && append) {
+            instanceId = pedalboard.items[0].instanceId;
+            append = false;
+        } else if (instanceId === Pedalboard.END_CONTROL_ID && !append) {
+            instanceId = pedalboard.items[pedalboard.items.length - 1].instanceId;
+            append = true;
+        }
+
+        let newPedalboard = pedalboard.clone();
+        this.updateVst3State(newPedalboard);
+
+        let targetItem = newPedalboard.getItem(instanceId);
+        if (targetItem === null) {
+            throw new PiPedalArgumentError("instanceId not found.");
+        }
+
+        let newItem = newPedalboard.cloneItemWithNewInstanceIds(sourceItem);
+        newPedalboard.addItem(newItem, instanceId, append);
+        newPedalboard.selectedPlugin = newItem.instanceId;
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+        return newItem.instanceId;
+    }
+    duplicatePedalboardItem(instanceId: number): number {
+        let item = this.pedalboard.get().getItem(instanceId);
+        return this.insertPedalboardItemCopy(instanceId, item, true);
     }
     addPedalboardSplitItem(instanceId: number, append: boolean): number {
         let pedalboard = this.pedalboard.get();
@@ -4004,6 +4049,5 @@ export class PiPedalModelFactory {
 
     }
 };
-
 
 

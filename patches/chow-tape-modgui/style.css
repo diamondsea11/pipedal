@@ -1,0 +1,299 @@
+.chow-tape-ui {
+  box-sizing: border-box;
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  color: #e8e8e5;
+  background: #17191a;
+  border: 1px solid #494b4b;
+  font-family: "cooper hewitt", Arial, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  user-select: none;
+  touch-action: none;
+}
+
+.chow-tape-ui * {
+  box-sizing: border-box;
+}
+
+.tape-header {
+  height: 124px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 30px;
+  color: #17191a;
+  background: #d7d5cf;
+  border-bottom: 5px solid #c84d42;
+}
+
+.tape-mark {
+  width: 174px;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.reel {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 7px solid #242627;
+  border-radius: 50%;
+}
+
+.reel i {
+  width: 12px;
+  height: 12px;
+  display: block;
+  background: #c84d42;
+  border-radius: 50%;
+}
+
+.tape-line {
+  width: 46px;
+  height: 5px;
+  background: #242627;
+}
+
+.tape-title {
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.tape-title strong {
+  font-size: 31px;
+  font-weight: 700;
+}
+
+.tape-title span {
+  margin-top: 7px;
+  color: #5c5d5b;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.signal-strip {
+  height: 88px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding-left: 30px;
+  border-left: 1px solid #999a96;
+}
+
+.section-grid {
+  height: 591px;
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  grid-template-rows: 190px 190px 211px;
+}
+
+.section {
+  min-width: 0;
+  padding: 15px 18px 12px;
+  border-right: 1px solid #444646;
+  border-bottom: 1px solid #444646;
+}
+
+.section:nth-child(3n) {
+  border-right: 0;
+}
+
+.section-heading {
+  height: 31px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 2px solid #606262;
+}
+
+.section-heading h2 {
+  margin: 0;
+  color: #d2d2cd;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.section.tape .section-heading,
+.section.motion .section-heading {
+  border-bottom-color: #c84d42;
+}
+
+.controls {
+  height: 132px;
+  display: grid;
+  align-items: center;
+  justify-items: center;
+}
+
+.controls.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.controls.five {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.controls.six {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.control {
+  width: 72px;
+  height: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: #bfc0bd;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.control span {
+  width: 100%;
+  min-height: 26px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: visible;
+  line-height: 13px;
+  white-space: normal;
+}
+
+.control.main {
+  width: 68px;
+  height: 86px;
+  color: #303232;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.control.main span {
+  min-height: 14px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.dial {
+  width: 54px;
+  height: 54px;
+  position: relative;
+  flex: 0 0 auto;
+  cursor: ns-resize;
+  background: #2b2d2d;
+  border: 4px solid #747674;
+  border-radius: 50%;
+  box-shadow: 0 2px 0 #0c0d0d;
+  transform-origin: 50% 50%;
+}
+
+.dial::before {
+  content: "";
+  width: 4px;
+  height: 18px;
+  position: absolute;
+  top: 3px;
+  left: 21px;
+  background: #e3e2dc;
+  border-radius: 2px;
+}
+
+.control.featured .dial,
+.control.accent .dial {
+  border-color: #c84d42;
+}
+
+.control.main .dial {
+  width: 58px;
+  height: 58px;
+  border-color: #777975;
+  background: #f0efea;
+  box-shadow: 0 2px 0 #9a9b97;
+}
+
+.control.main .dial::before {
+  left: 23px;
+  background: #282a2a;
+}
+
+.control.main.accent .dial {
+  border-color: #c84d42;
+}
+
+.toggle {
+  width: 31px;
+  height: 18px;
+  position: relative;
+  cursor: pointer;
+  background: #777977;
+  border: 2px solid #a9aaa6;
+  border-radius: 3px;
+  box-shadow: 0 2px 0 #0c0d0d;
+  transform-origin: 50% 50%;
+}
+
+.toggle::after {
+  content: "";
+  width: 13px;
+  height: 13px;
+  position: absolute;
+  top: 1px;
+  left: 7px;
+  background: #e6e5df;
+  border-radius: 2px;
+}
+
+.toggle.small {
+  margin-top: 1px;
+}
+
+.switch-control {
+  width: 58px;
+  color: #303232;
+  font-weight: 600;
+}
+
+.switch-control .toggle {
+  margin-bottom: 18px;
+  background: #c84d42;
+  border-color: #a33b33;
+}
+
+.compact .control {
+  width: 62px;
+  font-size: 11px;
+}
+
+.compact .dial {
+  width: 48px;
+  height: 48px;
+}
+
+.compact .dial::before {
+  left: 18px;
+  height: 16px;
+}
+
+.utility {
+  background: #202223;
+}
+
+@media (prefers-color-scheme: light) {
+  .chow-tape-ui {
+    color: #e8e8e5;
+    background: #17191a;
+  }
+}

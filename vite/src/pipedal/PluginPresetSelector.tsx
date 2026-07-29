@@ -37,6 +37,12 @@ import Divider from "@mui/material/Divider";
 import PluginPresetsIcon from "./svg/ic_pluginpreset.svg?react";
 import PluginPresetIcon from "./svg/ic_pluginpreset2.svg?react";
 import { Pedalboard, PedalboardItem } from './Pedalboard';
+import {
+    clearPedalboardClipboard,
+    copyPedalboardItem,
+    getPedalboardClipboardItem,
+    hasPedalboardClipboard
+} from './PedalboardClipboard';
 
 interface PluginPresetSelectorProps extends WithStyles<typeof styles> {
     pedalboardItem: PedalboardItem | null;
@@ -79,8 +85,6 @@ const styles = (theme: Theme) => createStyles({
 });
 
 
-let pluginClipboardContents: PedalboardItem | null = null;
-
 const PluginPresetSelector =
     withStyles(
         class extends Component<PluginPresetSelectorProps, PluginPresetSelectorState> {
@@ -103,7 +107,7 @@ const PluginPresetSelector =
                     renameDialogOnOk: undefined,
                     saveAsName: "",
                     hasPresets: this.hasPresets(this.props.pedalboardItem),
-                    isPastePluginEnabled: pluginClipboardContents !== null
+                    isPastePluginEnabled: hasPedalboardClipboard()
 
 
                 };
@@ -280,23 +284,24 @@ const PluginPresetSelector =
 
                 let pedalboardItem: PedalboardItem | null = pedalboard.tryGetItem(this.props.instanceId);
                 if (pedalboardItem === null) {
-                    pluginClipboardContents = null;
+                    clearPedalboardClipboard();
                     this.setState({ isPastePluginEnabled: false });
                     return;
                 }
-                pluginClipboardContents = pedalboardItem.clone();
+                copyPedalboardItem(pedalboardItem);
                 this.setState({ isPastePluginEnabled: true });
 
             }
 
             private isMenuPastePluginEnabled(): boolean {
-                return this.state.isPastePluginEnabled;
+                return this.state.isPastePluginEnabled || hasPedalboardClipboard();
             }
             private handleMenuPastePlugin(): void {
                 this.handlePresetsMenuClose();
 
-                if (pluginClipboardContents) {
-                    this.model.replacePedalboarditem(this.props.instanceId, pluginClipboardContents.clone());
+                let clipboardItem = getPedalboardClipboardItem();
+                if (clipboardItem) {
+                    this.model.replacePedalboarditem(this.props.instanceId, clipboardItem);
                 }
             }
 

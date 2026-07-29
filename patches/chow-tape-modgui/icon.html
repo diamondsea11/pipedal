@@ -1,0 +1,147 @@
+<div class="chow-tape-ui">
+  <header class="tape-header">
+    <div class="tape-mark">
+      <span class="reel"><i></i></span>
+      <span class="tape-line"></span>
+      <span class="reel"><i></i></span>
+    </div>
+    <div class="tape-title">
+      <strong>CHOW</strong>
+      <span>Tape Model</span>
+    </div>
+    <div class="signal-strip">
+      <div class="control main">
+        <div class="dial" mod-role="input-control-port" mod-port-symbol="input_gain" mod-widget-rotation="270"></div>
+        <span>Input</span>
+      </div>
+      <div class="control main">
+        <div class="dial" mod-role="input-control-port" mod-port-symbol="output_gain" mod-widget-rotation="270"></div>
+        <span>Output</span>
+      </div>
+      <div class="control main accent">
+        <div class="dial" mod-role="input-control-port" mod-port-symbol="dry_wet" mod-widget-rotation="270"></div>
+        <span>Mix</span>
+      </div>
+      <div class="control switch-control">
+        <div class="toggle" mod-role="bypass" mod-widget-rotation="48"></div>
+        <span>Bypass</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="section-grid">
+    <section class="section tape">
+      <div class="section-heading">
+        <h2>Tape</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="tape_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls five">
+        <div class="control featured"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_drive" mod-widget-rotation="270"></div><span>Drive</span></div>
+        <div class="control featured"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_saturation" mod-widget-rotation="270"></div><span>Saturation</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_bias" mod-widget-rotation="270"></div><span>Bias</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_mode" mod-widget-rotation="270"></div><span>Mode</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="azimuth" mod-widget-rotation="270"></div><span>Azimuth</span></div>
+      </div>
+    </section>
+
+    <section class="section tone">
+      <div class="section-heading">
+        <h2>Tone</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="tone_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls four">
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tone_bass" mod-widget-rotation="270"></div><span>Bass</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tone_treble" mod-widget-rotation="270"></div><span>Treble</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tone_transition_frequency" mod-widget-rotation="270"></div><span>Transition</span></div>
+      </div>
+    </section>
+
+    <section class="section compression">
+      <div class="section-heading">
+        <h2>Compression</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="compression_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls four">
+        <div class="control featured"><div class="dial" mod-role="input-control-port" mod-port-symbol="compression_amount" mod-widget-rotation="270"></div><span>Amount</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="compression_attack" mod-widget-rotation="270"></div><span>Attack</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="compression_release" mod-widget-rotation="270"></div><span>Release</span></div>
+      </div>
+    </section>
+
+    <section class="section loss">
+      <div class="section-heading">
+        <h2>Head &amp; Tape Loss</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="loss_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls five">
+        <div class="control featured"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_speed" mod-widget-rotation="270"></div><span>Speed</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_spacing" mod-widget-rotation="270"></div><span>Spacing</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="tape_thickness" mod-widget-rotation="270"></div><span>Thickness</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="playhead_gap" mod-widget-rotation="270"></div><span>Head Gap</span></div>
+      </div>
+    </section>
+
+    <section class="section filters">
+      <div class="section-heading">
+        <h2>Input Filters</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="input_filters_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls four">
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="input_low_cut" mod-widget-rotation="270"></div><span>Low Cut</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="input_high_cut" mod-widget-rotation="270"></div><span>High Cut</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="input_cut_makeup" mod-widget-rotation="270"></div><span>Makeup</span></div>
+      </div>
+    </section>
+
+    <section class="section motion">
+      <div class="section-heading">
+        <h2>Wow &amp; Flutter</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="wow_flutter_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls six compact">
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="flutter_rate" mod-widget-rotation="270"></div><span>Flutter Rate</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="flutter_depth" mod-widget-rotation="270"></div><span>Flutter Depth</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="wow_rate" mod-widget-rotation="270"></div><span>Wow Rate</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="wow_depth" mod-widget-rotation="270"></div><span>Wow Depth</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="wow_variance" mod-widget-rotation="270"></div><span>Variance</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="wow_drift" mod-widget-rotation="270"></div><span>Drift</span></div>
+      </div>
+    </section>
+
+    <section class="section degrade">
+      <div class="section-heading">
+        <h2>Degrade</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="degrade_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls four">
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="degrade_depth" mod-widget-rotation="270"></div><span>Depth</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="degrade_amount" mod-widget-rotation="270"></div><span>Amount</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="degrade_variance" mod-widget-rotation="270"></div><span>Variance</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="degrade_envelope" mod-widget-rotation="270"></div><span>Envelope</span></div>
+      </div>
+    </section>
+
+    <section class="section chew">
+      <div class="section-heading">
+        <h2>Chew</h2>
+        <div class="toggle small" mod-role="input-control-port" mod-port-symbol="chew_on_off" mod-widget="switch" mod-widget-rotation="48"></div>
+      </div>
+      <div class="controls four">
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="chew_depth" mod-widget-rotation="270"></div><span>Depth</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="chew_freq" mod-widget-rotation="270"></div><span>Frequency</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="chew_variance" mod-widget-rotation="270"></div><span>Variance</span></div>
+      </div>
+    </section>
+
+    <section class="section utility">
+      <div class="section-heading"><h2>Stereo &amp; Quality</h2></div>
+      <div class="controls five compact">
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="mid_side_mode" mod-widget-rotation="270"></div><span>Mid / Side</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="stereo_balance" mod-widget-rotation="270"></div><span>Balance</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="stereo_makeup" mod-widget-rotation="270"></div><span>Makeup</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="oversampling_factor" mod-widget-rotation="270"></div><span>OS Factor</span></div>
+        <div class="control"><div class="dial" mod-role="input-control-port" mod-port-symbol="oversampling_mode" mod-widget-rotation="270"></div><span>OS Mode</span></div>
+      </div>
+    </section>
+  </main>
+</div>

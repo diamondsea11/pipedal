@@ -792,6 +792,99 @@ interface FilmstripControlProps {
     unmonitorPort: (handle: MonitorPortHandle) => void;
 };
 
+interface OutputMeterControlProps {
+    instanceId: number;
+    symbol: string;
+    frameElement: HTMLElement;
+    monitorPort: (
+        instanceId: number,
+        symbol: string,
+        interval: number,
+        callback: (value: number) => void) => MonitorPortHandle;
+    unmonitorPort: (handle: MonitorPortHandle) => void;
+}
+
+class OutputMeterControl implements ModGuiControl {
+    private props: OutputMeterControlProps;
+    private monitorHandle: MonitorPortHandle | null = null;
+    private displayedDb = 0;
+    private peakDb = 0;
+    private peakHoldUntil = 0;
+
+    constructor(props: OutputMeterControlProps) {
+        this.props = props;
+    }
+
+    private readNumberAttribute(name: string, fallback: number): number {
+        const text = this.props.frameElement.getAttribute(name);
+        if (text === null) return fallback;
+        const value = Number.parseFloat(text);
+        return Number.isFinite(value) ? value : fallback;
+    }
+
+    private valueToDb(value: number): number {
+        const scale = this.props.frameElement.getAttribute("mod-meter-scale") ?? "db";
+        if (scale === "gain-reduction") {
+            return -20 * Math.log10(Math.max(value, 1.0e-9));
+        }
+        return Math.max(0, value);
+    }
+
+    private update(value: number) {
+        const maxDb = Math.max(1, this.readNumberAttribute("mod-meter-max", 30));
+        const release = Math.min(0.995, Math.max(0, this.readNumberAttribute("mod-meter-release", 0.82)));
+        const measuredDb = Math.min(maxDb, Math.max(0, this.valueToDb(value)));
+
+        this.displayedDb = measuredDb >= this.displayedDb
+            ? measuredDb
+            : measuredDb * (1 - release) + this.displayedDb * release;
+
+        const now = Date.now();
+        if (this.displayedDb >= this.peakDb || now >= this.peakHoldUntil) {
+            this.peakDb = this.displayedDb;
+            this.peakHoldUntil = now + 900;
+        }
+
+        const level = Math.min(1, this.displayedDb / maxDb);
+        const peak = Math.min(1, this.peakDb / maxDb);
+        this.props.frameElement.style.setProperty("--mod-meter-level", `${level * 100}%`);
+        this.props.frameElement.style.setProperty("--mod-meter-peak", `${peak * 100}%`);
+        this.props.frameElement.setAttribute("aria-valuenow", this.displayedDb.toFixed(1));
+
+        this.props.frameElement.querySelectorAll('[mod-role="output-control-value"]')
+            .forEach((element) => {
+                element.textContent = `${this.displayedDb.toFixed(1)} dB`;
+            });
+    }
+
+    onMounted() {
+        this.props.frameElement.setAttribute("role", "meter");
+        this.props.frameElement.setAttribute("aria-valuemin", "0");
+        this.props.frameElement.setAttribute(
+            "aria-valuemax",
+            this.readNumberAttribute("mod-meter-max", 30).toString()
+        );
+        this.monitorHandle = this.props.monitorPort(
+            this.props.instanceId,
+            this.props.symbol,
+            1.0 / 30,
+            (value: number) => this.update(value)
+        );
+        this.update(1);
+    }
+
+    onUnmount() {
+        if (this.monitorHandle) {
+            this.props.unmonitorPort(this.monitorHandle);
+            this.monitorHandle = null;
+        }
+    }
+
+    render(): HTMLElement | null {
+        return null;
+    }
+}
+
 class FilmstripControl implements ModGuiControl {
 
     private props: FilmstripControlProps;
@@ -1420,6 +1513,27 @@ function ModGuiHost(props: ModGuiHostProps) {
                 } else {
                     setModError("No mod-symbol attribute found on control element.");
                 }
+            });
+        element.querySelectorAll('[mod-role=output-control-port]')
+            .forEach((control) => {
+                const symbol = control.getAttribute("mod-port-symbol");
+                if (!symbol) {
+                    setModError("No mod-symbol attribute found on output meter.");
+                    return;
+                }
+                if (!plugin.getControl(symbol)) {
+                    setModError(`No plugin info found for output meter ${symbol}`);
+                    return;
+                }
+                const meter = new OutputMeterControl({
+                    instanceId: props.instanceId,
+                    symbol,
+                    frameElement: control as HTMLElement,
+                    monitorPort: model.monitorPort.bind(model),
+                    unmonitorPort: model.unmonitorPort.bind(model)
+                });
+                modGuiControls.push(meter);
+                meter.onMounted();
             });
         element.querySelectorAll('[mod-role=bypass]')
             .forEach((control) => {

@@ -41,6 +41,23 @@ static constexpr int RT_WEBSERVER_THREAD_PRIORITY = -1;
 
 static constexpr int NICE_WEBSERVER_PROCESS_PRIORITY = -9; // above chrome renderer, below pipewire..
 
+static void SetAudioThreadAffinity()
+{
+    long cpuCount = sysconf(_SC_NPROCESSORS_ONLN);
+    if (cpuCount < 4)
+    {
+        return;
+    }
+
+    cpu_set_t cpuSet;
+    CPU_ZERO(&cpuSet);
+    CPU_SET(1, &cpuSet);
+    if (sched_setaffinity(0, sizeof(cpuSet), &cpuSet) != 0)
+    {
+        Lv2Log::warning(SS("Failed to pin realtime audio thread to CPU 1 (" << strerror(errno) << ")"));
+    }
+}
+
 bool pipedal::IsRtPreemptKernel(SchedulerPriority priority)
 {
     #ifdef __linux__
@@ -122,6 +139,7 @@ void pipedal::SetThreadPriority(SchedulerPriority priority)
     {
     case SchedulerPriority::RealtimeAudio:
         SetPriority(RT_AUDIO_THREAD_PRIORITY, "RealtimeAudio");
+        SetAudioThreadAffinity();
         break;
     case SchedulerPriority::AudioService:
         SetPriority(RT_AUDIOSERVICE_THREAD_PRIORITY, "AudioService");

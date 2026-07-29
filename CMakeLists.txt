@@ -5,7 +5,7 @@ project(pipedal
     HOMEPAGE_URL "https://rerdavies.github.io/pipedal"
 )
 
-set (DISPLAY_VERSION "PiPedal v2.0.108-Release")
+set (DISPLAY_VERSION "PiPedal v2.0.108-codex6")
 
 option(PIPEDAL_DISABLE_COPYRIGHT_BUILD "Skip generation of copyright notices (use on non-Debian distros)" OFF)
 option(PIPEDAL_EXCLUDE_TESTS "Exclude test targets from default build" OFF)
@@ -37,10 +37,6 @@ set (SQLITECPP_INSTALL OFF CACHE BOOL "Disable SQLiteCpp install" FORCE)
 
 set(SUBMODULE_INSTALL OFF CACHE BOOL "" FORCE)
 
-# Remove SQLiteCPP install files. 
-set(CPACK_SOURCE_IGNORE_FILES
-    "*.a;sqlite3.h;$(CPACK_SOURCE_IGNORE_FILES)"
-)
 
 include(CTest)
 enable_testing()
@@ -56,7 +52,9 @@ add_subdirectory("src")
 
 set (VITE_BUILD_DIRECTORY ${PROJECT_SOURCE_DIR}/vite/dist/)
 
+
 # install
+
 
 install(
     DIRECTORY config/ DESTINATION /etc/pipedal/config
@@ -134,7 +132,9 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "libicu-dev ,lv2-dev,iw, ffmpeg, authbind, curl
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE ${DEBIAN_ARCHITECTURE})
 set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+set(CPACK_PROJECT_VERSION "2.0.108+codex6")
+set(CPACK_PACKAGE_VERSION "2.0.108+codex6")
+set(CPACK_DEBIAN_PACKAGE_VERSION "2.0.108+codex6")
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 if (CMAKE_BUILD_TYPE MATCHES Debug)
     set (CPACK_STRIP_FILES false)
@@ -154,4 +154,3 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 include(CPack)
 
 message(STATUS "CMAKE_INSTALL_PREFIX: ${CMAKE_INSTALL_PREFIX}")
-

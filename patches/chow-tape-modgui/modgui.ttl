@@ -1,0 +1,16 @@
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix modgui: <http://moddevices.com/ns/modgui#> .
+
+<https://github.com/jatinchowdhury18/AnalogTapeModel>
+    modgui:gui <https://github.com/jatinchowdhury18/AnalogTapeModel#PiPedalUI> .
+
+<https://github.com/jatinchowdhury18/AnalogTapeModel#PiPedalUI>
+    a modgui:Gui ;
+    modgui:resourcesDirectory <modgui> ;
+    modgui:iconTemplate <modgui/icon.html> ;
+    modgui:stylesheet <modgui/style.css> ;
+    modgui:brand "ChowDSP" ;
+    modgui:label "Tape Model" ;
+    modgui:model "CHOWTapeModel" ;
+    modgui:color "charcoal" ;
+    modgui:panel "aluminium" .

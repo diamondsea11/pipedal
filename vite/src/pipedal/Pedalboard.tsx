@@ -790,6 +790,38 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             }
         }
     }
+    cloneItemWithNewInstanceIds(item: PedalboardItem): PedalboardItem
+    {
+        let result = item.clone();
+        let instanceIdMap = new Map<number, number>();
+
+        let assignIds = (currentItem: PedalboardItem) => {
+            let oldInstanceId = currentItem.instanceId;
+            currentItem.instanceId = ++this.nextInstanceId;
+            instanceIdMap.set(oldInstanceId, currentItem.instanceId);
+
+            if (currentItem.isSplit()) {
+                let splitItem = currentItem as PedalboardSplitItem;
+                splitItem.topChain.forEach(assignIds);
+                splitItem.bottomChain.forEach(assignIds);
+            }
+        };
+        let remapReferences = (currentItem: PedalboardItem) => {
+            let remappedSidechainId = instanceIdMap.get(currentItem.sideChainInputId);
+            if (remappedSidechainId !== undefined) {
+                currentItem.sideChainInputId = remappedSidechainId;
+            }
+            if (currentItem.isSplit()) {
+                let splitItem = currentItem as PedalboardSplitItem;
+                splitItem.topChain.forEach(remapReferences);
+                splitItem.bottomChain.forEach(remapReferences);
+            }
+        };
+
+        assignIds(result);
+        remapReferences(result);
+        return result;
+    }
     replaceItem(instanceId: number, newItem: PedalboardItem)
     {
         newItem.instanceId = ++this.nextInstanceId;
@@ -887,5 +919,4 @@ function* itemGeneratorSplitAfter_(items: PedalboardItem[]): Generator<Pedalboar
         yield item;
     }
 }
-
 

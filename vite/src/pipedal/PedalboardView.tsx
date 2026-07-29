@@ -29,18 +29,31 @@ import { Theme } from '@mui/material/styles';
 import { PiPedalModel, PiPedalModelFactory } from './PiPedalModel';
 import { PluginType } from './Lv2Plugin';
 import ButtonBase from '@mui/material/ButtonBase';
+import Divider from '@mui/material/Divider';
+import Fade from '@mui/material/Fade';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ContentPasteIcon from '@mui/icons-material/ContentPaste';
+import ControlPointDuplicateIcon from '@mui/icons-material/ControlPointDuplicate';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import PluginIcon, { getIconColor, SelectIconUri } from './PluginIcon';
 import { SelectHoverBackground } from './SelectHoverBackground';
 import SvgPathBuilder from './SvgPathBuilder';
 import Draggable from './Draggable'
 import Rect from './Rect';
 import { PiPedalStateError } from './PiPedalError';
-import Utility from './Utility';
 import { isDarkMode } from './DarkMode';
 import {
     Pedalboard, PedalboardItem, PedalboardSplitItem, SplitType
 } from './Pedalboard';
+import {
+    copyPedalboardItem,
+    getPedalboardClipboardItem,
+    hasPedalboardClipboard
+} from './PedalboardClipboard';
 
 // import MidiIcon from './svg/ic_midi.svg?react';
 // import { midiChannelBindingControlFeatureEnabled } from './MidiChannelBinding';
@@ -252,6 +265,11 @@ interface LayoutSize {
 
 type PedalboardState = {
     pedalboard?: Pedalboard;
+    contextMenu: {
+        mouseX: number;
+        mouseY: number;
+        instanceId: number;
+    } | null;
 };
 
 const EMPTY_PEDALS: PedalLayout[] = [];
@@ -449,6 +467,7 @@ const PedalboardView =
                     if (!props.selectedId) props.selectedId = -1;
                     this.state = {
                         pedalboard: this.model.pedalboard.get(),
+                        contextMenu: null,
                     };
                     this.onPedalboardChanged = this.onPedalboardChanged.bind(this);
                     this.frameRef = React.createRef();
@@ -796,23 +815,78 @@ const PedalboardView =
 
                 }
 
-                onItemLongClick(event: SyntheticEvent, instanceId?: number): void {
+                openItemContextMenu(instanceId: number, clientX: number, clientY: number): void {
+                    if (!this.props.enableStructureEditing || instanceId < 0) {
+                        this.setSelection(instanceId);
+                        return;
+                    }
+                    this.setSelection(instanceId);
+                    this.setState({
+                        contextMenu: {
+                            mouseX: clientX + 2,
+                            mouseY: clientY - 6,
+                            instanceId: instanceId,
+                        }
+                    });
+                }
+
+                onItemLongClick(event: React.MouseEvent, instanceId?: number): void {
                     if (!instanceId) {
                         return;
                     }
                     event.preventDefault();
                     event.stopPropagation();
 
-                    if (!this.props.enableStructureEditing) {
-                        this.setSelection(instanceId);
-                        return;
-                    }
-                    if (!Utility.needsZoomedControls()) {
-                        if (this.props.onDoubleClick && this.props.enableStructureEditing && instanceId) {
-                            this.props.onDoubleClick(instanceId);
-                        }
-                    }
+                    this.openItemContextMenu(instanceId, event.clientX, event.clientY);
+                }
 
+                closeItemContextMenu(): void {
+                    this.setState({ contextMenu: null });
+                }
+
+                copyContextMenuItem(): void {
+                    let contextMenu = this.state.contextMenu;
+                    this.closeItemContextMenu();
+                    if (!contextMenu) return;
+
+                    let item = this.model.pedalboard.get().maybeGetItem(contextMenu.instanceId);
+                    if (item && !item.isEmpty()) {
+                        copyPedalboardItem(item);
+                    }
+                }
+
+                pasteContextMenuItem(): void {
+                    let contextMenu = this.state.contextMenu;
+                    let clipboardItem = getPedalboardClipboardItem();
+                    this.closeItemContextMenu();
+                    if (!contextMenu || !clipboardItem) return;
+
+                    let newId = this.model.insertPedalboardItemCopy(
+                        contextMenu.instanceId,
+                        clipboardItem,
+                        true
+                    );
+                    this.setSelection(newId);
+                }
+
+                duplicateContextMenuItem(): void {
+                    let contextMenu = this.state.contextMenu;
+                    this.closeItemContextMenu();
+                    if (!contextMenu) return;
+
+                    let newId = this.model.duplicatePedalboardItem(contextMenu.instanceId);
+                    this.setSelection(newId);
+                }
+
+                deleteContextMenuItem(): void {
+                    let contextMenu = this.state.contextMenu;
+                    this.closeItemContextMenu();
+                    if (!contextMenu) return;
+
+                    let newId = this.model.deletePedalboardPedal(contextMenu.instanceId);
+                    if (newId !== null) {
+                        this.setSelection(newId);
+                    }
                 }
 
                 strokeConnector(output: ReactNode[], channels: number, enabled: Boolean, svgPath: string) {
@@ -1091,7 +1165,7 @@ const PedalboardView =
                             <ButtonBase className={classes.pedalButton} 
                                 onClick={(e) => { this.onItemClick(e, instanceId); }}
                                 onDoubleClick={(e: SyntheticEvent) => { this.onItemDoubleClick(e, instanceId); }}
-                                onContextMenu={(e: SyntheticEvent) => { this.onItemLongClick(e, instanceId); }}
+                                onContextMenu={(e: React.MouseEvent) => { this.onItemLongClick(e, instanceId); }}
                             >
                                 <div className={frameStyle} style={{ position: "absolute" }} onContextMenu={(e) => { e.preventDefault(); }}
                                 >
@@ -1102,6 +1176,7 @@ const PedalboardView =
                                 </div>
                                 <Draggable draggable={draggable && (this.props.enableStructureEditing)} getScrollContainer={() => this.getScrollContainer()}
                                     onDragEnd={(x, y) => { this.onDragEnd(instanceId, x, y) }}
+                                    onLongPress={(x, y) => { this.openItemContextMenu(instanceId, x, y); }}
                                     style={{ opacity: enabled ? 0.99 : 0.3 }}
 
                                 >
@@ -1386,6 +1461,12 @@ const PedalboardView =
 
 
                     this.currentLayout = layoutChain; // save for mouse processing &c.
+                    let contextMenuItem = this.state.contextMenu
+                        ? this.state.pedalboard?.maybeGetItem(this.state.contextMenu.instanceId) ?? null
+                        : null;
+                    let canCopy = contextMenuItem !== null && !contextMenuItem.isEmpty();
+                    let canDelete = contextMenuItem !== null
+                        && (this.state.pedalboard?.canDeleteItem(contextMenuItem.instanceId) ?? false);
 
                     return (
                         <div className={classes.scrollContainer} ref={this.scrollRef}
@@ -1396,6 +1477,52 @@ const PedalboardView =
                                 }} >
                                 {this.renderChain(layoutChain, layoutSize)}
                             </div>
+                            <Menu
+                                open={this.state.contextMenu !== null}
+                                onClose={() => this.closeItemContextMenu()}
+                                anchorReference="anchorPosition"
+                                anchorPosition={this.state.contextMenu === null
+                                    ? undefined
+                                    : {
+                                        top: this.state.contextMenu.mouseY,
+                                        left: this.state.contextMenu.mouseX,
+                                    }}
+                                TransitionComponent={Fade}
+                                MenuListProps={{
+                                    "aria-label": "Pedal actions",
+                                    style: { minWidth: 190 }
+                                }}
+                            >
+                                <MenuItem
+                                    disabled={!canCopy}
+                                    onClick={() => this.duplicateContextMenuItem()}
+                                >
+                                    <ListItemIcon><ControlPointDuplicateIcon fontSize="small" /></ListItemIcon>
+                                    Duplicate
+                                </MenuItem>
+                                <MenuItem
+                                    disabled={!canCopy}
+                                    onClick={() => this.copyContextMenuItem()}
+                                >
+                                    <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+                                    Copy
+                                </MenuItem>
+                                <MenuItem
+                                    disabled={!hasPedalboardClipboard()}
+                                    onClick={() => this.pasteContextMenuItem()}
+                                >
+                                    <ListItemIcon><ContentPasteIcon fontSize="small" /></ListItemIcon>
+                                    Paste after
+                                </MenuItem>
+                                <Divider />
+                                <MenuItem
+                                    disabled={!canDelete}
+                                    onClick={() => this.deleteContextMenuItem()}
+                                >
+                                    <ListItemIcon><DeleteOutlineIcon fontSize="small" /></ListItemIcon>
+                                    Delete
+                                </MenuItem>
+                            </Menu>
                         </div>
                     );
                 }

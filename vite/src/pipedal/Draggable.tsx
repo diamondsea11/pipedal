@@ -54,6 +54,7 @@ export interface DraggableProps extends WithStyles<typeof styles> {
     onDragMove?: (clientX: number, clientY: number) => void;
     onDragEnd?: (clientX: number, clientY: number) => void;
     onDragCancel?: (clientX: number, clientY: number) => void;
+    onLongPress?: (clientX: number, clientY: number) => void;
     getScrollContainer: () => HTMLDivElement | null | undefined;
 
     children?: ReactNode | ReactNode[];
@@ -119,8 +120,15 @@ const Draggable =
             pointerType: string = "";
 
             lastOnDragTime: number = 0;
+            suppressNextClick: boolean = false;
 
             onClick(e: MouseEvent<HTMLDivElement>) {
+                if (this.suppressNextClick) {
+                    this.suppressNextClick = false;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
                 // if the click event immediately follows drag end, suppress it.
                 let dt = new Date().getTime() - this.lastOnDragTime;
                 if (dt < 150) {
@@ -163,6 +171,7 @@ const Draggable =
                 e.stopPropagation();
             }
             longPressTimer?: number = undefined;
+            contextMenuTimer?: number = undefined;
 
             longPressTimerTick() {
                 if (this.pointerType === "touch") {
@@ -185,6 +194,10 @@ const Draggable =
                 if (this.longPressTimer) {
                     clearTimeout(this.longPressTimer);
                     this.longPressTimer = undefined;
+                }
+                if (this.contextMenuTimer) {
+                    clearTimeout(this.contextMenuTimer);
+                    this.contextMenuTimer = undefined;
                 }
 
                 this.stopAutoScroll();
@@ -230,6 +243,16 @@ const Draggable =
                 if (!this.mouseDown && this.isValidPointer(e)) {
 
                     this.longPressTimer = setTimeout(() => this.longPressTimerTick(), LONG_PRESS_TIME_MS);
+                    if (e.pointerType === "touch" && this.props.onLongPress) {
+                        this.contextMenuTimer = setTimeout(() => {
+                            let clientX = this.startClientX;
+                            let clientY = this.startClientY;
+                            this.lastOnDragTime = new Date().getTime();
+                            this.suppressNextClick = true;
+                            this.cancelDrag();
+                            this.props.onLongPress?.(clientX, clientY);
+                        }, 650);
+                    }
 
                     this.dragTarget = e.currentTarget as HTMLDivElement;
                     document.body.addEventListener("pointerdown", this.onPointerDownCapture, true);
@@ -385,6 +408,12 @@ const Draggable =
 
             onPointerMove(e: PointerEvent<HTMLDivElement>): void {
                 if (this.isCapturedPointer(e)) {
+                    let dx = e.clientX - this.startClientX;
+                    let dy = e.clientY - this.startClientY;
+                    if (dx * dx + dy * dy > 100 && this.contextMenuTimer) {
+                        clearTimeout(this.contextMenuTimer);
+                        this.contextMenuTimer = undefined;
+                    }
                     if (!this.dragStarted && this.dragThresholdExceeded(e)) {
                         this.startDrag();
 

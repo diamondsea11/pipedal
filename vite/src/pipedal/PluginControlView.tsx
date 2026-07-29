@@ -65,7 +65,7 @@ const LANDSCAPE_HEIGHT_BREAK = 500;
 
 
 export interface ICustomizationHost {
-    makeStandardControl(uiControl: UiControl, controlValues: ControlValue[]): ReactNode;
+    makeStandardControl(uiControl: UiControl, controlValues: ControlValue[], options?: { slimmableWeights: number[] }): ReactNode;
     makeCustomControl(title: string, mainControl: ReactNode, editControl?: ReactNode): ReactNode;
     renderControlGroup(controlGroup: ControlGroup, key: string): ReactNode;
     isLandscapeGrid(): boolean;
@@ -365,6 +365,7 @@ export interface PluginControlViewProps extends WithStyles<typeof styles> {
     customizationId?: number;
     showModGui: boolean;
     onSetShowModGui: (instanceId: number, showModGui: boolean) => void;
+    options?: { slimmableWeights: number[] };
 }
 type PluginControlViewState = {
     landscapeGrid: boolean;
@@ -498,11 +499,12 @@ const PluginControlView =
             private ixKey: number = 1;
 
 
-            makeStandardControl(uiControl: UiControl, controlValues: ControlValue[]): ReactNode {
+            makeStandardControl(uiControl: UiControl, controlValues: ControlValue[], options?: { slimmableWeights?: number[] }): ReactNode {
                 let symbol = uiControl.symbol;
                 if (!uiControl.is_input) {
                     return (
-                        <PluginOutputControl key={uiControl.symbol} instanceId={this.props.instanceId} uiControl={uiControl} />
+                        <PluginOutputControl key={uiControl.symbol} instanceId={this.props.instanceId} uiControl={uiControl} 
+                        />
 
                     );
                 }
@@ -522,6 +524,7 @@ const PluginControlView =
                         onChange={(value: number) => { this.onControlValueChanged(controlValue!.key, value) }}
                         onPreviewChange={(value: number) => { this.onPreviewChange(controlValue!.key, value) }}
                         requestIMEEdit={(uiControl: any, value: any) => this.requestImeEdit(uiControl, value)}
+                        options={options}
 
                     />
                 ));
@@ -650,18 +653,21 @@ const PluginControlView =
                     );
                 }
                 return (
-                    <div key={key} className={!isLandscapeGrid ? classes.portGroup : classes.portGroupLandscape}
+                    <div key={key}
+                        data-pipedal-role="control-group"
+                        data-group-name={controlGroup.name}
+                        className={!isLandscapeGrid ? classes.portGroup : classes.portGroupLandscape}
                         style={{ borderWidth: (controlGroup.name === "" ? 0 : undefined) }}
                     >
                         {controlGroup.name !== "" && (
-                            <div className={classes.portGroupTitle}>
+                            <div data-pipedal-role="control-group-title" className={classes.portGroupTitle}>
                                 <ToolTipEx title={controlGroup.name}
                                 >
                                     <Typography noWrap variant="caption" >{controlGroup.name}</Typography>
                                 </ToolTipEx>
                             </div>
                         )}
-                        <div className={
+                        <div data-pipedal-role="control-group-controls" className={
                             this.state.landscapeGrid ? classes.portGroupControlsLandscape : classes.portGroupControls} >
                             {
                                 controls
@@ -846,7 +852,11 @@ const PluginControlView =
                             );
                         } else {
                             result.push((
-                                <div key={"ctl" + (this.controlKeyIndex++)} className={hasGroups ? classes.portgroupControlPadding : classes.controlPadding} >
+                                <div
+                                    key={"ctl" + (this.controlKeyIndex++)}
+                                    data-pipedal-role="custom-control"
+                                    className={hasGroups ? classes.portgroupControlPadding : classes.controlPadding}
+                                >
                                     {node as ReactNode}
                                 </div>
                             ));
@@ -1022,7 +1032,7 @@ const PluginControlView =
                 }
                 return (
                     <div className={scrollClass}>
-                        <div className={gridClass}  >
+                        <div data-pipedal-role="control-grid" className={gridClass}>
                             {
                                 nodes
                             }
@@ -1063,7 +1073,7 @@ const PluginControlView =
 
 
                 return (
-                    <div className={frameClass}>
+                    <div data-pipedal-role="plugin-control-frame" className={frameClass}>
                         <div className={classes.vuMeterL}>
                             <VuMeter displayText={true} display="input" instanceId={pedalboardItem.instanceId} />
                         </div>
@@ -1146,6 +1156,3 @@ const PluginControlView =
     ));
 
 export default PluginControlView;
-
-
-

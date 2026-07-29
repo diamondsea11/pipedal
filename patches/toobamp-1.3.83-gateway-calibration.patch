@@ -1,0 +1,337 @@
+diff --git a/src/LsNumerics/AudioThreadToBackgroundQueue.cpp b/src/LsNumerics/AudioThreadToBackgroundQueue.cpp
+index 03605bd..1b00cd8 100644
+--- a/src/LsNumerics/AudioThreadToBackgroundQueue.cpp
++++ b/src/LsNumerics/AudioThreadToBackgroundQueue.cpp
+@@ -259,6 +259,7 @@ void AudioThreadToBackgroundQueue::CreateThread(const std::function<void(void)>
+         [this, threadProc, threadNumber]()
+         {
+             toob::SetThreadName(SS("crvb" << threadNumber));
++            toob::SetRealtimeWorkerAffinity(threadNumber - 1);
+ 
+             if (this->schedulerPolicy == SchedulerPolicy::UnitTest)
+             {
+diff --git a/src/LsNumerics/ConvolutionReverb.cpp b/src/LsNumerics/ConvolutionReverb.cpp
+index 64a9699..579c79a 100644
+--- a/src/LsNumerics/ConvolutionReverb.cpp
++++ b/src/LsNumerics/ConvolutionReverb.cpp
+@@ -1435,6 +1435,7 @@ void BalancedConvolution::AssemblyThreadProc()
+     disable_denorms();
+     
+     toob::SetThreadName("cr_assembly");
++    toob::SetRealtimeWorkerAffinity(1);
+     try
+     {
+         // 76 slots into pipewire priorities nicely.
+diff --git a/src/NamBackgroundProcessor.cpp b/src/NamBackgroundProcessor.cpp
+index c03a489..b77406a 100644
+--- a/src/NamBackgroundProcessor.cpp
++++ b/src/NamBackgroundProcessor.cpp
+@@ -24,6 +24,7 @@ SOFTWARE.
+ #include "NamBackgroundProcessor.hpp"
+ #include "namFixes/dsp_ex.h"
+ #include "LsNumerics/LsMath.hpp"
++#include "util.hpp"
+ #include <iostream>
+ 
+ using namespace toob;
+@@ -56,6 +57,7 @@ void NamBackgroundProcessor::ThreadProc()
+ 
+     pthread_t pid = pthread_self();
+     pthread_setname_np(pid, "tnam_bg");
++    toob::SetRealtimeWorkerAffinity(0);
+ 
+     int result = sched_setscheduler(0, SCHED_RR, &param);
+     if (result != 0)
+@@ -111,8 +113,7 @@ void NamBackgroundProcessor::ThreadProc()
+ 
+             if (this->backgroundInputTailPosition + source->length > this->backgroundInputBuffer.size())
+             {
+-                backgroundInputBuffer.resize(backgroundInputBuffer.size() * 2);
+-                backgroundReturnBuffer.resize(backgroundInputBuffer.size());
++                throw std::logic_error("TooB NAM background input buffer capacity exceeded.");
+             }
+             const float *restrict pIn = source->samples;
+             float *restrict pOut = backgroundInputBuffer.data() + backgroundInputTailPosition;
+@@ -298,8 +299,7 @@ bool NamBackgroundProcessor::fgProcessMessage(bool wait)
+             size_t len = msg->length;
+             if (backgroundReturnBuffer.size() < backgroundReturnTailPosition + len)
+             {
+-                // should never happen.
+-                backgroundReturnBuffer.resize(backgroundReturnTailPosition + len);
++                throw std::logic_error("TooB NAM foreground return buffer capacity exceeded.");
+             }
+             float *restrict pDest = backgroundReturnBuffer.data() + backgroundReturnTailPosition;
+             const float *restrict pSource = msg->samples;
+@@ -355,9 +355,6 @@ void NamBackgroundProcessor::fgClose()
+     }
+ }
+ 
+-static float baseInputAdjustment = Af2Db(6);  // users are asked to gainstage to -6dBU.
+-static float baseOutputAdjustment = Af2Db(6); // users are asked to gainstage to -6dBU.
+-
+ NamVolumeAdjustments toob::nam_impl::CalculateNamVolumeAdjustments(
+     NeuralAudioDsp *dsp,
+     const NamCalibrationSettings &calibrationSettings)
+@@ -368,65 +365,32 @@ NamVolumeAdjustments toob::nam_impl::CalculateNamVolumeAdjustments(
+         return {1.0f, 1.0f};
+     }
+ 
+-    // INPUT LEVELS
+-
+-    result.input = baseInputAdjustment; // calbration goes here later. //yyy: Default value should probably be +6dB.
+-    float dbIn;
++    result.input = 1.0f;
+     if (calibrationSettings.calibrateInput && dsp->HasModelInputLevelDBu())
+     {
+-        dbIn = calibrationSettings.calibrationDbu - dsp->GetModelInputLevelDBu();
+-    }
+-    else
+-    {
+-        dbIn = -6; // Users are instructed to gainstage to -6dB. Models w/o metadata appear to be ROUGHLY expecting -12dbU.
++        result.input = Db2Af(
++            calibrationSettings.calibrationDbu - dsp->GetModelInputLevelDBu());
+     }
+-    result.input = Db2Af(dbIn + 6); // +6 to make up for our instructions to gainstage to -6dB.
+-
+-    // OUTPUT LEVELS
+ 
+-    auto outputCalibration = calibrationSettings.outputCalbration;
+-    if (outputCalibration == OutputCalibrationMode::Calibrated && !(dsp->HasModelOutputLevelDBu() && dsp->HasModelInputLevelDBu()))
+-    {
+-        outputCalibration = OutputCalibrationMode::Normalized;
+-    }
+-    if (outputCalibration == OutputCalibrationMode::Normalized && !dsp->HasModelLoudnessDB())
+-    {
+-        outputCalibration = OutputCalibrationMode::Raw;
+-    }
+-    float dbOut;
+-    switch (outputCalibration)
++    result.output = 1.0f;
++    switch (calibrationSettings.outputCalbration)
+     {
+     case OutputCalibrationMode::Normalized:
+-    {
+-        // NB: This is an RMS adjustment (hence the magic 18.0)
+-        const float targetLoudness = -18;
+-        float gainDB = targetLoudness - dsp->GetModelLoudnessDB();
+-
+-        dbOut = gainDB + 6; // +6 determined empirically. loudness values are not completely reliable.
++        if (dsp->HasModelLoudnessDB())
++        {
++            result.output = Db2Af(-18.0f - dsp->GetModelLoudnessDB(), -200);
++        }
+         break;
+-    }
+     case OutputCalibrationMode::Calibrated:
+-    {
+-        const float inputLevel = calibrationSettings.calibrationDbu;
+-        const float outputLevel = dsp->GetModelOutputLevelDBu();
+-        dbOut = -(outputLevel - inputLevel);
++        if (dsp->HasModelOutputLevelDBu())
++        {
++            result.output = Db2Af(
++                dsp->GetModelOutputLevelDBu() - calibrationSettings.calibrationDbu);
++        }
+         break;
+-    }
+-    default:
+     case OutputCalibrationMode::Raw:
+-        dbOut = 0; 
+         break;
+     }
+-    result.output = Db2Af(dbOut - 6, -200); // -6dB to get back to our recommened -6dB gainstaging.
+-
+-    // std::cout << "yyy: Model loudness: " << (dsp->HasModelLoudnessDB() ? dsp->GetModelLoudnessDB() : -1) << 
+-    //     " inputLevelDBU: " << (dsp->HasModelInputLevelDBu() ? dsp->GetModelInputLevelDBu() : -1) << 
+-    //     " outputLevelDBU: " << (dsp->HasModelOutputLevelDBu() ? dsp->GetModelOutputLevelDBu() : -1) << 
+-    //     " calibrationDBU: " << calibrationSettings.calibrationDbu <<
+-    //     std::endl
+-    //     ;
+-
+-    // std::cout << "xxy: Calibration: in = " << Af2Db(result.input) << " out = " << Af2Db(result.output) << std::endl;
+     return result;
+ }
+ void NamBackgroundProcessor::SetBgVolumes()
+@@ -442,4 +406,4 @@ void NamBackgroundProcessor::SetBgVolumes()
+         bgInputVolume = 0.0;
+         bgOutputVolume = 0.0;
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/src/NamBackgroundProcessor.hpp b/src/NamBackgroundProcessor.hpp
+index 2e58ad2..3c62cb8 100644
+--- a/src/NamBackgroundProcessor.hpp
++++ b/src/NamBackgroundProcessor.hpp
+@@ -347,8 +347,9 @@ namespace toob::nam_impl
+         void SetFrameSize(size_t frameSize) {
+             this->frameSize = frameSize;
+             size_t bufferSize = std::max((size_t)64,frameSize);
+-            this->backgroundReturnBuffer.resize(2*bufferSize);
+-            this->backgroundInputBuffer.resize(2*bufferSize);
++            size_t processingCapacity = 2 * bufferSize + MAX_DATA_MESSAGE_SAMPLES;
++            this->backgroundReturnBuffer.resize(processingCapacity);
++            this->backgroundInputBuffer.resize(processingCapacity);
+             this->backgroundInputTailPosition = 0;
+             this->backgroundReturnTailPosition = 0;
+         }
+@@ -435,4 +436,4 @@ namespace toob::nam_impl
+         std::unique_ptr<std::jthread> thread;
+         std::atomic<bool> threadActive = false;
+     };
+-}
+\ No newline at end of file
++}
+diff --git a/src/NeuralAmpModeler.cpp b/src/NeuralAmpModeler.cpp
+index 71d742c..5fd8dfc 100644
+--- a/src/NeuralAmpModeler.cpp
++++ b/src/NeuralAmpModeler.cpp
+@@ -436,17 +436,16 @@ void NeuralAmpModeler::SetModel()
+         {
+             fgModelMetadata.input_level_dbu = 0;
+         }
+-        fgModelMetadata.flags = flags;
+-
+         if (mNAM->HasModelOutputLevelDBu())
+         {
+             flags |= TOOB_NAM_METADATA_FLAGS::has_output_level_dbu;
+-            fgModelMetadata.output_level_dbu = mNAM->GetModelInputLevelDBu();
++            fgModelMetadata.output_level_dbu = mNAM->GetModelOutputLevelDBu();
+         }
+         else
+         {
+             fgModelMetadata.output_level_dbu = 0;
+         }
++        fgModelMetadata.flags = flags;
+         fgModelMetadata.hasSlimmableSizes = mNAM? mNAM->HasSlimmableSizes(): false;
+         fgModelMetadata.model_type = (OutputModelType)(int)(mNAM->GetModelType());
+         fgModelMetadata.model_weight = mNAM->GetModelWeight();
+@@ -1537,4 +1536,4 @@ void NeuralAmpModeler::SendModelMetadataNotification()
+     values[TOOB_NAM_METADATA_OFFSETS::model_type] = (float)(int)fgModelMetadata.model_type;
+ 
+     this->PutPatchProperty(0, this->namUris.toob_nam__model_metadata, values.size(), values.data());
+-}
+\ No newline at end of file
++}
+diff --git a/src/ToobAmp.lv2/ttl.in/ToobNeuralAmpModeler.ttl.in b/src/ToobAmp.lv2/ttl.in/ToobNeuralAmpModeler.ttl.in
+index 0a4eca0..5ff2dc3 100644
+--- a/src/ToobAmp.lv2/ttl.in/ToobNeuralAmpModeler.ttl.in
++++ b/src/ToobAmp.lv2/ttl.in/ToobNeuralAmpModeler.ttl.in
+@@ -257,10 +257,10 @@ SOFTWARE.
+                 a lv2:InputPort ,
+                 lv2:ControlPort ;
+ 
+-                lv2:index 2;
+-                lv2:symbol "modelSize" ;
+-                lv2:name "Slim";
+-                lv2:default 0.0 ;
++                lv2:index 2;
++                lv2:symbol "modelSize" ;
++                lv2:name "Slim";
++                lv2:default 1.0 ;
+                 lv2:minimum 0.0;
+                 lv2:maximum 1.0;
+                 lv2:portProperty epp:expensive;
+@@ -406,10 +406,10 @@ SOFTWARE.
+                 a lv2:InputPort ,
+                 lv2:ControlPort ;
+ 
+-                lv2:index 11 ;
+-                lv2:symbol "inputCalibrationMode" ;
+-                lv2:name "Input Calibration";
+-                lv2:default 1.0 ;
++                lv2:index 11 ;
++                lv2:symbol "inputCalibrationMode" ;
++                lv2:name "Input Calibration";
++                lv2:default 1.0 ;
+                 lv2:minimum 0.0 ;
+                 lv2:maximum 1.0; 
+                 lv2:portProperty lv2:enumeration ;
+@@ -431,12 +431,12 @@ SOFTWARE.
+ 
+                 lv2:index 12 ;
+                 lv2:symbol "calibration" ;
+-                lv2:name "Value";
+-                lv2:default -6.0 ;
+-                lv2:minimum -30.0 ;
+-                lv2:maximum 12.0; 
+-                units:unit toobNam:dbuUnits;
+-                rdfs:comment "Measured instrument voltage level in dBU";
++                lv2:name "Interface Input Level";
++                lv2:default 13.0 ;
++                lv2:minimum -60.0 ;
++                lv2:maximum 60.0;
++                units:unit toobNam:dbuUnits;
++                rdfs:comment "Analog input level in dBu RMS that corresponds to digital 0 dBFS peak.";
+                 pg:group toobNam:calibrationGroup ;
+ 
+         ],
+@@ -474,9 +474,9 @@ SOFTWARE.
+                 lv2:index 14 ;
+                 lv2:symbol "version" ;
+                 lv2:name "Preset Version";
+-                lv2:default 1.0 ;
+-                lv2:minimum 0.0 ;
+-                lv2:maximum 1.0; 
++                lv2:default 5.0 ;
++                lv2:minimum 0.0 ;
++                lv2:maximum 5.0;
+                 lv2:portProperty epp:notOnGUI;
+         ],
+         [
+diff --git a/src/util.cpp b/src/util.cpp
+index e94bfcd..3fe62bd 100644
+--- a/src/util.cpp
++++ b/src/util.cpp
+@@ -30,6 +30,9 @@
+ #include <mutex>
+ #include <fstream>
+ #include <fcntl.h>
++#include <pthread.h>
++#include <sched.h>
++#include <thread>
+ #include <unistd.h>
+ 
+ using namespace toob;
+@@ -58,6 +61,22 @@ int toob::SetThreadNice(int niceness)
+     return nice(niceness);
+ }
+ 
++bool toob::SetRealtimeWorkerAffinity(int workerIndex)
++{
++    unsigned int cpuCount = std::thread::hardware_concurrency();
++    if (cpuCount < 4)
++    {
++        return false;
++    }
++
++    unsigned int workerCpuCount = cpuCount - 2;
++    unsigned int cpu = 2 + (unsigned int)workerIndex % workerCpuCount;
++    cpu_set_t cpuSet;
++    CPU_ZERO(&cpuSet);
++    CPU_SET(cpu, &cpuSet);
++    return pthread_setaffinity_np(pthread_self(), sizeof(cpuSet), &cpuSet) == 0;
++}
++
+ 
+ int toob::SetRtThreadPriority(int schedPriority)
+ {
+@@ -193,4 +212,4 @@ std::filesystem::path toob::TemporaryFilename(const std::string &prefix, const s
+ 
+     
+ 
+-}
+\ No newline at end of file
++}
+diff --git a/src/util.hpp b/src/util.hpp
+index c5cc1bf..a163c20 100644
+--- a/src/util.hpp
++++ b/src/util.hpp
+@@ -38,6 +38,7 @@ namespace toob
+ 
+     int SetRtThreadPriority(int threadPriority);
+     int SetThreadNice(int niceness);
++    bool SetRealtimeWorkerAffinity(int workerIndex);
+ 
+     std::filesystem::path TemporaryFilename(const std::string &prefix = "", const std::string&extension = ".tmp");
+ 

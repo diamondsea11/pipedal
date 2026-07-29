@@ -2294,6 +2294,19 @@ std::shared_ptr<Lv2PluginInfo> PiPedalModel::GetPluginInfo(const std::string &ur
     return pluginHost.GetPluginInfo(uri);
 }
 
+static bool IsLegacyFactoryNamPath(const std::map<std::string, std::string> &pathProperties)
+{
+    for (const auto &[key, value] : pathProperties)
+    {
+        if (key == "http://two-play.com/plugins/toob-nam#modelFile" &&
+            value.find("NeuralAmpModels/Factory Models/") != std::string::npos)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const PedalboardItem *pedalboardItem_)
 {
     std::shared_ptr<Lv2PluginInfo> pPlugin = pluginHost.GetPluginInfo(pedalboardItem_->uri());
@@ -2355,6 +2368,44 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
                     snapshotValue.SetControlValue("gate", value);
                 }
                 snapshotValue.SetControlValue("version", 0.0f);
+                pVersion = snapshotValue.GetControlValue("version");
+            }
+            float version = pVersion == nullptr ? 0.0f : pVersion->value();
+            if (version < 2.0f)
+            {
+                // Version 2 uses the NAM/Gateway definition: the interface input
+                // level in dBu RMS that corresponds to 0 dBFS peak.
+                snapshotValue.SetControlValue("calibration", 12.0f);
+                snapshotValue.SetControlValue("version", 2.0f);
+                version = 2.0f;
+            }
+            if (version < 3.0f)
+            {
+                // Use this installation's interface calibration and maximum A2
+                // model quality for existing TooB NAM instances.
+                snapshotValue.SetControlValue("calibration", 13.0f);
+                snapshotValue.SetControlValue("modelSize", 1.0f);
+                snapshotValue.SetControlValue("version", 3.0f);
+                version = 3.0f;
+            }
+            if (version < 4.0f)
+            {
+                // Old bundled presets compensated for the former calibration
+                // implementation with an input trim. Gateway-compatible
+                // calibration makes that trim incorrect.
+                if (IsLegacyFactoryNamPath(snapshotValue.pathProperties_))
+                {
+                    snapshotValue.SetControlValue("inputGain", 0.0f);
+                }
+                snapshotValue.SetControlValue("version", 4.0f);
+                version = 4.0f;
+            }
+            if (version < 5.0f)
+            {
+                // Calibration is effective only when the loaded model exposes
+                // input_level_dbu metadata. Models without it remain at unity.
+                snapshotValue.SetControlValue("inputCalibrationMode", 1.0f);
+                snapshotValue.SetControlValue("version", 5.0f);
             }
         }
         if (pPlugin->piPedalUI())
@@ -2438,6 +2489,43 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
                     pedalboardItem->SetControlValue("gate", value);
                 }
                 pedalboardItem->SetControlValue("version", 0.0f);
+                pVersion = pedalboardItem->GetControlValue("version");
+            }
+            float version = pVersion == nullptr ? 0.0f : pVersion->value();
+            if (version < 2.0f)
+            {
+                // Version 2 uses the NAM/Gateway definition: the interface input
+                // level in dBu RMS that corresponds to 0 dBFS peak.
+                pedalboardItem->SetControlValue("calibration", 12.0f);
+                pedalboardItem->SetControlValue("version", 2.0f);
+                version = 2.0f;
+            }
+            if (version < 3.0f)
+            {
+                // Use this installation's interface calibration and maximum A2
+                // model quality for existing TooB NAM instances.
+                pedalboardItem->SetControlValue("calibration", 13.0f);
+                pedalboardItem->SetControlValue("modelSize", 1.0f);
+                pedalboardItem->SetControlValue("version", 3.0f);
+                version = 3.0f;
+            }
+            if (version < 4.0f)
+            {
+                // Preserve user trims, but remove the historical compensation
+                // from presets that shipped with TooB.
+                if (IsLegacyFactoryNamPath(pedalboardItem->pathProperties_))
+                {
+                    pedalboardItem->SetControlValue("inputGain", 0.0f);
+                }
+                pedalboardItem->SetControlValue("version", 4.0f);
+                version = 4.0f;
+            }
+            if (version < 5.0f)
+            {
+                // Use calibrated input by default; the plugin applies no
+                // adjustment when calibration metadata is unavailable.
+                pedalboardItem->SetControlValue("inputCalibrationMode", 1.0f);
+                pedalboardItem->SetControlValue("version", 5.0f);
             }
         }
         for (size_t i = 0; i < pPlugin->ports().size(); ++i)

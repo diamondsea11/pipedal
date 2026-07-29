@@ -541,6 +541,11 @@ private:
     std::atomic<uint64_t> underruns = 0;
     std::atomic<std::chrono::system_clock::time_point> lastUnderrunTime =
         std::chrono::system_clock::from_time_t(0);
+    std::atomic<uint64_t> callbackTimeTotalNs = 0;
+    std::atomic<uint64_t> callbackCount = 0;
+    std::atomic<uint64_t> callbackMaxNs = 0;
+    std::atomic<uint64_t> callbackNearDeadlineCount = 0;
+    std::atomic<uint64_t> callbackDeadlineNs = 0;
 
     std::string GetAtomObjectType(uint8_t *pData)
     {
@@ -1372,6 +1377,7 @@ private:
     }
     virtual void OnProcess(size_t nframes)
     {
+        auto callbackStart = std::chrono::steady_clock::now();
         try
         {
             float *restrict in, *restrict out;
@@ -1412,6 +1418,25 @@ private:
                 this->underruns = 0;
             }
             this->currentSample += nframes;
+
+            uint64_t elapsedNs = (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                     std::chrono::steady_clock::now() - callbackStart)
+                                     .count();
+            uint64_t deadlineNs = sampleRate == 0 ? 0 : (1000000000ULL * nframes) / sampleRate;
+            callbackDeadlineNs.store(deadlineNs, std::memory_order_relaxed);
+            callbackTimeTotalNs.fetch_add(elapsedNs, std::memory_order_relaxed);
+            callbackCount.fetch_add(1, std::memory_order_relaxed);
+
+            uint64_t previousMax = callbackMaxNs.load(std::memory_order_relaxed);
+            while (elapsedNs > previousMax &&
+                   !callbackMaxNs.compare_exchange_weak(
+                       previousMax, elapsedNs, std::memory_order_relaxed))
+            {
+            }
+            if (deadlineNs != 0 && elapsedNs * 10 >= deadlineNs * 8)
+            {
+                callbackNearDeadlineCount.fetch_add(1, std::memory_order_relaxed);
+            }
         }
         catch (const std::exception &e)
         {
@@ -1540,6 +1565,22 @@ public:
                             lastUnderrunCount = underruns;
                             ++underrunMessagesGiven;
                         }
+                    }
+                    uint64_t count = callbackCount.exchange(0);
+                    uint64_t totalNs = callbackTimeTotalNs.exchange(0);
+                    uint64_t maxNs = callbackMaxNs.exchange(0);
+                    uint64_t nearDeadline = callbackNearDeadlineCount.exchange(0);
+                    uint64_t deadlineNs = callbackDeadlineNs.load(std::memory_order_relaxed);
+                    if (count != 0 && deadlineNs != 0)
+                    {
+                        double averagePercent = 100.0 * (double)totalNs / count / deadlineNs;
+                        double maximumPercent = 100.0 * (double)maxNs / deadlineNs;
+                        Lv2Log::info(
+                            "Audio DSP headroom: avg %.1f%%, max %.1f%%, >=80%%: %lu/%lu",
+                            averagePercent,
+                            maximumPercent,
+                            (unsigned long)nearDeadline,
+                            (unsigned long)count);
                     }
                     waitTime += waitPeriod;
                 }

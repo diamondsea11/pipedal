@@ -1,0 +1,344 @@
+.calf-ui {
+  --accent: #55b7a5;
+  box-sizing: border-box;
+  width: 1240px;
+  min-height: 620px;
+  overflow: hidden;
+  color: #eceeeb;
+  background: #16191a;
+  border: 1px solid #4b5050;
+  font-family: "cooper hewitt", Arial, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0;
+  user-select: none;
+  touch-action: none;
+}
+
+.calf-ui * {
+  box-sizing: border-box;
+}
+
+.calf-header {
+  height: 116px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 18px 28px;
+  color: #171a1a;
+  background: #d8dbd6;
+  border-bottom: 5px solid var(--accent);
+}
+
+.calf-brand {
+  width: 190px;
+  flex: 0 0 auto;
+}
+
+.calf-brand strong,
+.calf-brand span {
+  display: block;
+}
+
+.calf-brand strong {
+  font-size: 27px;
+  line-height: 30px;
+}
+
+.calf-brand span {
+  margin-top: 4px;
+  color: #5d6260;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.calf-mark {
+  width: 60px;
+  height: 60px;
+  position: relative;
+  flex: 0 0 auto;
+  border: 5px solid #242828;
+  border-radius: 50%;
+}
+
+.calf-mark::before,
+.calf-mark::after {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+}
+
+.calf-mark::before {
+  width: 30px;
+  height: 6px;
+  top: 22px;
+  left: 10px;
+}
+
+.calf-mark::after {
+  width: 6px;
+  height: 30px;
+  top: 10px;
+  left: 22px;
+}
+
+.header-controls {
+  min-width: 0;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 22px;
+}
+
+.calf-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.calf-section {
+  min-height: 168px;
+  padding: 15px 18px 13px;
+  border-right: 1px solid #424747;
+  border-bottom: 1px solid #424747;
+}
+
+.calf-section:nth-child(3n) {
+  border-right: 0;
+}
+
+.calf-section h2 {
+  height: 29px;
+  margin: 0 0 8px;
+  color: #cfd3cf;
+  border-bottom: 2px solid #5b6160;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.calf-section.primary h2,
+.calf-section.dynamics h2,
+.calf-section.band h2 {
+  border-bottom-color: var(--accent);
+}
+
+.calf-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(58px, 1fr));
+  align-items: start;
+  justify-items: center;
+  gap: 8px 2px;
+}
+
+.calf-control {
+  width: 70px;
+  min-height: 102px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  color: #bfc4c0;
+  font-size: 11px;
+  line-height: 12px;
+  text-align: center;
+}
+
+.calf-control > span {
+  width: 100%;
+  min-height: 25px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.calf-control.header {
+  min-height: 80px;
+  color: #303534;
+  font-weight: 600;
+}
+
+.calf-dial {
+  width: 52px;
+  height: 52px;
+  position: relative;
+  flex: 0 0 auto;
+  cursor: ns-resize;
+  background: #292d2d;
+  border: 4px solid #737977;
+  border-radius: 50%;
+  box-shadow: 0 2px 0 #0b0d0d;
+  transform-origin: 50% 50%;
+}
+
+.calf-dial::before {
+  content: "";
+  width: 4px;
+  height: 17px;
+  position: absolute;
+  top: 3px;
+  left: 20px;
+  background: #eceee9;
+  border-radius: 2px;
+}
+
+.header .calf-dial {
+  width: 56px;
+  height: 56px;
+  background: #f0f1ed;
+  border-color: #747a77;
+  box-shadow: 0 2px 0 #a5a8a4;
+}
+
+.header .calf-dial::before {
+  left: 22px;
+  background: #262a29;
+}
+
+.calf-switch {
+  width: 32px;
+  height: 19px;
+  position: relative;
+  margin: 17px 0 16px;
+  cursor: pointer;
+  background: var(--accent);
+  border: 2px solid #747b78;
+  border-radius: 3px;
+  transform-origin: 50% 50%;
+}
+
+.calf-switch::after {
+  content: "";
+  width: 13px;
+  height: 13px;
+  position: absolute;
+  top: 1px;
+  left: 7px;
+  background: #f1f2ee;
+  border-radius: 2px;
+}
+
+.calf-select {
+  width: 82px;
+  min-height: 34px;
+  position: relative;
+  margin-top: 16px;
+  padding: 8px 20px 7px 8px;
+  cursor: pointer;
+  color: #e7e9e5;
+  background: #292d2d;
+  border: 1px solid #737977;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.calf-select::after {
+  content: "";
+  position: absolute;
+  top: 13px;
+  right: 8px;
+  border: 4px solid transparent;
+  border-top-color: var(--accent);
+}
+
+.calf-select [mod-role="input-control-value"] {
+  display: block;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mod-enumerated-list {
+  width: 132px;
+  max-height: 190px;
+  display: none;
+  position: absolute;
+  top: 36px;
+  left: -24px;
+  z-index: 80;
+  overflow-y: auto;
+  padding: 4px;
+  color: #eef0ec;
+  background: #252929;
+  border: 1px solid #747a77;
+  border-radius: 4px;
+  box-shadow: 0 5px 15px #0008;
+}
+
+.mod-enumerated-list [mod-role="enumeration-option"] {
+  padding: 6px;
+  border-radius: 2px;
+}
+
+.mod-enumerated-list [mod-role="enumeration-option"]:hover,
+.mod-enumerated-list [mod-role="enumeration-option"].selected {
+  color: #151818;
+  background: var(--accent);
+}
+
+.gr-meter {
+  --mod-meter-level: 0%;
+  --mod-meter-peak: 0%;
+  width: 310px;
+  padding: 9px 12px;
+  color: #202424;
+}
+
+.gr-meter strong {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.gr-track {
+  height: 17px;
+  position: relative;
+  overflow: hidden;
+  background: #afb4b0;
+  border: 2px solid #747a77;
+  border-radius: 3px;
+}
+
+.gr-fill {
+  width: var(--mod-meter-level);
+  height: 100%;
+  background: var(--accent);
+}
+
+.gr-peak {
+  width: 2px;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: var(--mod-meter-peak);
+  background: #c84d42;
+}
+
+.gr-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  color: #656a67;
+  font-size: 9px;
+}
+
+.multi-gr {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 18px;
+  padding: 7px 0 4px;
+}
+
+.multi-gr .gr-meter {
+  width: auto;
+  color: #d6dad6;
+}
+
+.multi-gr .gr-track {
+  background: #343939;
+}
