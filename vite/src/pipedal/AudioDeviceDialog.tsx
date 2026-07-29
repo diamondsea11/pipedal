@@ -43,6 +43,7 @@ import IconButtonEx from './IconButtonEx';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import TextField from '@mui/material/TextField';
 
 import AlsaDeviceInfo from './AlsaDeviceInfo';
 import ResizeResponsiveComponent from './ResizeResponsiveComponent';
@@ -532,6 +533,18 @@ const AudioDeviceDialog = withStyles(
             });
         }
 
+        handleNamInputCalibrationChanged(e: React.ChangeEvent<HTMLInputElement>) {
+            const value = Number(e.target.value);
+            if (!Number.isFinite(value)) return;
+            let settings = this.state.jackServerSettings.clone();
+            settings.setNamInputCalibrationDbu(Math.max(-20, Math.min(40, value)));
+            settings.valid = false;
+            this.setState({
+                jackServerSettings: settings,
+                okEnabled: isOkEnabled(settings, this.state.alsaDevices)
+            });
+        }
+
         applySettings() {
             const settings = this.state.jackServerSettings.clone();
             settings.valid = true;
@@ -765,6 +778,24 @@ const AudioDeviceDialog = withStyles(
                                             }
                                         </Select>
                                     </FormControl>
+                                    <TextField
+                                        variant="standard"
+                                        type="number"
+                                        label="NAM input calibration"
+                                        value={this.state.jackServerSettings.getNamInputCalibrationDbu()}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                            this.handleNamInputCalibrationChanged(e)}
+                                        disabled={!selectedInputDevice}
+                                        slotProps={{
+                                            htmlInput: {
+                                                min: -20,
+                                                max: 40,
+                                                step: 0.1,
+                                            }
+                                        }}
+                                        helperText="dBu at 0 dBFS"
+                                        style={{ width: 150, margin: 8 }}
+                                    />
                                 </div>
                             </div>
                             <Typography display="block" variant="caption" style={{ textAlign: "left", marginTop: 12, marginLeft: 24 }}

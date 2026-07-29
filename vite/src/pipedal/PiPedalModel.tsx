@@ -2305,6 +2305,71 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
     }
 
+    configurePathAInput(inputChannel: number): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        newPedalboard.pathAInputChannels = [inputChannel];
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    configurePathMix(path: "A" | "B", mute: boolean, pan: number): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        if (path === "A") {
+            newPedalboard.pathAMute = mute;
+            newPedalboard.pathAPan = Math.max(-1, Math.min(1, pan));
+        } else {
+            newPedalboard.pathBMute = mute;
+            newPedalboard.pathBPan = Math.max(-1, Math.min(1, pan));
+        }
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    configureGlobalEq(settings: {
+        enabled: boolean;
+        lowCutHz: number;
+        lowGainDb: number;
+        midGainDb: number;
+        midFrequencyHz: number;
+        highGainDb: number;
+        highCutHz: number;
+    }): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        newPedalboard.globalEqEnabled = settings.enabled;
+        newPedalboard.globalEqLowCutHz = Math.max(10, Math.min(500, settings.lowCutHz));
+        newPedalboard.globalEqLowGainDb = Math.max(-12, Math.min(12, settings.lowGainDb));
+        newPedalboard.globalEqMidGainDb = Math.max(-12, Math.min(12, settings.midGainDb));
+        newPedalboard.globalEqMidFrequencyHz = Math.max(100, Math.min(8000, settings.midFrequencyHz));
+        newPedalboard.globalEqHighGainDb = Math.max(-12, Math.min(12, settings.highGainDb));
+        newPedalboard.globalEqHighCutHz = Math.max(1000, Math.min(24000, settings.highCutHz));
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    applyRoutingTemplate(template: "single" | "guitar-vocal" | "dual"): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        const inputCount = this.jackConfiguration.get().inputAudioPorts.length;
+        if (inputCount === 0) {
+            return;
+        }
+        if (template === "single") {
+            newPedalboard.disablePathB();
+            newPedalboard.pathAInputChannels = [0];
+        } else if (template === "dual") {
+            newPedalboard.pathAInputChannels = [0];
+            newPedalboard.enablePathB(Math.min(1, Math.max(0, inputCount - 1)));
+            newPedalboard.pathBName = "Path B";
+        } else {
+            newPedalboard.pathAInputChannels = [
+                inputCount >= 3 ? 2 : Math.max(0, inputCount - 1)
+            ];
+            newPedalboard.enablePathB(0);
+            newPedalboard.pathBName = "Vocal";
+        }
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
 
     movePedalboardItem(fromInstanceId: number, toInstanceId: number): void {
         if (fromInstanceId === toInstanceId) return;

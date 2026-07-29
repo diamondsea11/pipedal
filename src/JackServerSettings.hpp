@@ -20,6 +20,7 @@
 
 #pragma once
 #include <cstdint>
+#include <map>
 #include "json.hpp"
 #include "AudioConfig.hpp"
 
@@ -40,6 +41,7 @@ namespace pipedal
         uint64_t sampleRate_ = 0;
         uint32_t bufferSize_ = 64;
         uint32_t numberOfBuffers_ = 3;
+        std::map<std::string, float> namInputCalibrationProfiles_;
 
     public:
         JackServerSettings();
@@ -65,6 +67,18 @@ namespace pipedal
 
         uint32_t GetBufferSize() const { return bufferSize_; }
         uint32_t GetNumberOfBuffers() const { return numberOfBuffers_; }
+        float GetNamInputCalibrationDbu() const;
+        void SetNamInputCalibrationDbu(float value)
+        {
+            if (!alsaInputDevice_.empty())
+            {
+                namInputCalibrationProfiles_[alsaInputDevice_] = value;
+            }
+        }
+        const std::map<std::string, float> &GetNamInputCalibrationProfiles() const
+        {
+            return namInputCalibrationProfiles_;
+        }
         const std::string &GetAlsaInputDevice()  const { return alsaInputDevice_; }
         const std::string &GetAlsaInputDeviceName()  const { return alsaInputDeviceName_; }
         const std::string &GetAlsaOutputDevice() const { return alsaOutputDevice_; }
@@ -109,7 +123,8 @@ namespace pipedal
                    this->alsaDevice_       == other.alsaDevice_ &&
                    this->sampleRate_       == other.sampleRate_ &&
                    this->bufferSize_       == other.bufferSize_ &&
-                   this->numberOfBuffers_  == other.numberOfBuffers_;
+                   this->numberOfBuffers_  == other.numberOfBuffers_ &&
+                   this->namInputCalibrationProfiles_ == other.namInputCalibrationProfiles_;
         }
         void FixUpDeviceNames();
 

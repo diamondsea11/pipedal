@@ -33,6 +33,89 @@
 
 using namespace pipedal;
 
+namespace
+{
+    enum class EqType
+    {
+        LowPass,
+        HighPass,
+        LowShelf,
+        Peak,
+        HighShelf
+    };
+
+    void ConfigureBiquad(
+        Lv2Pedalboard::Biquad &filter,
+        EqType type,
+        float sampleRate,
+        float frequency,
+        float gainDb = 0,
+        float q = 0.70710678f)
+    {
+        frequency = std::max(10.0f, std::min(frequency, sampleRate * 0.45f));
+        float a = std::pow(10.0f, gainDb / 40.0f);
+        float omega = 2.0f * (float)M_PI * frequency / sampleRate;
+        float cosine = std::cos(omega);
+        float sine = std::sin(omega);
+        float alpha = sine / (2.0f * q);
+        float sqrtA = std::sqrt(a);
+        float b0, b1, b2, a0, a1, a2;
+
+        switch (type)
+        {
+        case EqType::LowPass:
+            b0 = (1.0f - cosine) * 0.5f;
+            b1 = 1.0f - cosine;
+            b2 = b0;
+            a0 = 1.0f + alpha;
+            a1 = -2.0f * cosine;
+            a2 = 1.0f - alpha;
+            break;
+        case EqType::HighPass:
+            b0 = (1.0f + cosine) * 0.5f;
+            b1 = -(1.0f + cosine);
+            b2 = b0;
+            a0 = 1.0f + alpha;
+            a1 = -2.0f * cosine;
+            a2 = 1.0f - alpha;
+            break;
+        case EqType::LowShelf:
+            alpha = sine * 0.5f * std::sqrt(2.0f);
+            b0 = a * ((a + 1) - (a - 1) * cosine + 2 * sqrtA * alpha);
+            b1 = 2 * a * ((a - 1) - (a + 1) * cosine);
+            b2 = a * ((a + 1) - (a - 1) * cosine - 2 * sqrtA * alpha);
+            a0 = (a + 1) + (a - 1) * cosine + 2 * sqrtA * alpha;
+            a1 = -2 * ((a - 1) + (a + 1) * cosine);
+            a2 = (a + 1) + (a - 1) * cosine - 2 * sqrtA * alpha;
+            break;
+        case EqType::HighShelf:
+            alpha = sine * 0.5f * std::sqrt(2.0f);
+            b0 = a * ((a + 1) + (a - 1) * cosine + 2 * sqrtA * alpha);
+            b1 = -2 * a * ((a - 1) + (a + 1) * cosine);
+            b2 = a * ((a + 1) + (a - 1) * cosine - 2 * sqrtA * alpha);
+            a0 = (a + 1) - (a - 1) * cosine + 2 * sqrtA * alpha;
+            a1 = 2 * ((a - 1) - (a + 1) * cosine);
+            a2 = (a + 1) - (a - 1) * cosine - 2 * sqrtA * alpha;
+            break;
+        default:
+            b0 = 1 + alpha * a;
+            b1 = -2 * cosine;
+            b2 = 1 - alpha * a;
+            a0 = 1 + alpha / a;
+            a1 = -2 * cosine;
+            a2 = 1 - alpha / a;
+            break;
+        }
+
+        filter.b0 = b0 / a0;
+        filter.b1 = b1 / a0;
+        filter.b2 = b2 / a0;
+        filter.a1 = a1 / a0;
+        filter.a2 = a2 / a0;
+        filter.z1 = filter.z2 = 0;
+    }
+}
+
 float *Lv2Pedalboard::CreateNewAudioBuffer()
 {
     return bufferPool.AllocateBuffer<float>(pHost->GetMaxAudioBufferSize());
@@ -335,8 +418,28 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
     outputVolume.SetTarget(pedalboard.output_volume_db());
     pathBInputVolume.SetTarget(pedalboard.pathBInputVolumeDb());
     pathBOutputVolume.SetTarget(pedalboard.pathBOutputVolumeDb());
+    this->pathAMute = pedalboard.pathAMute();
+    this->pathAPan = std::max(-1.0f, std::min(1.0f, pedalboard.pathAPan()));
+    this->pathBMute = pedalboard.pathBMute();
+    this->pathBPan = std::max(-1.0f, std::min(1.0f, pedalboard.pathBPan()));
+    this->globalEqEnabled = pedalboard.globalEqEnabled();
 
-    size_t nInputs = std::max(GetNumberOfAudioInputChannels(),(size_t)1);
+    for (size_t channel = 0; channel < this->globalEq.size(); ++channel)
+    {
+        auto &filters = this->globalEq[channel];
+        float sampleRate = (float)this->pHost->GetSampleRate();
+        ConfigureBiquad(filters[0], EqType::HighPass, sampleRate, pedalboard.globalEqLowCutHz());
+        ConfigureBiquad(filters[1], EqType::LowShelf, sampleRate, 120, pedalboard.globalEqLowGainDb());
+        ConfigureBiquad(filters[2], EqType::Peak, sampleRate,
+                        pedalboard.globalEqMidFrequencyHz(), pedalboard.globalEqMidGainDb(), 1.0f);
+        ConfigureBiquad(filters[3], EqType::HighShelf, sampleRate, 4000, pedalboard.globalEqHighGainDb());
+        ConfigureBiquad(filters[4], EqType::LowPass, sampleRate, pedalboard.globalEqHighCutHz());
+    }
+
+    this->pathAInputChannels = pedalboard.pathAInputChannels();
+    size_t nInputs = this->pathAInputChannels.empty()
+        ? std::max(GetNumberOfAudioInputChannels(), (size_t)1)
+        : std::max(this->pathAInputChannels.size(), (size_t)1);
 
     for (size_t i = 0; i < nInputs; ++i)
     {
@@ -605,17 +708,31 @@ bool Lv2Pedalboard::Run(
     }
     for (size_t i = 0; i < samples; ++i)
     {
-        float volume = outputVolume.Tick();
-        float pathBVolume = this->pathBEnabled ? pathBOutputVolume.Tick() : 0;
+        float volume = this->pathAMute ? 0 : outputVolume.Tick();
+        float pathBVolume = this->pathBEnabled && !this->pathBMute ? pathBOutputVolume.Tick() : 0;
         for (size_t c = 0; c < this->pedalboardOutputBuffers.size(); ++c)
         {
             if (outputBuffers[c] == nullptr) {
                 break;
             }
+            float pathAGain = c == 0
+                ? (this->pathAPan > 0 ? 1.0f - this->pathAPan : 1.0f)
+                : (this->pathAPan < 0 ? 1.0f + this->pathAPan : 1.0f);
+            float pathBGain = c == 0
+                ? (this->pathBPan > 0 ? 1.0f - this->pathBPan : 1.0f)
+                : (this->pathBPan < 0 ? 1.0f + this->pathBPan : 1.0f);
             float pathBOutput = this->pathBEnabled
-                ? this->pathBOutputBuffers[c][i] * pathBVolume
+                ? this->pathBOutputBuffers[c][i] * pathBVolume * pathBGain
                 : 0;
-            outputBuffers[c][i] = this->pedalboardOutputBuffers[c][i] * volume + pathBOutput;
+            float value = this->pedalboardOutputBuffers[c][i] * volume * pathAGain + pathBOutput;
+            if (this->globalEqEnabled && c < this->globalEq.size())
+            {
+                for (auto &filter : this->globalEq[c])
+                {
+                    value = filter.Process(value);
+                }
+            }
+            outputBuffers[c][i] = value;
         }
     }
     this->currentFrameOffset += samples;

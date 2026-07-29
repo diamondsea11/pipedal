@@ -288,6 +288,22 @@ export class Snapshot {
         this.isModified = input.isModified;
         this.name = input.name;
         this.color = input.color;
+        this.hasMixSettings = input.hasMixSettings ?? false;
+        this.inputVolumeDb = input.inputVolumeDb ?? 0;
+        this.outputVolumeDb = input.outputVolumeDb ?? 0;
+        this.pathBInputVolumeDb = input.pathBInputVolumeDb ?? 0;
+        this.pathBOutputVolumeDb = input.pathBOutputVolumeDb ?? 0;
+        this.pathAMute = input.pathAMute ?? false;
+        this.pathAPan = input.pathAPan ?? 0;
+        this.pathBMute = input.pathBMute ?? false;
+        this.pathBPan = input.pathBPan ?? 0;
+        this.globalEqEnabled = input.globalEqEnabled ?? false;
+        this.globalEqLowCutHz = input.globalEqLowCutHz ?? 20;
+        this.globalEqLowGainDb = input.globalEqLowGainDb ?? 0;
+        this.globalEqMidGainDb = input.globalEqMidGainDb ?? 0;
+        this.globalEqMidFrequencyHz = input.globalEqMidFrequencyHz ?? 800;
+        this.globalEqHighGainDb = input.globalEqHighGainDb ?? 0;
+        this.globalEqHighCutHz = input.globalEqHighCutHz ?? 20000;
         return this;
     }
     static deserializeArray(input: any): (Snapshot| null)[] {
@@ -323,6 +339,22 @@ export class Snapshot {
     isModified: boolean = false;
     color: string = "";
     values: SnapshotValue[] = [];
+    hasMixSettings: boolean = false;
+    inputVolumeDb: number = 0;
+    outputVolumeDb: number = 0;
+    pathBInputVolumeDb: number = 0;
+    pathBOutputVolumeDb: number = 0;
+    pathAMute: boolean = false;
+    pathAPan: number = 0;
+    pathBMute: boolean = false;
+    pathBPan: number = 0;
+    globalEqEnabled: boolean = false;
+    globalEqLowCutHz: number = 20;
+    globalEqLowGainDb: number = 0;
+    globalEqMidGainDb: number = 0;
+    globalEqMidFrequencyHz: number = 800;
+    globalEqHighGainDb: number = 0;
+    globalEqHighCutHz: number = 20000;
 };
 
 export enum SplitType {
@@ -408,18 +440,32 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         this.name = input.name;
         this.input_volume_db  = input.input_volume_db;
         this.output_volume_db = input.output_volume_db;
+        this.pathAInputChannels = input.pathAInputChannels
+            ? input.pathAInputChannels.slice()
+            : [];
+        this.pathAMute = input.pathAMute ?? false;
+        this.pathAPan = input.pathAPan ?? 0;
         this.items = PedalboardItem.deserializeArray(input.items);
         this.nextInstanceId = input.nextInstanceId ?? 0;
         this.pathBEnabled = input.pathBEnabled ?? false;
         this.pathBName = input.pathBName ?? "Vocal";
         this.pathBInputVolumeDb = input.pathBInputVolumeDb ?? 0;
         this.pathBOutputVolumeDb = input.pathBOutputVolumeDb ?? 0;
+        this.pathBMute = input.pathBMute ?? false;
+        this.pathBPan = input.pathBPan ?? 0;
         this.pathBInputChannels = input.pathBInputChannels
             ? input.pathBInputChannels.slice()
             : [0];
         this.pathBItems = input.pathBItems
             ? PedalboardItem.deserializeArray(input.pathBItems)
             : [];
+        this.globalEqEnabled = input.globalEqEnabled ?? false;
+        this.globalEqLowCutHz = input.globalEqLowCutHz ?? 20;
+        this.globalEqLowGainDb = input.globalEqLowGainDb ?? 0;
+        this.globalEqMidGainDb = input.globalEqMidGainDb ?? 0;
+        this.globalEqMidFrequencyHz = input.globalEqMidFrequencyHz ?? 800;
+        this.globalEqHighGainDb = input.globalEqHighGainDb ?? 0;
+        this.globalEqHighCutHz = input.globalEqHighCutHz ?? 20000;
         if (this.pathBEnabled && this.pathBItems.length === 0) {
             this.pathBItems = [this.createEmptyItem()];
         }
@@ -436,13 +482,25 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     name: string = "";
     input_volume_db: number = 0;
     output_volume_db: number = 0;
+    pathAInputChannels: number[] = [];
+    pathAMute: boolean = false;
+    pathAPan: number = 0;
     items: PedalboardItem[] = [];
     pathBEnabled: boolean = false;
     pathBName: string = "Vocal";
     pathBInputVolumeDb: number = 0;
     pathBOutputVolumeDb: number = 0;
+    pathBMute: boolean = false;
+    pathBPan: number = 0;
     pathBInputChannels: number[] = [0];
     pathBItems: PedalboardItem[] = [];
+    globalEqEnabled: boolean = false;
+    globalEqLowCutHz: number = 20;
+    globalEqLowGainDb: number = 0;
+    globalEqMidGainDb: number = 0;
+    globalEqMidFrequencyHz: number = 800;
+    globalEqHighGainDb: number = 0;
+    globalEqHighCutHz: number = 20000;
     nextInstanceId: number = -1;
 
     snapshots: (Snapshot | null)[] = [];
@@ -513,6 +571,22 @@ export class Pedalboard implements Deserializable<Pedalboard> {
 
     makeSnapshot(): Snapshot {
         let result = new Snapshot();
+        result.hasMixSettings = true;
+        result.inputVolumeDb = this.input_volume_db;
+        result.outputVolumeDb = this.output_volume_db;
+        result.pathBInputVolumeDb = this.pathBInputVolumeDb;
+        result.pathBOutputVolumeDb = this.pathBOutputVolumeDb;
+        result.pathAMute = this.pathAMute;
+        result.pathAPan = this.pathAPan;
+        result.pathBMute = this.pathBMute;
+        result.pathBPan = this.pathBPan;
+        result.globalEqEnabled = this.globalEqEnabled;
+        result.globalEqLowCutHz = this.globalEqLowCutHz;
+        result.globalEqLowGainDb = this.globalEqLowGainDb;
+        result.globalEqMidGainDb = this.globalEqMidGainDb;
+        result.globalEqMidFrequencyHz = this.globalEqMidFrequencyHz;
+        result.globalEqHighGainDb = this.globalEqHighGainDb;
+        result.globalEqHighCutHz = this.globalEqHighCutHz;
         let it = this.itemsGenerator();
         while (true)
         {

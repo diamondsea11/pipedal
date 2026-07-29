@@ -1236,6 +1236,21 @@ private:
         inputBuffers[0] = pInputBuffers->at(0);
         inputBuffers[1] = pInputBuffers->size() >= 2 ? pInputBuffers->at(1) : nullptr;
         inputBuffers[2] = nullptr;
+        const auto &pathAChannels = pedalboard->GetPathAInputChannels();
+        if (!pathAChannels.empty())
+        {
+            inputBuffers[0] = audioDriver->GetZeroInputBuffer();
+            inputBuffers[1] = audioDriver->GetZeroInputBuffer();
+            size_t channelCount = std::min(pathAChannels.size(), (size_t)2);
+            for (size_t i = 0; i < channelCount; ++i)
+            {
+                int64_t channel = pathAChannels[i];
+                if (channel >= 0 && (size_t)channel < audioDriver->DeviceInputBufferCount())
+                {
+                    inputBuffers[i] = audioDriver->GetDeviceInputBuffer((size_t)channel);
+                }
+            }
+        }
 
         outputBuffers[0] = pOutputBuffers->at(0);
         outputBuffers[1] = pOutputBuffers->size() >= 2 ? pOutputBuffers->at(1) : nullptr;

@@ -212,6 +212,22 @@ namespace pipedal
         std::string color_;
         bool isModified_ = false;
         std::vector<SnapshotValue> values_;
+        bool hasMixSettings_ = false;
+        float inputVolumeDb_ = 0;
+        float outputVolumeDb_ = 0;
+        float pathBInputVolumeDb_ = 0;
+        float pathBOutputVolumeDb_ = 0;
+        bool pathAMute_ = false;
+        float pathAPan_ = 0;
+        bool pathBMute_ = false;
+        float pathBPan_ = 0;
+        bool globalEqEnabled_ = false;
+        float globalEqLowCutHz_ = 20;
+        float globalEqLowGainDb_ = 0;
+        float globalEqMidGainDb_ = 0;
+        float globalEqMidFrequencyHz_ = 800;
+        float globalEqHighGainDb_ = 0;
+        float globalEqHighCutHz_ = 20000;
 
         DECLARE_JSON_MAP(Snapshot);
     };
@@ -222,14 +238,26 @@ namespace pipedal
         std::string name_;
         float input_volume_db_ = 0;
         float output_volume_db_ = 0;
+        std::vector<int64_t> pathAInputChannels_;
+        bool pathAMute_ = false;
+        float pathAPan_ = 0;
 
         std::vector<PedalboardItem> items_;
         bool pathBEnabled_ = false;
         std::string pathBName_ = "Vocal";
         float pathBInputVolumeDb_ = 0;
         float pathBOutputVolumeDb_ = 0;
+        bool pathBMute_ = false;
+        float pathBPan_ = 0;
         std::vector<int64_t> pathBInputChannels_ = {0};
         std::vector<PedalboardItem> pathBItems_;
+        bool globalEqEnabled_ = false;
+        float globalEqLowCutHz_ = 20;
+        float globalEqLowGainDb_ = 0;
+        float globalEqMidGainDb_ = 0;
+        float globalEqMidFrequencyHz_ = 800;
+        float globalEqHighGainDb_ = 0;
+        float globalEqHighCutHz_ = 20000;
         uint64_t nextInstanceId_ = 0;
         uint64_t NextInstanceId() { return ++nextInstanceId_; }
 
@@ -273,12 +301,24 @@ namespace pipedal
         GETTER_SETTER_VEC(items)
         GETTER_SETTER(input_volume_db)
         GETTER_SETTER(output_volume_db)
+        GETTER_SETTER_VEC(pathAInputChannels)
+        GETTER_SETTER(pathAMute)
+        GETTER_SETTER(pathAPan)
         GETTER_SETTER(pathBEnabled)
         GETTER_SETTER_REF(pathBName)
         GETTER_SETTER(pathBInputVolumeDb)
         GETTER_SETTER(pathBOutputVolumeDb)
+        GETTER_SETTER(pathBMute)
+        GETTER_SETTER(pathBPan)
         GETTER_SETTER_VEC(pathBInputChannels)
         GETTER_SETTER_VEC(pathBItems)
+        GETTER_SETTER(globalEqEnabled)
+        GETTER_SETTER(globalEqLowCutHz)
+        GETTER_SETTER(globalEqLowGainDb)
+        GETTER_SETTER(globalEqMidGainDb)
+        GETTER_SETTER(globalEqMidFrequencyHz)
+        GETTER_SETTER(globalEqHighGainDb)
+        GETTER_SETTER(globalEqHighCutHz)
         GETTER_SETTER_VEC(snapshots)
         GETTER_SETTER(selectedSnapshot)
         GETTER_SETTER(selectedPlugin)

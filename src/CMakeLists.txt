@@ -537,6 +537,7 @@ add_executable(jsonTest
 )
 target_link_libraries(jsonTest PRIVATE PiPedalCommon)
 target_include_directories(jsonTest PRIVATE ${PIPEDAL_INCLUDES})
+target_compile_definitions(jsonTest PRIVATE PIPEDAL_STANDALONE_JSON_TEST)
 
 if(Catch2_FOUND)
     target_link_libraries(jsonTest PRIVATE Catch2::Catch2 Catch2::Catch2WithMain)
@@ -944,4 +945,3 @@ install (TARGETS pipedald pipedaladmind pipedal_update DESTINATION ${CMAKE_INSTA
    )
 
    
-

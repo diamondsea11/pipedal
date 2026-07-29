@@ -39,6 +39,24 @@ JackServerSettings::JackServerSettings()
 {
 }
 
+float JackServerSettings::GetNamInputCalibrationDbu() const
+{
+    auto profile = namInputCalibrationProfiles_.find(alsaInputDevice_);
+    if (profile != namInputCalibrationProfiles_.end())
+    {
+        return profile->second;
+    }
+
+    std::string deviceName = alsaInputDeviceName_ + " " + alsaInputDevice_;
+    std::transform(deviceName.begin(), deviceName.end(), deviceName.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (deviceName.find("babyface pro") != std::string::npos)
+    {
+        return 13.0f;
+    }
+    return 12.0f;
+}
+
 static std::vector<std::string> SplitArgs(const char *szBuff)
 {
     std::vector<std::string> result;
@@ -170,4 +188,5 @@ JSON_MAP_REFERENCE(JackServerSettings, alsaOutputDeviceName)
 JSON_MAP_REFERENCE(JackServerSettings, sampleRate)
 JSON_MAP_REFERENCE(JackServerSettings, bufferSize)
 JSON_MAP_REFERENCE(JackServerSettings, numberOfBuffers)
+JSON_MAP_REFERENCE(JackServerSettings, namInputCalibrationProfiles)
 JSON_MAP_END()

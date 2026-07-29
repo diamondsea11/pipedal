@@ -257,6 +257,24 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
     }
     std::map<int64_t, SnapshotValue*> indexedValues;
     Snapshot *snapshot = this->snapshots_[snapshotIndex].get();
+    if (snapshot->hasMixSettings_)
+    {
+        input_volume_db_ = snapshot->inputVolumeDb_;
+        output_volume_db_ = snapshot->outputVolumeDb_;
+        pathBInputVolumeDb_ = snapshot->pathBInputVolumeDb_;
+        pathBOutputVolumeDb_ = snapshot->pathBOutputVolumeDb_;
+        pathAMute_ = snapshot->pathAMute_;
+        pathAPan_ = snapshot->pathAPan_;
+        pathBMute_ = snapshot->pathBMute_;
+        pathBPan_ = snapshot->pathBPan_;
+        globalEqEnabled_ = snapshot->globalEqEnabled_;
+        globalEqLowCutHz_ = snapshot->globalEqLowCutHz_;
+        globalEqLowGainDb_ = snapshot->globalEqLowGainDb_;
+        globalEqMidGainDb_ = snapshot->globalEqMidGainDb_;
+        globalEqMidFrequencyHz_ = snapshot->globalEqMidFrequencyHz_;
+        globalEqHighGainDb_ = snapshot->globalEqHighGainDb_;
+        globalEqHighCutHz_ = snapshot->globalEqHighCutHz_;
+    }
 
     for (auto &value: snapshot->values_)
     {
@@ -362,7 +380,19 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
         }
     }
     if (this->pathBEnabled_ != other.pathBEnabled_ ||
+        this->pathAInputChannels_ != other.pathAInputChannels_ ||
+        this->pathAMute_ != other.pathAMute_ ||
+        this->pathAPan_ != other.pathAPan_ ||
         this->pathBInputChannels_ != other.pathBInputChannels_ ||
+        this->pathBMute_ != other.pathBMute_ ||
+        this->pathBPan_ != other.pathBPan_ ||
+        this->globalEqEnabled_ != other.globalEqEnabled_ ||
+        this->globalEqLowCutHz_ != other.globalEqLowCutHz_ ||
+        this->globalEqLowGainDb_ != other.globalEqLowGainDb_ ||
+        this->globalEqMidGainDb_ != other.globalEqMidGainDb_ ||
+        this->globalEqMidFrequencyHz_ != other.globalEqMidFrequencyHz_ ||
+        this->globalEqHighGainDb_ != other.globalEqHighGainDb_ ||
+        this->globalEqHighCutHz_ != other.globalEqHighCutHz_ ||
         this->pathBItems_.size() != other.pathBItems_.size())
     {
         return false;
@@ -523,6 +553,22 @@ void  Pedalboard::SetCurrentSnapshotModified(bool modified)
 Snapshot Pedalboard::MakeSnapshotFromCurrentSettings(const Pedalboard &previousPedalboard)
 {
     Snapshot snapshot;
+    snapshot.hasMixSettings_ = true;
+    snapshot.inputVolumeDb_ = input_volume_db_;
+    snapshot.outputVolumeDb_ = output_volume_db_;
+    snapshot.pathBInputVolumeDb_ = pathBInputVolumeDb_;
+    snapshot.pathBOutputVolumeDb_ = pathBOutputVolumeDb_;
+    snapshot.pathAMute_ = pathAMute_;
+    snapshot.pathAPan_ = pathAPan_;
+    snapshot.pathBMute_ = pathBMute_;
+    snapshot.pathBPan_ = pathBPan_;
+    snapshot.globalEqEnabled_ = globalEqEnabled_;
+    snapshot.globalEqLowCutHz_ = globalEqLowCutHz_;
+    snapshot.globalEqLowGainDb_ = globalEqLowGainDb_;
+    snapshot.globalEqMidGainDb_ = globalEqMidGainDb_;
+    snapshot.globalEqMidFrequencyHz_ = globalEqMidFrequencyHz_;
+    snapshot.globalEqHighGainDb_ = globalEqHighGainDb_;
+    snapshot.globalEqHighCutHz_ = globalEqHighCutHz_;
     // name and color don't matter. this is strictly for loading purposes.
     auto items = this->GetAllPlugins();
     for (auto item : items)
@@ -580,13 +626,25 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,name)
     JSON_MAP_REFERENCE(Pedalboard,input_volume_db)
     JSON_MAP_REFERENCE(Pedalboard,output_volume_db)
+    JSON_MAP_REFERENCE(Pedalboard,pathAInputChannels)
+    JSON_MAP_REFERENCE(Pedalboard,pathAMute)
+    JSON_MAP_REFERENCE(Pedalboard,pathAPan)
     JSON_MAP_REFERENCE(Pedalboard,items)
     JSON_MAP_REFERENCE(Pedalboard,pathBEnabled)
     JSON_MAP_REFERENCE(Pedalboard,pathBName)
     JSON_MAP_REFERENCE(Pedalboard,pathBInputVolumeDb)
     JSON_MAP_REFERENCE(Pedalboard,pathBOutputVolumeDb)
+    JSON_MAP_REFERENCE(Pedalboard,pathBMute)
+    JSON_MAP_REFERENCE(Pedalboard,pathBPan)
     JSON_MAP_REFERENCE(Pedalboard,pathBInputChannels)
     JSON_MAP_REFERENCE(Pedalboard,pathBItems)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqEnabled)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqLowCutHz)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqLowGainDb)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqMidGainDb)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqMidFrequencyHz)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqHighGainDb)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqHighCutHz)
     JSON_MAP_REFERENCE(Pedalboard,nextInstanceId)
     JSON_MAP_REFERENCE(Pedalboard,snapshots)
     JSON_MAP_REFERENCE(Pedalboard,selectedSnapshot)
@@ -606,5 +664,20 @@ JSON_MAP_BEGIN(Snapshot)
     JSON_MAP_REFERENCE(Snapshot,isModified)
     JSON_MAP_REFERENCE(Snapshot,color)
     JSON_MAP_REFERENCE(Snapshot,values)
+    JSON_MAP_REFERENCE(Snapshot,hasMixSettings)
+    JSON_MAP_REFERENCE(Snapshot,inputVolumeDb)
+    JSON_MAP_REFERENCE(Snapshot,outputVolumeDb)
+    JSON_MAP_REFERENCE(Snapshot,pathBInputVolumeDb)
+    JSON_MAP_REFERENCE(Snapshot,pathBOutputVolumeDb)
+    JSON_MAP_REFERENCE(Snapshot,pathAMute)
+    JSON_MAP_REFERENCE(Snapshot,pathAPan)
+    JSON_MAP_REFERENCE(Snapshot,pathBMute)
+    JSON_MAP_REFERENCE(Snapshot,pathBPan)
+    JSON_MAP_REFERENCE(Snapshot,globalEqEnabled)
+    JSON_MAP_REFERENCE(Snapshot,globalEqLowCutHz)
+    JSON_MAP_REFERENCE(Snapshot,globalEqLowGainDb)
+    JSON_MAP_REFERENCE(Snapshot,globalEqMidGainDb)
+    JSON_MAP_REFERENCE(Snapshot,globalEqMidFrequencyHz)
+    JSON_MAP_REFERENCE(Snapshot,globalEqHighGainDb)
+    JSON_MAP_REFERENCE(Snapshot,globalEqHighCutHz)
 JSON_MAP_END()
-

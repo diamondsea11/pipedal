@@ -32,6 +32,9 @@ export default class JackServerSettings {
         this.sampleRate = input.sampleRate;
         this.bufferSize = input.bufferSize;
         this.numberOfBuffers = input.numberOfBuffers;
+        this.namInputCalibrationProfiles = {
+            ...(input.namInputCalibrationProfiles ?? {})
+        };
         return this;
     }
     // constructor(alsaDevice: string, sampleRate?: number, bufferSize?: number, numberOfBuffers?: number)
@@ -57,6 +60,22 @@ export default class JackServerSettings {
     sampleRate = 48000;
     bufferSize = 64;
     numberOfBuffers = 3;
+    namInputCalibrationProfiles: {[deviceId: string]: number} = {};
+
+    getNamInputCalibrationDbu(): number {
+        const configured = this.namInputCalibrationProfiles[this.alsaInputDevice];
+        if (configured !== undefined) {
+            return configured;
+        }
+        const deviceName = `${this.alsaInputDeviceName} ${this.alsaInputDevice}`.toLowerCase();
+        return deviceName.includes("babyface pro") ? 13.0 : 12.0;
+    }
+
+    setNamInputCalibrationDbu(value: number): void {
+        if (this.alsaInputDevice) {
+            this.namInputCalibrationProfiles[this.alsaInputDevice] = value;
+        }
+    }
 
     /**
      * Configure this instance to use the dummy audio device. This mirrors the

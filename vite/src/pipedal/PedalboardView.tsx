@@ -38,8 +38,17 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
+import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import EqualizerIcon from '@mui/icons-material/Equalizer';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ControlPointDuplicateIcon from '@mui/icons-material/ControlPointDuplicate';
@@ -283,6 +292,7 @@ interface LayoutSize {
 
 type PedalboardState = {
     pedalboard?: Pedalboard;
+    globalEqDialogOpen: boolean;
     contextMenu: {
         mouseX: number;
         mouseY: number;
@@ -492,6 +502,7 @@ const PedalboardView =
                     if (!props.selectedId) props.selectedId = -1;
                     this.state = {
                         pedalboard: this.model.pedalboard.get(),
+                        globalEqDialogOpen: false,
                         contextMenu: null,
                     };
                     this.onPedalboardChanged = this.onPedalboardChanged.bind(this);
@@ -1509,11 +1520,21 @@ const PedalboardView =
                     }
 
                     this.currentLayout = layoutChain.concat(pathBLayout);
-                    let frameWidth = Math.max(420, layoutSize.width, pathBSize.width);
+                    let frameWidth = Math.max(680, layoutSize.width, pathBSize.width);
                     let frameHeight = layoutSize.height +
                         (pathBLayout.length === 0 ? 0 : PATH_GAP + pathBSize.height);
-                    let inputPorts = this.model.jackSettings.get().inputAudioPorts;
+                    let inputPorts = this.model.jackConfiguration.get().inputAudioPorts;
+                    let pathAInput = pedalboard?.pathAInputChannels[0]
+                        ?? this.model.channelRouterSettings.get().mainInputChannels[0]
+                        ?? 0;
+                    if (pathAInput < 0 || pathAInput >= inputPorts.length) {
+                        pathAInput = 0;
+                    }
                     let pathBInput = pedalboard?.pathBInputChannels[0] ?? 0;
+                    let outputChannels = this.model.channelRouterSettings.get().mainOutputChannels
+                        .filter((channel) => channel >= 0)
+                        .map((channel) => `OUT ${channel + 1}`)
+                        .join("/");
                     let contextMenuItem = this.state.contextMenu
                         ? this.state.pedalboard?.maybeGetItem(this.state.contextMenu.instanceId) ?? null
                         : null;
@@ -1530,7 +1551,68 @@ const PedalboardView =
                                 }} >
                                 <div className={classes.pathHeader} style={{ top: 0 }}>
                                     <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path A</Typography>
-                                    <Typography variant="caption" color="textSecondary">Main input</Typography>
+                                    <Select
+                                        size="small"
+                                        value={pathAInput}
+                                        onChange={(event) =>
+                                            this.model.configurePathAInput(Number(event.target.value))}
+                                        aria-label="Path A input"
+                                        style={{ height: 28, minWidth: 82 }}
+                                    >
+                                        {inputPorts.map((_port, index) => (
+                                            <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
+                                        ))}
+                                    </Select>
+                                    <Select
+                                        size="small"
+                                        value=""
+                                        displayEmpty
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            if (value === "single" || value === "dual" || value === "guitar-vocal") {
+                                                this.model.applyRoutingTemplate(value);
+                                            }
+                                        }}
+                                        aria-label="Routing template"
+                                        style={{ height: 28, minWidth: 116 }}
+                                    >
+                                        <MenuItem value="">Routing</MenuItem>
+                                        <MenuItem value="single">Single input</MenuItem>
+                                        <MenuItem value="dual">Dual inputs</MenuItem>
+                                        <MenuItem value="guitar-vocal">Guitar + Vocal</MenuItem>
+                                    </Select>
+                                    <IconButton
+                                        size="small"
+                                        color={pedalboard?.pathAMute ? "primary" : "default"}
+                                        title="Mute Path A"
+                                        aria-label="Mute Path A"
+                                        onClick={() => this.model.configurePathMix(
+                                            "A", !pedalboard?.pathAMute, pedalboard?.pathAPan ?? 0)}
+                                    >
+                                        <VolumeOffIcon fontSize="small" />
+                                    </IconButton>
+                                    <Select
+                                        size="small"
+                                        value={pedalboard?.pathAPan ?? 0}
+                                        onChange={(event) => this.model.configurePathMix(
+                                            "A", pedalboard?.pathAMute ?? false, Number(event.target.value))}
+                                        aria-label="Path A pan"
+                                        style={{ height: 28, minWidth: 58 }}
+                                    >
+                                        <MenuItem value={-1}>L</MenuItem>
+                                        <MenuItem value={0}>C</MenuItem>
+                                        <MenuItem value={1}>R</MenuItem>
+                                    </Select>
+                                    <Button
+                                        size="small"
+                                        startIcon={<EqualizerIcon />}
+                                        onClick={() => this.setState({ globalEqDialogOpen: true })}
+                                    >
+                                        Global EQ
+                                    </Button>
+                                    <Typography variant="caption" color="textSecondary">
+                                        {outputChannels}
+                                    </Typography>
                                     {!pedalboard?.pathBEnabled && (
                                         <Button
                                             size="small"
@@ -1570,6 +1652,28 @@ const PedalboardView =
                                             </Typography>
                                             <IconButton
                                                 size="small"
+                                                color={pedalboard?.pathBMute ? "primary" : "default"}
+                                                title="Mute Path B"
+                                                aria-label="Mute Path B"
+                                                onClick={() => this.model.configurePathMix(
+                                                    "B", !pedalboard?.pathBMute, pedalboard?.pathBPan ?? 0)}
+                                            >
+                                                <VolumeOffIcon fontSize="small" />
+                                            </IconButton>
+                                            <Select
+                                                size="small"
+                                                value={pedalboard?.pathBPan ?? 0}
+                                                onChange={(event) => this.model.configurePathMix(
+                                                    "B", pedalboard?.pathBMute ?? false, Number(event.target.value))}
+                                                aria-label="Path B pan"
+                                                style={{ height: 28, minWidth: 58 }}
+                                            >
+                                                <MenuItem value={-1}>L</MenuItem>
+                                                <MenuItem value={0}>C</MenuItem>
+                                                <MenuItem value={1}>R</MenuItem>
+                                            </Select>
+                                            <IconButton
+                                                size="small"
                                                 title="Remove Path B"
                                                 aria-label="Remove Path B"
                                                 onClick={() => this.model.configurePathB(false)}
@@ -1585,6 +1689,79 @@ const PedalboardView =
                                     </>
                                 )}
                             </div>
+                            <Dialog
+                                open={this.state.globalEqDialogOpen}
+                                onClose={() => this.setState({ globalEqDialogOpen: false })}
+                                maxWidth="sm"
+                                fullWidth
+                            >
+                                <DialogTitle>Global EQ</DialogTitle>
+                                <DialogContent
+                                    style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                                        gap: 16,
+                                        paddingTop: 8,
+                                    }}
+                                >
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={pedalboard?.globalEqEnabled ?? false}
+                                                onChange={(event) => {
+                                                    if (!pedalboard) return;
+                                                    this.model.configureGlobalEq({
+                                                        enabled: event.target.checked,
+                                                        lowCutHz: pedalboard.globalEqLowCutHz,
+                                                        lowGainDb: pedalboard.globalEqLowGainDb,
+                                                        midGainDb: pedalboard.globalEqMidGainDb,
+                                                        midFrequencyHz: pedalboard.globalEqMidFrequencyHz,
+                                                        highGainDb: pedalboard.globalEqHighGainDb,
+                                                        highCutHz: pedalboard.globalEqHighCutHz,
+                                                    });
+                                                }}
+                                            />
+                                        }
+                                        label="Enabled"
+                                        style={{ gridColumn: "1 / -1" }}
+                                    />
+                                    {[
+                                        ["Low cut", "globalEqLowCutHz", "Hz"],
+                                        ["Low shelf", "globalEqLowGainDb", "dB"],
+                                        ["Mid gain", "globalEqMidGainDb", "dB"],
+                                        ["Mid frequency", "globalEqMidFrequencyHz", "Hz"],
+                                        ["High shelf", "globalEqHighGainDb", "dB"],
+                                        ["High cut", "globalEqHighCutHz", "Hz"],
+                                    ].map(([label, key, unit]) => (
+                                        <TextField
+                                            key={key}
+                                            label={label}
+                                            type="number"
+                                            defaultValue={(pedalboard as any)?.[key] ?? 0}
+                                            slotProps={{ input: { endAdornment: unit } }}
+                                            onBlur={(event) => {
+                                                if (!pedalboard) return;
+                                                const value = Number(event.target.value);
+                                                if (!Number.isFinite(value)) return;
+                                                this.model.configureGlobalEq({
+                                                    enabled: pedalboard.globalEqEnabled,
+                                                    lowCutHz: key === "globalEqLowCutHz" ? value : pedalboard.globalEqLowCutHz,
+                                                    lowGainDb: key === "globalEqLowGainDb" ? value : pedalboard.globalEqLowGainDb,
+                                                    midGainDb: key === "globalEqMidGainDb" ? value : pedalboard.globalEqMidGainDb,
+                                                    midFrequencyHz: key === "globalEqMidFrequencyHz" ? value : pedalboard.globalEqMidFrequencyHz,
+                                                    highGainDb: key === "globalEqHighGainDb" ? value : pedalboard.globalEqHighGainDb,
+                                                    highCutHz: key === "globalEqHighCutHz" ? value : pedalboard.globalEqHighCutHz,
+                                                });
+                                            }}
+                                        />
+                                    ))}
+                                </DialogContent>
+                                <DialogActions>
+                                    <Button onClick={() => this.setState({ globalEqDialogOpen: false })}>
+                                        Close
+                                    </Button>
+                                </DialogActions>
+                            </Dialog>
                             <Menu
                                 open={this.state.contextMenu !== null}
                                 onClose={() => this.closeItemContextMenu()}

@@ -25,12 +25,16 @@
 
 #include "json.hpp"
 #include "json_variant.hpp"
+#ifndef PIPEDAL_STANDALONE_JSON_TEST
 #include "Pedalboard.hpp"
+#include "JackServerSettings.hpp"
+#endif
 #include <concepts>
 #include <type_traits>
 
 using namespace pipedal;
 
+#ifndef PIPEDAL_STANDALONE_JSON_TEST
 TEST_CASE("legacy pedalboards default to one path", "[json_read_test][multipath]")
 {
     std::stringstream input{
@@ -54,6 +58,20 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     source.pathBInputChannels({0});
     source.pathBInputVolumeDb(-3.0f);
     source.pathBOutputVolumeDb(2.5f);
+    source.pathAInputChannels({2});
+    source.pathAMute(true);
+    source.pathAPan(-1.0f);
+    source.pathBMute(false);
+    source.pathBPan(1.0f);
+    source.globalEqEnabled(true);
+    source.globalEqLowCutHz(75);
+    source.globalEqLowGainDb(-1.5f);
+    source.globalEqMidGainDb(2.0f);
+    source.globalEqMidFrequencyHz(1250);
+    source.globalEqHighGainDb(-2.5f);
+    source.globalEqHighCutHz(14500);
+    source.snapshots().push_back(
+        std::make_shared<Snapshot>(source.MakeSnapshotFromCurrentSettings(source)));
 
     std::stringstream serialized;
     json_writer writer{serialized};
@@ -69,8 +87,54 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.pathBInputChannels() == std::vector<int64_t>{0});
     REQUIRE(result.pathBInputVolumeDb() == -3.0f);
     REQUIRE(result.pathBOutputVolumeDb() == 2.5f);
+    REQUIRE(result.pathAInputChannels() == std::vector<int64_t>{2});
+    REQUIRE(result.pathAMute());
+    REQUIRE(result.pathAPan() == -1.0f);
+    REQUIRE_FALSE(result.pathBMute());
+    REQUIRE(result.pathBPan() == 1.0f);
+    REQUIRE(result.globalEqEnabled());
+    REQUIRE(result.globalEqLowCutHz() == 75);
+    REQUIRE(result.globalEqLowGainDb() == -1.5f);
+    REQUIRE(result.globalEqMidGainDb() == 2.0f);
+    REQUIRE(result.globalEqMidFrequencyHz() == 1250);
+    REQUIRE(result.globalEqHighGainDb() == -2.5f);
+    REQUIRE(result.globalEqHighCutHz() == 14500);
     REQUIRE(result.pathBItems().size() == 1);
+    REQUIRE(result.snapshots().size() == 1);
+    REQUIRE(result.snapshots()[0]->hasMixSettings_);
+    REQUIRE(result.snapshots()[0]->pathAMute_);
+    REQUIRE(result.snapshots()[0]->pathAPan_ == -1.0f);
+    REQUIRE(result.snapshots()[0]->pathBPan_ == 1.0f);
+    REQUIRE(result.snapshots()[0]->globalEqEnabled_);
+    REQUIRE(result.snapshots()[0]->globalEqMidFrequencyHz_ == 1250);
 }
+
+TEST_CASE("NAM calibration profiles follow the active interface", "[json_read_test][nam-calibration]")
+{
+    JackServerSettings babyface("hw:CARD=Babyface2359687", "hw:CARD=Babyface2359687", 48000, 48, 3);
+    babyface.SetAlsaInputDevice(
+        "hw:CARD=Babyface2359687",
+        "RME Babyface Pro FS");
+    REQUIRE(babyface.GetNamInputCalibrationDbu() == 13.0f);
+    babyface.SetNamInputCalibrationDbu(14.5f);
+    REQUIRE(babyface.GetNamInputCalibrationDbu() == 14.5f);
+
+    babyface.SetAlsaInputDevice("hw:CARD=Other", "Other USB Audio");
+    REQUIRE(babyface.GetNamInputCalibrationDbu() == 12.0f);
+    babyface.SetNamInputCalibrationDbu(10.0f);
+
+    std::stringstream serialized;
+    json_writer writer{serialized};
+    writer.write(babyface);
+    json_reader reader{serialized};
+    JackServerSettings restored;
+    reader.read(&restored);
+
+    REQUIRE(restored.GetNamInputCalibrationDbu() == 10.0f);
+    restored.SetAlsaInputDevice("hw:CARD=Babyface2359687", "RME Babyface Pro FS");
+    REQUIRE(restored.GetNamInputCalibrationDbu() == 14.5f);
+}
+#endif
 
 class JsonTestTarget
 {

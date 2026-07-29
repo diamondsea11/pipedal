@@ -2370,6 +2370,7 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
         //////// PLUGIN SPECIFIC UPGRADES //////////////////////
         if (pPlugin->uri() == "http://two-play.com/plugins/toob-nam")
         {
+            float interfaceCalibration = jackServerSettings.GetNamInputCalibrationDbu();
             ControlValue *pVersion = snapshotValue.GetControlValue("version");
             if (pVersion == nullptr)
             {
@@ -2411,7 +2412,7 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
             {
                 // Use this installation's interface calibration and maximum A2
                 // model quality for existing TooB NAM instances.
-                snapshotValue.SetControlValue("calibration", 13.0f);
+                snapshotValue.SetControlValue("calibration", interfaceCalibration);
                 snapshotValue.SetControlValue("modelSize", 1.0f);
                 snapshotValue.SetControlValue("version", 3.0f);
                 version = 3.0f;
@@ -2435,6 +2436,10 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
                 snapshotValue.SetControlValue("inputCalibrationMode", 1.0f);
                 snapshotValue.SetControlValue("version", 5.0f);
             }
+            snapshotValue.SetControlValue("calibration", interfaceCalibration);
+            snapshotValue.SetControlValue("modelSize", 1.0f);
+            snapshotValue.SetControlValue("inputCalibrationMode", 1.0f);
+            snapshotValue.SetControlValue("version", 6.0f);
         }
         if (pPlugin->piPedalUI())
         {
@@ -2491,6 +2496,7 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
         //////// PLUGIN SPECIFIC UPGRADES //////////////////////
         if (pPlugin->uri() == "http://two-play.com/plugins/toob-nam")
         {
+            float interfaceCalibration = jackServerSettings.GetNamInputCalibrationDbu();
             ControlValue *pVersion = pedalboardItem->GetControlValue("version");
             if (pVersion == nullptr)
             {
@@ -2532,7 +2538,7 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
             {
                 // Use this installation's interface calibration and maximum A2
                 // model quality for existing TooB NAM instances.
-                pedalboardItem->SetControlValue("calibration", 13.0f);
+                pedalboardItem->SetControlValue("calibration", interfaceCalibration);
                 pedalboardItem->SetControlValue("modelSize", 1.0f);
                 pedalboardItem->SetControlValue("version", 3.0f);
                 version = 3.0f;
@@ -2555,6 +2561,13 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
                 pedalboardItem->SetControlValue("inputCalibrationMode", 1.0f);
                 pedalboardItem->SetControlValue("version", 5.0f);
             }
+            // Interface calibration is an installation setting, not a preset
+            // characteristic. Keep every NAM instance synchronized with the
+            // currently selected capture device.
+            pedalboardItem->SetControlValue("calibration", interfaceCalibration);
+            pedalboardItem->SetControlValue("modelSize", 1.0f);
+            pedalboardItem->SetControlValue("inputCalibrationMode", 1.0f);
+            pedalboardItem->SetControlValue("version", 6.0f);
         }
         for (size_t i = 0; i < pPlugin->ports().size(); ++i)
         {

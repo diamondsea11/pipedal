@@ -27,6 +27,7 @@
 #include <lv2/urid/urid.h>
 #include <functional>
 #include "DbDezipper.hpp"
+#include <array>
 
 namespace pipedal
 {
@@ -51,6 +52,20 @@ namespace pipedal
 
     class Lv2Pedalboard
     {
+    public:
+        struct Biquad
+        {
+            float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
+            float z1 = 0, z2 = 0;
+            float Process(float value)
+            {
+                float result = value * b0 + z1;
+                z1 = value * b1 - result * a1 + z2;
+                z2 = value * b2 - result * a2;
+                return result;
+            }
+        };
+
     private:
         IHost *pHost = nullptr;
         size_t currentFrameOffset = 0;
@@ -62,10 +77,17 @@ namespace pipedal
         BufferPool bufferPool;
         std::vector<float *> pedalboardInputBuffers;
         std::vector<float *> pedalboardOutputBuffers;
+        std::vector<int64_t> pathAInputChannels;
+        bool pathAMute = false;
+        float pathAPan = 0;
         bool pathBEnabled = false;
         std::vector<int64_t> pathBInputChannels;
         std::vector<float *> pathBInputBuffers;
         std::vector<float *> pathBOutputBuffers;
+        bool pathBMute = false;
+        float pathBPan = 0;
+        bool globalEqEnabled = false;
+        std::array<std::array<Biquad, 5>, 2> globalEq;
         float *pedalboardSidechainBuffer = nullptr;
 
         std::vector<std::shared_ptr<IEffect>> effects;
@@ -187,6 +209,7 @@ namespace pipedal
         std::vector<float *> &GetoutputBuffers() { return this->pedalboardOutputBuffers; }
         bool IsPathBEnabled() const { return this->pathBEnabled; }
         const std::vector<int64_t> &GetPathBInputChannels() const { return this->pathBInputChannels; }
+        const std::vector<int64_t> &GetPathAInputChannels() const { return this->pathAInputChannels; }
 
         int GetControlIndex(uint64_t instanceId, const std::string &symbol);
         void SetControlValue(int effectIndex, int portIndex, float value);
