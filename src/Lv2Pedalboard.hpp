@@ -56,10 +56,16 @@ namespace pipedal
         size_t currentFrameOffset = 0;
         DbDezipper inputVolume;
         DbDezipper outputVolume;
+        DbDezipper pathBInputVolume;
+        DbDezipper pathBOutputVolume;
 
         BufferPool bufferPool;
         std::vector<float *> pedalboardInputBuffers;
         std::vector<float *> pedalboardOutputBuffers;
+        bool pathBEnabled = false;
+        std::vector<int64_t> pathBInputChannels;
+        std::vector<float *> pathBInputBuffers;
+        std::vector<float *> pathBOutputBuffers;
         float *pedalboardSidechainBuffer = nullptr;
 
         std::vector<std::shared_ptr<IEffect>> effects;
@@ -156,7 +162,20 @@ namespace pipedal
         void Deactivate();
         void UpdateAudioPorts();
 
-        bool Run(float **inputBuffers, float **outputBuffers, uint32_t samples, RealtimeRingBufferWriter *realtimeWriter);
+        bool Run(
+            float **inputBuffers,
+            float **outputBuffers,
+            float **pathBHardwareInputBuffers,
+            uint32_t samples,
+            RealtimeRingBufferWriter *realtimeWriter);
+        bool Run(
+            float **inputBuffers,
+            float **outputBuffers,
+            uint32_t samples,
+            RealtimeRingBufferWriter *realtimeWriter)
+        {
+            return Run(inputBuffers, outputBuffers, nullptr, samples, realtimeWriter);
+        }
 
         void ResetAtomBuffers();
 
@@ -166,11 +185,15 @@ namespace pipedal
 
         std::vector<float *> &GetInputBuffers() { return this->pedalboardInputBuffers; }
         std::vector<float *> &GetoutputBuffers() { return this->pedalboardOutputBuffers; }
+        bool IsPathBEnabled() const { return this->pathBEnabled; }
+        const std::vector<int64_t> &GetPathBInputChannels() const { return this->pathBInputChannels; }
 
         int GetControlIndex(uint64_t instanceId, const std::string &symbol);
         void SetControlValue(int effectIndex, int portIndex, float value);
         void SetInputVolume(float value) { this->inputVolume.SetTarget(value); }
         void SetOutputVolume(float value) { this->outputVolume.SetTarget(value); }
+        void SetPathBInputVolume(float value) { this->pathBInputVolume.SetTarget(value); }
+        void SetPathBOutputVolume(float value) { this->pathBOutputVolume.SetTarget(value); }
         void SetBypass(int effectIndex, bool enabled);
 
         void ComputeVus(RealtimeVuBuffers *vuConfiguration, uint32_t samples);

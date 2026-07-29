@@ -89,6 +89,8 @@ namespace pipedal
         MaybeLv2StateChanged,
         SetInputVolume,
         SetOutputVolume,
+        SetPathBInputVolume,
+        SetPathBOutputVolume,
         Lv2ErrorMessage,
 
         RealtimeMidiEvent,
@@ -470,6 +472,18 @@ namespace pipedal
             SetVolumeBody body;
             body.value = value;
             write(RingBufferCommand::SetOutputVolume, body);
+        }
+        void SetPathBInputVolume(float value)
+        {
+            SetVolumeBody body;
+            body.value = value;
+            write(RingBufferCommand::SetPathBInputVolume, body);
+        }
+        void SetPathBOutputVolume(float value)
+        {
+            SetVolumeBody body;
+            body.value = value;
+            write(RingBufferCommand::SetPathBOutputVolume, body);
         }
 
         void FreeVuSubscriptions(RealtimeVuBuffers *configuration)

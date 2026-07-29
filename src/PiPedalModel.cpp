@@ -613,6 +613,34 @@ void PiPedalModel::PreviewOutputVolume(float value)
 {
     audioHost->SetOutputVolume(value);
 }
+void PiPedalModel::SetPathBInputVolume(float value)
+{
+    PreviewPathBInputVolume(value);
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        this->pedalboard.pathBInputVolumeDb(value);
+    }
+    this->SetPresetChanged(-1, true);
+    this->FirePedalboardChanged(-1, false);
+}
+void PiPedalModel::SetPathBOutputVolume(float value)
+{
+    PreviewPathBOutputVolume(value);
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        this->pedalboard.pathBOutputVolumeDb(value);
+    }
+    this->SetPresetChanged(-1, true);
+    this->FirePedalboardChanged(-1, false);
+}
+void PiPedalModel::PreviewPathBInputVolume(float value)
+{
+    audioHost->SetPathBInputVolume(value);
+}
+void PiPedalModel::PreviewPathBOutputVolume(float value)
+{
+    audioHost->SetPathBOutputVolume(value);
+}
 
 void PiPedalModel::SetControl(int64_t clientId, int64_t pedalItemId, const std::string &symbol, float value)
 {

@@ -385,6 +385,10 @@ export const MainPage =
                     } else if (selectedId === Pedalboard.END_CONTROL_ID) // synthetic output volume.
                     {
                         return pedalboard.makeEndItem();
+                    } else if (selectedId === Pedalboard.AUX_START_CONTROL_ID) {
+                        return pedalboard.makePathBStartItem();
+                    } else if (selectedId === Pedalboard.AUX_END_CONTROL_ID) {
+                        return pedalboard.makePathBEndItem();
                     }
 
                     let it = pedalboard.itemsGenerator();

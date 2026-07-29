@@ -64,13 +64,19 @@ std::vector<PedalboardItem*> Pedalboard::GetAllPlugins()
 {
     std::vector<PedalboardItem*> result;
     GetAllItems(result,this->items());
+    GetAllItems(result,this->pathBItems());
     return result;
 }
 
 
 const PedalboardItem*Pedalboard::GetItem(int64_t pedalItemId) const
 {
-    return GetItem_(this->items(),pedalItemId);
+    const PedalboardItem *result = GetItem_(this->items(), pedalItemId);
+    if (result == nullptr)
+    {
+        result = GetItem_(this->pathBItems(), pedalItemId);
+    }
+    return result;
 }
 PedalboardItem*Pedalboard::GetItem(int64_t pedalItemId)
  {
@@ -221,6 +227,19 @@ Pedalboard Pedalboard::MakeDefault()
     return result;
 }
 
+void Pedalboard::EnsurePathB()
+{
+    pathBEnabled(true);
+    if (pathBItems().empty())
+    {
+        pathBItems().push_back(MakeEmptyItem());
+    }
+    if (pathBInputChannels().empty())
+    {
+        pathBInputChannels().push_back(0);
+    }
+}
+
 
 bool IsPedalboardSplitItem(const PedalboardItem*self, const std::vector<PedalboardItem>&value)
 {
@@ -338,6 +357,19 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
     for (size_t i = 0; i < this->items_.size();++i) 
     {
         if (!this->items_[i].IsStructurallyIdentical(other.items_[i]))
+        {
+            return false;
+        }
+    }
+    if (this->pathBEnabled_ != other.pathBEnabled_ ||
+        this->pathBInputChannels_ != other.pathBInputChannels_ ||
+        this->pathBItems_.size() != other.pathBItems_.size())
+    {
+        return false;
+    }
+    for (size_t i = 0; i < this->pathBItems_.size(); ++i)
+    {
+        if (!this->pathBItems_[i].IsStructurallyIdentical(other.pathBItems_[i]))
         {
             return false;
         }
@@ -549,6 +581,12 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,input_volume_db)
     JSON_MAP_REFERENCE(Pedalboard,output_volume_db)
     JSON_MAP_REFERENCE(Pedalboard,items)
+    JSON_MAP_REFERENCE(Pedalboard,pathBEnabled)
+    JSON_MAP_REFERENCE(Pedalboard,pathBName)
+    JSON_MAP_REFERENCE(Pedalboard,pathBInputVolumeDb)
+    JSON_MAP_REFERENCE(Pedalboard,pathBOutputVolumeDb)
+    JSON_MAP_REFERENCE(Pedalboard,pathBInputChannels)
+    JSON_MAP_REFERENCE(Pedalboard,pathBItems)
     JSON_MAP_REFERENCE(Pedalboard,nextInstanceId)
     JSON_MAP_REFERENCE(Pedalboard,snapshots)
     JSON_MAP_REFERENCE(Pedalboard,selectedSnapshot)
@@ -569,5 +607,4 @@ JSON_MAP_BEGIN(Snapshot)
     JSON_MAP_REFERENCE(Snapshot,color)
     JSON_MAP_REFERENCE(Snapshot,values)
 JSON_MAP_END()
-
 

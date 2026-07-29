@@ -1268,6 +1268,38 @@ public:
     }
     REGISTER_MESSAGE_HANDLER(previewOutputVolume)
 
+    void handle_setPathBInputVolume(int replyTo, json_reader *pReader)
+    {
+        float value;
+        pReader->read(&value);
+        this->model.SetPathBInputVolume(value);
+    }
+    REGISTER_MESSAGE_HANDLER(setPathBInputVolume)
+
+    void handle_setPathBOutputVolume(int replyTo, json_reader *pReader)
+    {
+        float value;
+        pReader->read(&value);
+        this->model.SetPathBOutputVolume(value);
+    }
+    REGISTER_MESSAGE_HANDLER(setPathBOutputVolume)
+
+    void handle_previewPathBInputVolume(int replyTo, json_reader *pReader)
+    {
+        float value;
+        pReader->read(&value);
+        this->model.PreviewPathBInputVolume(value);
+    }
+    REGISTER_MESSAGE_HANDLER(previewPathBInputVolume)
+
+    void handle_previewPathBOutputVolume(int replyTo, json_reader *pReader)
+    {
+        float value;
+        pReader->read(&value);
+        this->model.PreviewPathBOutputVolume(value);
+    }
+    REGISTER_MESSAGE_HANDLER(previewPathBOutputVolume)
+
     void handle_listenForMidiEvent(int replyTo, json_reader *pReader)
     {
         ListenForMidiEventBody body;

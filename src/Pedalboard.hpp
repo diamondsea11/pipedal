@@ -224,6 +224,12 @@ namespace pipedal
         float output_volume_db_ = 0;
 
         std::vector<PedalboardItem> items_;
+        bool pathBEnabled_ = false;
+        std::string pathBName_ = "Vocal";
+        float pathBInputVolumeDb_ = 0;
+        float pathBOutputVolumeDb_ = 0;
+        std::vector<int64_t> pathBInputChannels_ = {0};
+        std::vector<PedalboardItem> pathBItems_;
         uint64_t nextInstanceId_ = 0;
         uint64_t NextInstanceId() { return ++nextInstanceId_; }
 
@@ -267,6 +273,12 @@ namespace pipedal
         GETTER_SETTER_VEC(items)
         GETTER_SETTER(input_volume_db)
         GETTER_SETTER(output_volume_db)
+        GETTER_SETTER(pathBEnabled)
+        GETTER_SETTER_REF(pathBName)
+        GETTER_SETTER(pathBInputVolumeDb)
+        GETTER_SETTER(pathBOutputVolumeDb)
+        GETTER_SETTER_VEC(pathBInputChannels)
+        GETTER_SETTER_VEC(pathBItems)
         GETTER_SETTER_VEC(snapshots)
         GETTER_SETTER(selectedSnapshot)
         GETTER_SETTER(selectedPlugin)
@@ -277,6 +289,7 @@ namespace pipedal
         PedalboardItem MakeSplit();
 
         static Pedalboard MakeDefault();
+        void EnsurePathB();
     };
 
 #undef GETTER_SETTER_REF

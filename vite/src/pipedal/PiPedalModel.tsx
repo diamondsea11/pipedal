@@ -1906,6 +1906,16 @@ export class PiPedalModel //implements PiPedalModel
         } else if (instanceId === Pedalboard.END_CONTROL_ID) {
             this._setOutputVolume(value, notifyServer);
             return;
+        } else if (instanceId === Pedalboard.AUX_START_CONTROL_ID && key === "volume_db") {
+            newPedalboard.pathBInputVolumeDb = value;
+            this.setModelPedalboard(newPedalboard);
+            if (notifyServer) this.webSocket?.send("setPathBInputVolume", value);
+            return;
+        } else if (instanceId === Pedalboard.AUX_END_CONTROL_ID && key === "volume_db") {
+            newPedalboard.pathBOutputVolumeDb = value;
+            this.setModelPedalboard(newPedalboard);
+            if (notifyServer) this.webSocket?.send("setPathBOutputVolume", value);
+            return;
         }
         let item = newPedalboard.getItem(instanceId);
         changed = item.setControlValue(key, value);
@@ -2109,6 +2119,12 @@ export class PiPedalModel //implements PiPedalModel
         } else if (instanceId === Pedalboard.END_CONTROL_ID) {
             this.previewOutputVolume(value);
             return;
+        } else if (instanceId === Pedalboard.AUX_START_CONTROL_ID && key === "volume_db") {
+            this.webSocket?.send("previewPathBInputVolume", value);
+            return;
+        } else if (instanceId === Pedalboard.AUX_END_CONTROL_ID && key === "volume_db") {
+            this.webSocket?.send("previewPathBOutputVolume", value);
+            return;
         }
 
         // Get the control info to check if it's expensive
@@ -2248,6 +2264,45 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
 
 
+    }
+
+    movePedalboardItemToPathStart(instanceId: number, terminalInstanceId: number): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        this.updateVst3State(newPedalboard);
+        let fromItem = newPedalboard.getItem(instanceId);
+        newPedalboard.deleteItem(instanceId);
+        newPedalboard.addToPathStart(fromItem, terminalInstanceId);
+        newPedalboard.selectedPlugin = fromItem.instanceId;
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    movePedalboardItemToPathEnd(instanceId: number, terminalInstanceId: number): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        this.updateVst3State(newPedalboard);
+        let fromItem = newPedalboard.getItem(instanceId);
+        newPedalboard.deleteItem(instanceId);
+        newPedalboard.addToPathEnd(fromItem, terminalInstanceId);
+        newPedalboard.selectedPlugin = fromItem.instanceId;
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
+    configurePathB(enabled: boolean, inputChannel?: number, name?: string): void {
+        let newPedalboard = this.pedalboard.get().clone();
+        if (enabled) {
+            newPedalboard.enablePathB(inputChannel ?? newPedalboard.pathBInputChannels[0] ?? 0);
+        } else {
+            newPedalboard.disablePathB();
+        }
+        if (inputChannel !== undefined) {
+            newPedalboard.pathBInputChannels = [inputChannel];
+        }
+        if (name !== undefined) {
+            newPedalboard.pathBName = name;
+        }
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
     }
 
 
@@ -4049,5 +4104,3 @@ export class PiPedalModelFactory {
 
     }
 };
-
-

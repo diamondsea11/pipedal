@@ -1060,6 +1060,10 @@ const PluginControlView =
                     pedalboardItem = pedalboard.makeStartItem();
                 } else if (this.props.instanceId === Pedalboard.END_CONTROL_ID) {
                     pedalboardItem = pedalboard.makeEndItem();
+                } else if (this.props.instanceId === Pedalboard.AUX_START_CONTROL_ID) {
+                    pedalboardItem = pedalboard.makePathBStartItem();
+                } else if (this.props.instanceId === Pedalboard.AUX_END_CONTROL_ID) {
+                    pedalboardItem = pedalboard.makePathBEndItem();
                 } else {
                     pedalboardItem = pedalboard.getItem(this.props.instanceId);
                 }

@@ -25,10 +25,52 @@
 
 #include "json.hpp"
 #include "json_variant.hpp"
+#include "Pedalboard.hpp"
 #include <concepts>
 #include <type_traits>
 
 using namespace pipedal;
+
+TEST_CASE("legacy pedalboards default to one path", "[json_read_test][multipath]")
+{
+    std::stringstream input{
+        R"({"name":"Legacy","input_volume_db":0,"output_volume_db":0,"items":[],"nextInstanceId":0,"snapshots":[],"selectedSnapshot":-1,"selectedPlugin":-1})"};
+    json_reader reader{input};
+    Pedalboard pedalboard;
+    reader.read(&pedalboard);
+
+    REQUIRE(reader.is_complete());
+    REQUIRE_FALSE(pedalboard.pathBEnabled());
+    REQUIRE(pedalboard.pathBName() == "Vocal");
+    REQUIRE(pedalboard.pathBInputChannels() == std::vector<int64_t>{0});
+    REQUIRE(pedalboard.pathBItems().empty());
+}
+
+TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][multipath]")
+{
+    Pedalboard source = Pedalboard::MakeDefault();
+    source.EnsurePathB();
+    source.pathBName("Vocal");
+    source.pathBInputChannels({0});
+    source.pathBInputVolumeDb(-3.0f);
+    source.pathBOutputVolumeDb(2.5f);
+
+    std::stringstream serialized;
+    json_writer writer{serialized};
+    writer.write(source);
+
+    json_reader reader{serialized};
+    Pedalboard result;
+    reader.read(&result);
+
+    REQUIRE(reader.is_complete());
+    REQUIRE(result.pathBEnabled());
+    REQUIRE(result.pathBName() == "Vocal");
+    REQUIRE(result.pathBInputChannels() == std::vector<int64_t>{0});
+    REQUIRE(result.pathBInputVolumeDb() == -3.0f);
+    REQUIRE(result.pathBOutputVolumeDb() == 2.5f);
+    REQUIRE(result.pathBItems().size() == 1);
+}
 
 class JsonTestTarget
 {

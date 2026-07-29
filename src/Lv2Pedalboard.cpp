@@ -324,11 +324,17 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
 
     inputVolume.SetSampleRate((float)(this->pHost->GetSampleRate()));
     outputVolume.SetSampleRate((float)(this->pHost->GetSampleRate()));
+    pathBInputVolume.SetSampleRate((float)(this->pHost->GetSampleRate()));
+    pathBOutputVolume.SetSampleRate((float)(this->pHost->GetSampleRate()));
     inputVolume.SetMinDb(-60);
     outputVolume.SetMinDb(-60);
+    pathBInputVolume.SetMinDb(-60);
+    pathBOutputVolume.SetMinDb(-60);
 
     inputVolume.SetTarget(pedalboard.input_volume_db());
     outputVolume.SetTarget(pedalboard.output_volume_db());
+    pathBInputVolume.SetTarget(pedalboard.pathBInputVolumeDb());
+    pathBOutputVolume.SetTarget(pedalboard.pathBOutputVolumeDb());
 
     size_t nInputs = std::max(GetNumberOfAudioInputChannels(),(size_t)1);
 
@@ -354,6 +360,34 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         {
             this->pedalboardOutputBuffers.push_back(outputs[0]);
             this->pedalboardOutputBuffers.push_back(outputs[1]);
+        }
+    }
+
+    this->pathBEnabled = pedalboard.pathBEnabled();
+    this->pathBInputChannels = pedalboard.pathBInputChannels();
+    if (this->pathBEnabled)
+    {
+        size_t nPathBInputs = std::max(this->pathBInputChannels.size(), (size_t)1);
+        this->pathBInputBuffers = AllocateAudioBuffers((int)nPathBInputs);
+        auto pathBOutputs = PrepareItems(
+            pedalboard.pathBItems(),
+            this->pathBInputBuffers,
+            errorList,
+            existingEffects);
+
+        if (nOutputs == 1)
+        {
+            this->pathBOutputBuffers.push_back(pathBOutputs[0]);
+        }
+        else if (pathBOutputs.size() == 1)
+        {
+            this->pathBOutputBuffers.push_back(pathBOutputs[0]);
+            this->pathBOutputBuffers.push_back(pathBOutputs[0]);
+        }
+        else
+        {
+            this->pathBOutputBuffers.push_back(pathBOutputs[0]);
+            this->pathBOutputBuffers.push_back(pathBOutputs[1]);
         }
     }
     PrepareMidiMap(pedalboard);
@@ -468,6 +502,13 @@ void Lv2Pedalboard::PrepareMidiMap(const Pedalboard &pedalboard)
         auto &item = pedalboard.items()[i];
         PrepareMidiMap(item);
     }
+    if (pedalboard.pathBEnabled())
+    {
+        for (const auto &item : pedalboard.pathBItems())
+        {
+            PrepareMidiMap(item);
+        }
+    }
     std::sort(this->midiMappings.begin(), this->midiMappings.end(),
               [](const MidiMapping &left, const MidiMapping &right)
               { return left.key < right.key; });
@@ -510,7 +551,12 @@ static void Copy(float *restrict input, float *restrict output, uint32_t samples
         output[i] = input[i];
     }
 }
-bool Lv2Pedalboard::Run(float **inputBuffers, float **outputBuffers, uint32_t samples, RealtimeRingBufferWriter *ringBufferWriter)
+bool Lv2Pedalboard::Run(
+    float **inputBuffers,
+    float **outputBuffers,
+    float **pathBHardwareInputBuffers,
+    uint32_t samples,
+    RealtimeRingBufferWriter *ringBufferWriter)
 {
     this->ringBufferWriter = ringBufferWriter;
     for (size_t i = 0; i < this->pedalboardInputBuffers.size(); ++i)
@@ -529,6 +575,22 @@ bool Lv2Pedalboard::Run(float **inputBuffers, float **outputBuffers, uint32_t sa
             this->pedalboardInputBuffers[c][i] = inputBuffers[c][i] * volume;
         }
     }
+    if (this->pathBEnabled)
+    {
+        for (size_t i = 0; i < samples; ++i)
+        {
+            float volume = this->pathBInputVolume.Tick();
+            for (size_t c = 0; c < this->pathBInputBuffers.size(); ++c)
+            {
+                float *source = pathBHardwareInputBuffers == nullptr
+                    ? nullptr
+                    : pathBHardwareInputBuffers[c];
+                this->pathBInputBuffers[c][i] = source == nullptr
+                    ? 0
+                    : source[i] * volume;
+            }
+        }
+    }
     for (int i = 0; i < this->processActions.size(); ++i)
     {
         processActions[i](samples);
@@ -544,12 +606,16 @@ bool Lv2Pedalboard::Run(float **inputBuffers, float **outputBuffers, uint32_t sa
     for (size_t i = 0; i < samples; ++i)
     {
         float volume = outputVolume.Tick();
+        float pathBVolume = this->pathBEnabled ? pathBOutputVolume.Tick() : 0;
         for (size_t c = 0; c < this->pedalboardOutputBuffers.size(); ++c)
         {
             if (outputBuffers[c] == nullptr) {
                 break;
             }
-            outputBuffers[c][i] = this->pedalboardOutputBuffers[c][i] * volume;
+            float pathBOutput = this->pathBEnabled
+                ? this->pathBOutputBuffers[c][i] * pathBVolume
+                : 0;
+            outputBuffers[c][i] = this->pedalboardOutputBuffers[c][i] * volume + pathBOutput;
         }
     }
     this->currentFrameOffset += samples;
@@ -586,11 +652,6 @@ void Lv2Pedalboard::ComputeVus(RealtimeVuBuffers *realtimeVuBuffers, uint32_t sa
         auto& rtIndex = realtimeVuBuffers->enabledIndexes[i];
         int index = rtIndex.index;
         if (index == -1) continue;
-        if (index == Pedalboard::AUX_START_CONTROL_ID || index == Pedalboard::AUX_END_CONTROL_ID)
-        {
-            // handled by master VU updates.
-            continue;
-        }
         VuUpdateX *pUpdate = &realtimeVuBuffers->vuUpdateWorkingData[i];
         if (index == Pedalboard::START_CONTROL_ID)
         {
@@ -614,6 +675,42 @@ void Lv2Pedalboard::ComputeVus(RealtimeVuBuffers *realtimeVuBuffers, uint32_t sa
             else if (this->pedalboardOutputBuffers.size() == 1)
             {
                 pUpdate->AccumulateInputs(&(this->pedalboardOutputBuffers[0][0]), samples);
+            }
+        }
+        else if (index == Pedalboard::AUX_START_CONTROL_ID)
+        {
+            if (!this->pathBEnabled)
+            {
+                continue;
+            }
+            if (this->pathBInputBuffers.size() >= 2)
+            {
+                pUpdate->AccumulateOutputs(
+                    this->pathBInputBuffers[0],
+                    this->pathBInputBuffers[1],
+                    samples);
+            }
+            else if (this->pathBInputBuffers.size() == 1)
+            {
+                pUpdate->AccumulateOutputs(this->pathBInputBuffers[0], samples);
+            }
+        }
+        else if (index == Pedalboard::AUX_END_CONTROL_ID)
+        {
+            if (!this->pathBEnabled)
+            {
+                continue;
+            }
+            if (this->pathBOutputBuffers.size() >= 2)
+            {
+                pUpdate->AccumulateInputs(
+                    this->pathBOutputBuffers[0],
+                    this->pathBOutputBuffers[1],
+                    samples);
+            }
+            else if (this->pathBOutputBuffers.size() == 1)
+            {
+                pUpdate->AccumulateInputs(this->pathBOutputBuffers[0], samples);
             }
         }
         else

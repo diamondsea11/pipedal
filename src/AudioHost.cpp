@@ -780,6 +780,20 @@ private:
                 this->realtimeActivePedalboard->SetOutputVolume(body.value);
                 break;
             }
+            case RingBufferCommand::SetPathBInputVolume:
+            {
+                SetVolumeBody body;
+                realtimeReader.readComplete(&body);
+                this->realtimeActivePedalboard->SetPathBInputVolume(body.value);
+                break;
+            }
+            case RingBufferCommand::SetPathBOutputVolume:
+            {
+                SetVolumeBody body;
+                realtimeReader.readComplete(&body);
+                this->realtimeActivePedalboard->SetPathBOutputVolume(body.value);
+                break;
+            }
             case RingBufferCommand::ParameterRequest:
             {
                 RealtimePatchPropertyRequest *pRequest = nullptr;
@@ -1217,6 +1231,7 @@ private:
         }
         float *inputBuffers[3];
         float *outputBuffers[3];
+        float *pathBInputBuffers[3] = {nullptr, nullptr, nullptr};
         bool buffersValid = true;
         inputBuffers[0] = pInputBuffers->at(0);
         inputBuffers[1] = pInputBuffers->size() >= 2 ? pInputBuffers->at(1) : nullptr;
@@ -1228,9 +1243,27 @@ private:
 
         if (pedalboard != nullptr)
         {
+            if (pedalboard->IsPathBEnabled())
+            {
+                const auto &pathBChannels = pedalboard->GetPathBInputChannels();
+                size_t channelCount = std::min(pathBChannels.size(), (size_t)2);
+                for (size_t i = 0; i < channelCount; ++i)
+                {
+                    int64_t channel = pathBChannels[i];
+                    if (channel >= 0 && (size_t)channel < audioDriver->DeviceInputBufferCount())
+                    {
+                        pathBInputBuffers[i] = audioDriver->GetDeviceInputBuffer((size_t)channel);
+                    }
+                }
+            }
             pedalboard->ProcessParameterRequests(pParameterRequests, nframes);
 
-            pedalboard->Run(inputBuffers, outputBuffers, (uint32_t)nframes, &realtimeWriter);
+            pedalboard->Run(
+                inputBuffers,
+                outputBuffers,
+                pathBInputBuffers,
+                (uint32_t)nframes,
+                &realtimeWriter);
             pedalboard->GatherPatchProperties(pParameterRequests);
             pedalboard->GatherPathPatchProperties(this);
 
@@ -1342,10 +1375,18 @@ private:
                         AccumulateVuOutputs(nFrames, vuUpdate, pHost->GetChannelSelection().mainOutputChannels());
                         break;
                     case Pedalboard::AUX_START_CONTROL_ID:
-                        AccumulateVuInputs(nFrames, vuUpdate, pHost->GetChannelSelection().auxInputChannels());
+                        if (this->realtimeActivePedalboard == nullptr ||
+                            !this->realtimeActivePedalboard->IsPathBEnabled())
+                        {
+                            AccumulateVuInputs(nFrames, vuUpdate, pHost->GetChannelSelection().auxInputChannels());
+                        }
                         break;
                     case Pedalboard::AUX_END_CONTROL_ID:
-                        AccumulateVuOutputs(nFrames, vuUpdate, pHost->GetChannelSelection().auxOutputChannels());
+                        if (this->realtimeActivePedalboard == nullptr ||
+                            !this->realtimeActivePedalboard->IsPathBEnabled())
+                        {
+                            AccumulateVuOutputs(nFrames, vuUpdate, pHost->GetChannelSelection().auxOutputChannels());
+                        }
                         break;
                     }
                 }
@@ -2053,6 +2094,22 @@ public:
             hostWriter.SetOutputVolume(value);
         }
     }
+    virtual void SetPathBInputVolume(float value)
+    {
+        std::lock_guard guard(mutex);
+        if (active && this->currentPedalboard)
+        {
+            hostWriter.SetPathBInputVolume(value);
+        }
+    }
+    virtual void SetPathBOutputVolume(float value)
+    {
+        std::lock_guard guard(mutex);
+        if (active && this->currentPedalboard)
+        {
+            hostWriter.SetPathBOutputVolume(value);
+        }
+    }
 
     std::vector<IndexedSnapshot *> pendingSnapshots;
 
@@ -2188,10 +2245,14 @@ public:
                             nChannels = this->pHost->GetChannelSelection().mainOutputChannels().size();
                             break;
                         case Pedalboard::AUX_START_CONTROL_ID:
-                            nChannels = this->pHost->GetChannelSelection().auxInputChannels().size();
+                            nChannels = pedalboard->IsPathBEnabled()
+                                ? pedalboard->GetPathBInputChannels().size()
+                                : this->pHost->GetChannelSelection().auxInputChannels().size();
                             break;
                         case Pedalboard::AUX_END_CONTROL_ID:
-                            nChannels = this->pHost->GetChannelSelection().auxOutputChannels().size();
+                            nChannels = pedalboard->IsPathBEnabled()
+                                ? pedalboard->GetNumberOfAudioOutputChannels()
+                                : this->pHost->GetChannelSelection().auxOutputChannels().size();
                             break;
                         }
                         v.isStereoInput_ = v.isStereoOutput_ = nChannels > 1;

@@ -397,6 +397,10 @@ namespace pipedal
         void SetOutputVolume(float value);
         void PreviewInputVolume(float value);
         void PreviewOutputVolume(float value);
+        void SetPathBInputVolume(float value);
+        void SetPathBOutputVolume(float value);
+        void PreviewPathBInputVolume(float value);
+        void PreviewPathBOutputVolume(float value);
 
         void SetPedalboard(int64_t clientId, Pedalboard &pedalboard);
         Pedalboard &GetPedalboard();

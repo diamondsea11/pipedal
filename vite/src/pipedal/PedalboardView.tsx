@@ -34,7 +34,12 @@ import Fade from '@mui/material/Fade';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
+import AddIcon from '@mui/icons-material/Add';
+import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ControlPointDuplicateIcon from '@mui/icons-material/ControlPointDuplicate';
@@ -74,6 +79,8 @@ const DISABLED_CONNECTOR_COLOR = isDarkMode() ? "#666" : "#CCC";
 const CELL_WIDTH: number = 96;
 const CELL_HEIGHT: number = 64;
 const FRAME_SIZE: number = 36;
+const PATH_HEADER_HEIGHT: number = 36;
+const PATH_GAP: number = 8;
 
 const STROKE_WIDTH = 3;
 const STEREO_STROKE_WIDTH = 6;
@@ -111,6 +118,17 @@ const pedalboardStyles = (theme: Theme) => createStyles({
         position: "relative",
         overflow: "visible",
 
+    }),
+    pathHeader: css({
+        position: "absolute",
+        left: 8,
+        right: 8,
+        height: PATH_HEADER_HEIGHT,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        zIndex: 2,
     }),
     splitItem: css({
         position: "absolute",
@@ -301,6 +319,7 @@ class PedalLayout {
     originalOutputs: number = 2;
 
     pedalItem?: PedalboardItem;
+    terminalInstanceId: number = 0;
 
     // Split Layout only.
     topChildren: PedalLayout[] = EMPTY_PEDALS;
@@ -309,22 +328,28 @@ class PedalLayout {
     bottomConnectorY: number = 0;
 
 
-    static Start(): PedalLayout {
+    static Start(instanceId: number = START_CONTROL, numberOfOutputs: number = 2): PedalLayout {
         let t: PedalLayout = new PedalLayout();
         t.uri = START_PEDALBOARD_ITEM_URI;
         t.pluginType = PluginType.Terminal;
         t.iconUrl = TERMINAL_ICON_URL;
         t.numberOfInputs = 0;
-        t.numberOfOutputs = 2;
+        t.numberOfOutputs = numberOfOutputs;
+        t.originalInputs = 0;
+        t.originalOutputs = numberOfOutputs;
+        t.terminalInstanceId = instanceId;
         return t;
     }
-    static End(): PedalLayout {
+    static End(instanceId: number = END_CONTROL, numberOfInputs: number = 2): PedalLayout {
         let t: PedalLayout = new PedalLayout();
         t.pluginType = PluginType.Terminal;
         t.uri = END_PEDALBOARD_ITEM_URI;
         t.iconUrl = TERMINAL_ICON_URL;
-        t.numberOfInputs = 2;
+        t.numberOfInputs = numberOfInputs;
         t.numberOfOutputs = 0;
+        t.originalInputs = numberOfInputs;
+        t.originalOutputs = 0;
+        t.terminalInstanceId = instanceId;
         return t;
     }
     constructor(model?: PiPedalModel, pedalItem?: PedalboardItem) {
@@ -599,11 +624,11 @@ const PedalboardView =
 
                         } else if (item.bounds.contains(clientX, clientY)) {
                             if (item.isStart()) {
-                                this.model.movePedalboardItemToStart(instanceId);
+                                this.model.movePedalboardItemToPathStart(instanceId, item.terminalInstanceId);
                                 this.setSelection(instanceId);
                                 return;
                             } else if (item.isEnd()) {
-                                this.model.movePedalboardItemToEnd(instanceId);
+                                this.model.movePedalboardItemToPathEnd(instanceId, item.terminalInstanceId);
                                 this.setSelection(instanceId);
                                 return;
                             } else {
@@ -1251,7 +1276,7 @@ const PedalboardView =
                                 result.push(<div key={this.renderKey++} className={classes.splitItem} style={{ left: item.bounds.x, top: item.bounds.y, width: item.bounds.width }} >
                                     <div className={classes.splitStart} >
 
-                                        {this.pedalButton(START_CONTROL, item.pluginType, item.iconColor, false, true, false, false, false)}
+                                        {this.pedalButton(item.terminalInstanceId, item.pluginType, item.iconColor, false, true, false, false, false)}
                                     </div>
                                 </div>);
                                 break;
@@ -1259,7 +1284,7 @@ const PedalboardView =
                                 result.push(<div key={this.renderKey++} className={classes.splitItem} style={{ left: item.bounds.x, top: item.bounds.y, width: item.bounds.width }} >
                                     <div className={classes.splitStart} >
 
-                                        {this.pedalButton(END_CONTROL, item.pluginType, "", false, true, false, false, false)}
+                                        {this.pedalButton(item.terminalInstanceId, item.pluginType, "", false, true, false, false, false)}
                                     </div>
                                 </div>);
                                 break;
@@ -1414,7 +1439,7 @@ const PedalboardView =
                                 item.numberOfOutputs = (topOutputs >= 1 || bottomOutputs >= 1) ? 2 : 1;
                             }
                         } else if (item.isStart()) {
-                            item.numberOfOutputs = Math.min(PiPedalModelFactory.getInstance().jackSettings.get().inputAudioPorts.length, 2);
+                            item.numberOfOutputs = Math.min(item.originalOutputs, 2);
                         } else if (item.isEnd()) {
                             item.numberOfInputs =
                                 CalculateConnection(
@@ -1448,19 +1473,47 @@ const PedalboardView =
                 render() {
                     const classes = withStyles.getClasses(this.props);
                     this.renderKey = 0;
-                    let layoutChain = makeChain(this.model, this.state.pedalboard?.items);
-                    let start = PedalLayout.Start();
-                    let end = PedalLayout.End();
+                    let pedalboard = this.state.pedalboard;
+                    let layoutChain = makeChain(this.model, pedalboard?.items);
                     if (layoutChain.length !== 0) {
-                        layoutChain.splice(0, 0, start);
-                        layoutChain.splice(layoutChain.length, 0, end);
+                        layoutChain.splice(0, 0, PedalLayout.Start());
+                        layoutChain.splice(layoutChain.length, 0, PedalLayout.End());
                         this.markStereoOutputs(layoutChain, 2, 2);
                     }
 
                     let layoutSize = this.doLayout(layoutChain);
+                    this.offsetLayout_(layoutChain, PATH_HEADER_HEIGHT);
+                    layoutSize.height += PATH_HEADER_HEIGHT;
 
+                    let pathBLayout: PedalLayout[] = [];
+                    let pathBSize: LayoutSize = { width: 0, height: 0 };
+                    if (pedalboard?.pathBEnabled) {
+                        pathBLayout = makeChain(this.model, pedalboard.pathBItems);
+                        let pathBInputs = Math.max(1, Math.min(2, pedalboard.pathBInputChannels.length));
+                        if (pathBLayout.length !== 0) {
+                            pathBLayout.splice(
+                                0,
+                                0,
+                                PedalLayout.Start(Pedalboard.AUX_START_CONTROL_ID, pathBInputs));
+                            pathBLayout.splice(
+                                pathBLayout.length,
+                                0,
+                                PedalLayout.End(Pedalboard.AUX_END_CONTROL_ID, 2));
+                            this.markStereoOutputs(pathBLayout, pathBInputs, 2);
+                        }
+                        pathBSize = this.doLayout(pathBLayout);
+                        this.offsetLayout_(
+                            pathBLayout,
+                            layoutSize.height + PATH_GAP + PATH_HEADER_HEIGHT);
+                        pathBSize.height += PATH_HEADER_HEIGHT;
+                    }
 
-                    this.currentLayout = layoutChain; // save for mouse processing &c.
+                    this.currentLayout = layoutChain.concat(pathBLayout);
+                    let frameWidth = Math.max(420, layoutSize.width, pathBSize.width);
+                    let frameHeight = layoutSize.height +
+                        (pathBLayout.length === 0 ? 0 : PATH_GAP + pathBSize.height);
+                    let inputPorts = this.model.jackSettings.get().inputAudioPorts;
+                    let pathBInput = pedalboard?.pathBInputChannels[0] ?? 0;
                     let contextMenuItem = this.state.contextMenu
                         ? this.state.pedalboard?.maybeGetItem(this.state.contextMenu.instanceId) ?? null
                         : null;
@@ -1473,9 +1526,64 @@ const PedalboardView =
                         >
                             <div className={classes.container} ref={this.frameRef}
                                 style={{
-                                    width: layoutSize.width, height: layoutSize.height,
+                                    width: frameWidth, height: frameHeight,
                                 }} >
+                                <div className={classes.pathHeader} style={{ top: 0 }}>
+                                    <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path A</Typography>
+                                    <Typography variant="caption" color="textSecondary">Main input</Typography>
+                                    {!pedalboard?.pathBEnabled && (
+                                        <Button
+                                            size="small"
+                                            startIcon={<AddIcon />}
+                                            onClick={() => this.model.configurePathB(true, 0, "Vocal")}
+                                            style={{ marginLeft: "auto" }}
+                                        >
+                                            Add path
+                                        </Button>
+                                    )}
+                                </div>
                                 {this.renderChain(layoutChain, layoutSize)}
+                                {pathBLayout.length !== 0 && (
+                                    <>
+                                        <div
+                                            className={classes.pathHeader}
+                                            style={{ top: layoutSize.height + PATH_GAP }}
+                                        >
+                                            <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path B</Typography>
+                                            <Select
+                                                size="small"
+                                                value={pathBInput}
+                                                onChange={(event) =>
+                                                    this.model.configurePathB(
+                                                        true,
+                                                        Number(event.target.value),
+                                                        pedalboard?.pathBName)}
+                                                aria-label="Path B input"
+                                                style={{ height: 28, minWidth: 82 }}
+                                            >
+                                                {inputPorts.map((_port, index) => (
+                                                    <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
+                                                ))}
+                                            </Select>
+                                            <Typography variant="caption" color="textSecondary">
+                                                {pedalboard?.pathBName}
+                                            </Typography>
+                                            <IconButton
+                                                size="small"
+                                                title="Remove Path B"
+                                                aria-label="Remove Path B"
+                                                onClick={() => this.model.configurePathB(false)}
+                                                style={{ marginLeft: "auto" }}
+                                            >
+                                                <CloseIcon fontSize="small" />
+                                            </IconButton>
+                                        </div>
+                                        {this.renderChain(pathBLayout, {
+                                            width: frameWidth,
+                                            height: frameHeight,
+                                        })}
+                                    </>
+                                )}
                             </div>
                             <Menu
                                 open={this.state.contextMenu !== null}
