@@ -55,6 +55,7 @@ import ToobFrequencyResponseView from './ToobFrequencyResponseView';
 import ToolTipEx from './ToolTipEx';
 import MidiChannelBindingControl from './MidiChannelBindingControl';
 import MidiChannelBinding from './MidiChannelBinding';
+import PatchPropertyControl from './PatchPropertyControl';
 
 
 export const StandardItemSize = { width: 80, height: 110 };
@@ -522,6 +523,9 @@ const PluginControlView =
                 return ((
                     <PluginControl key={"ppc" + uiControl.symbol} instanceId={this.props.instanceId} uiControl={uiControl} value={controlValue.value}
                         onChange={(value: number) => { this.onControlValueChanged(controlValue!.key, value) }}
+                        onTrigger={(value: number) => {
+                            this.model.sendPedalboardControlTrigger(this.props.instanceId, uiControl.symbol, value);
+                        }}
                         onPreviewChange={(value: number) => { this.onPreviewChange(controlValue!.key, value) }}
                         requestIMEEdit={(uiControl: any, value: any) => this.requestImeEdit(uiControl, value)}
                         options={options}
@@ -710,6 +714,25 @@ const PluginControlView =
                             this.push_control(result, pluginControl, controlValues);
                         }
                     }
+                }
+                const numericPatchProperties = plugin.patchProperties
+                    .filter((property) => property.writable && property.isNumeric())
+                    .sort((left, right) => {
+                        const leftIndex = left.index < 0 ? Number.MAX_SAFE_INTEGER : left.index;
+                        const rightIndex = right.index < 0 ? Number.MAX_SAFE_INTEGER : right.index;
+                        if (leftIndex !== rightIndex) {
+                            return leftIndex - rightIndex;
+                        }
+                        return (left.label || left.uri).localeCompare(right.label || right.uri);
+                    });
+                for (const patchProperty of numericPatchProperties) {
+                    result.push(
+                        <PatchPropertyControl
+                            key={"patch-" + patchProperty.uri}
+                            instanceId={this.props.instanceId}
+                            property={patchProperty}
+                        />
+                    );
                 }
                 for (let i = 0; i < plugin.fileProperties.length; ++i) {
                     let fileProperty = plugin.fileProperties[i];

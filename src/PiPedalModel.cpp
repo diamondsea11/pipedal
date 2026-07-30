@@ -2031,6 +2031,13 @@ void PiPedalModel::SendSetPatchProperty(
     {
         std::shared_ptr<Lv2PluginInfo> pluginInfo = GetPluginInfo(pedalboardItem->uri_);
         auto pipedalUi = pluginInfo->piPedalUI();
+        bool isWritablePatchProperty = std::any_of(
+            pluginInfo->patchProperties().begin(),
+            pluginInfo->patchProperties().end(),
+            [&propertyUri](const Lv2PatchPropertyInfo &property)
+            {
+                return property.writable() && property.uri() == propertyUri;
+            });
         if (pipedalUi)
         {
             auto fileProperty = pipedalUi->GetFileProperty(propertyUri);
@@ -2041,6 +2048,9 @@ void PiPedalModel::SendSetPatchProperty(
                 std::string atomString = abstractPath.to_string();
                 pedalboardItem->pathProperties_[propertyUri] = atomString;
             }
+        }
+        if (pipedalUi || isWritablePatchProperty)
+        {
             this->SetPresetChanged(clientId, true);
         }
     }

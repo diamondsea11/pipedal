@@ -37,6 +37,7 @@
 #include "lv2/log/logger.h"
 #include "lv2/lv2plug.in/ns/extensions/units/units.h"
 #include "lv2/atom/forge.h"
+#include "lv2/lv2plug.in/ns/ext/buf-size/buf-size.h"
 #include "AtomBuffer.hpp"
 #include "StateInterface.hpp"
 #include "LogFeature.hpp"
@@ -98,6 +99,7 @@ namespace pipedal
         std::vector<char *> inputAtomBuffers;
         std::vector<char *> outputAtomBuffers;
         std::vector<const LV2_Feature *> features;
+        LV2_Feature boundedBlockLengthFeature{LV2_BUF_SIZE__boundedBlockLength, nullptr};
         LV2_Feature *work_schedule_feature = nullptr;
         MapPathFeature mapPathFeature;
 

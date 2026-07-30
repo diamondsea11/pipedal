@@ -180,6 +180,7 @@ Lv2Effect::Lv2Effect(
     }
     this->features.push_back(logFeature.GetFeature());
     this->features.push_back(optionsFeature.GetFeature());
+    this->features.push_back(&boundedBlockLengthFeature);
 
     this->features.push_back(mapPathFeature.GetMapPathFeature());
     this->features.push_back(mapPathFeature.GetMakePathFeature());

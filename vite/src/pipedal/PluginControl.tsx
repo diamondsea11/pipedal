@@ -146,6 +146,7 @@ export interface PluginControlProps extends WithStyles<typeof pluginControlStyle
     value: number;
     onPreviewChange?: (value: number) => void;
     onChange: (value: number) => void;
+    onTrigger?: (value: number) => void;
     theme: Theme;
     requestIMEEdit: (uiControl: UiControl, value: number) => void;
     options?: { slimmableWeights?: number[] }
@@ -538,7 +539,7 @@ const PluginControl =
 
             resetToDefaultValue(uiControl: UiControl): void {
                 let value = uiControl.default_value;
-                this.model.setPedalboardControl(this.props.instanceId, uiControl.symbol, value);
+                this.props.onChange(value);
             }
             onPointerDoubleTap() {
                 let uiControl = this.props.uiControl;
@@ -646,10 +647,10 @@ const PluginControl =
                 if (uiControl) {
                     switch (buttonStyle) {
                         case ButtonStyle.Momentary:
-                            this.model.setPedalboardControl(this.props.instanceId, uiControl.symbol, uiControl.max_value);
+                            this.props.onChange(uiControl.max_value);
                             break;
                         case ButtonStyle.MomentaryOnByDefault:
-                            this.model.setPedalboardControl(this.props.instanceId, uiControl.symbol, uiControl.min_value);
+                            this.props.onChange(uiControl.min_value);
                             break;
                         case ButtonStyle.Trigger:
                             {
@@ -657,7 +658,11 @@ const PluginControl =
                                 if (uiControl.max_value === uiControl.default_value) {
                                     value = uiControl.min_value;
                                 }
-                                this.model.sendPedalboardControlTrigger(this.props.instanceId, uiControl.symbol, value);
+                                if (this.props.onTrigger) {
+                                    this.props.onTrigger(value);
+                                } else {
+                                    this.props.onChange(value);
+                                }
 
                             }
                             break;
@@ -669,10 +674,10 @@ const PluginControl =
                 if (uiControl) {
                     switch (buttonStyle) {
                         case ButtonStyle.Momentary:
-                            this.model.setPedalboardControl(this.props.instanceId, uiControl.symbol, uiControl.min_value);
+                            this.props.onChange(uiControl.min_value);
                             break;
                         case ButtonStyle.MomentaryOnByDefault:
-                            this.model.setPedalboardControl(this.props.instanceId, uiControl.symbol, uiControl.max_value);
+                            this.props.onChange(uiControl.max_value);
                             break;
                         case ButtonStyle.Trigger:
                             {
