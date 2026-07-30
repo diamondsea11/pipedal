@@ -26,8 +26,13 @@ interface DuskDefinition {
     uri: string;
     title: string;
     family: string;
+    // Colours below are taken from each plugin's own JUCE LookAndFeel in the
+    // upstream dusk-audio/dusk-audio-plugins source, so the PiPedal skin matches
+    // the original plugin's palette rather than an invented one.
     accent: string;
     secondary: string;
+    background?: string;
+    panel?: string;
     sections: DuskSection[];
     gainReductionProperty?: string;
 }
@@ -67,8 +72,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/duskverb",
         title: "DuskVerb",
         family: "ALGORITHMIC REVERB",
-        accent: "#68b7a2",
-        secondary: "#d6a94f",
+        accent: "#e89c4f",
+        secondary: "#4a9eff",
+        background: "#1a1a1a",
+        panel: "#242424",
         sections: [
             { name: "Main", controls: ["algorithm", "mix", "bus_mode", "bypass", "predelay", "predelay_sync", "decay", "size"] },
             { name: "Motion", controls: ["mod_depth", "mod_rate", "tail_spin_depth", "tail_spin_rate", "diffusion", "saturation", "width"] },
@@ -87,8 +94,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/multi-comp",
         title: "Multi-Comp",
         family: "MULTI-MODE DYNAMICS",
-        accent: "#d86d62",
-        secondary: "#65a9bc",
+        accent: "#ffaa00",
+        secondary: "#cc6600",
+        background: "#161616",
+        panel: "#232323",
         gainReductionProperty: "gr_meter",
         sections: [
             { name: "Global", controls: ["mode", "bypass", "mix", "stereo_link", "stereo_link_mode", "auto_makeup", "global_lookahead", "oversampling", "true_peak_enable", "true_peak_quality"] },
@@ -111,8 +120,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/multi-q",
         title: "Multi-Q",
         family: "DYNAMIC EQUALIZER",
-        accent: "#55a8c4",
-        secondary: "#d5ad50",
+        accent: "#4488ff",
+        secondary: "#e89c4f",
+        background: "#181818",
+        panel: "#222224",
         sections: [
             { name: "Master", controls: ["master_gain", "bypass", "hq_enabled", "processing_mode", "q_couple_mode", "eq_type", "auto_gain_enabled", "limiter_enabled", "limiter_ceiling"] },
             ...Array.from({ length: 8 }, (_, index) => ({ name: `Band ${index + 1}`, controls: bandControls(index + 1) })),
@@ -131,8 +142,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/_4K_EQ",
         title: "4K EQ",
         family: "CONSOLE EQUALIZER",
-        accent: "#e1b64f",
-        secondary: "#5da89c",
+        accent: "#007bff",
+        secondary: "#c44444",
+        background: "#242424",
+        panel: "#2f2f2f",
         sections: [
             { name: "Master", controls: ["eq_type", "bypass", "input_gain", "output_gain", "saturation", "oversampling", "ms_mode", "auto_gain"] },
             { name: "Filters", controls: ["hpf_enabled", "hpf_freq", "lpf_enabled", "lpf_freq"] },
@@ -147,8 +160,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/tapemachine",
         title: "TapeMachine",
         family: "ANALOG TAPE",
-        accent: "#c8885a",
-        secondary: "#66a7a0",
+        accent: "#c4a77d",
+        secondary: "#d4c090",
+        background: "#1a1512",
+        panel: "#2d2520",
         sections: [
             { name: "Machine", controls: ["tapeMachine", "tapeSpeed", "tapeType", "signalPath", "eqStandard", "calibration", "autoCal"] },
             { name: "Gain & Tone", controls: ["inputGain", "saturation", "bias", "highpassFreq", "lowpassFreq", "outputGain", "autoComp"] },
@@ -160,8 +175,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/tapemachine-2",
         title: "TapeMachine 2",
         family: "ADVANCED TAPE",
-        accent: "#c8885a",
-        secondary: "#66a7a0",
+        accent: "#c4a77d",
+        secondary: "#d4c090",
+        background: "#1a1512",
+        panel: "#2d2520",
         sections: [
             { name: "Machine", controls: ["tapeMachine", "tapeSpeed", "tapeType", "signalPath", "eqStandard", "calibration", "autoCal", "headWidth"] },
             { name: "Gain & Tone", controls: ["inputGain", "bias", "highpassFreq", "lowpassFreq", "outputGain", "autoComp"] },
@@ -174,8 +191,10 @@ const DUSK_DEFINITIONS: DuskDefinition[] = [
         uri: "https://dusk-audio.github.io/plugins/spectrum-analyzer",
         title: "Spectrum Analyzer",
         family: "ANALYSIS",
-        accent: "#68b7a2",
-        secondary: "#d6a94f",
+        accent: "#00aaff",
+        secondary: "#ffaa00",
+        background: "#1a1a1a",
+        panel: "#252525",
         sections: [
             { name: "Analysis", controls: ["channelMode", "fftResolution", "smoothing", "slope", "decayRate", "peakHold", "peakHoldTime"] },
             { name: "Display", controls: ["displayMin", "displayMax", "kSystemType"] },
@@ -187,9 +206,9 @@ const styles = (_theme: Theme) => createStyles({
     skin: css({
         width: "100%",
         height: "100%",
-        color: "#e6e8e7",
-        background: "#151819",
-        "& [data-pipedal-role='plugin-control-frame']": { background: "#151819" },
+        color: "#e0e0e0",
+        background: "var(--dusk-bg, #1a1a1a)",
+        "& [data-pipedal-role='plugin-control-frame']": { background: "var(--dusk-bg, #1a1a1a)" },
         "& [data-pipedal-role='control-grid']": {
             gap: 7,
             rowGap: 7,
@@ -205,9 +224,9 @@ const styles = (_theme: Theme) => createStyles({
             minHeight: 158,
             margin: 0,
             padding: "12px 9px 7px",
-            color: "#e6e8e7",
-            background: "#1c2021",
-            border: "1px solid #3c4344",
+            color: "#e0e0e0",
+            background: "var(--dusk-panel, #242424)",
+            border: "1px solid #3a3a3a",
             borderTop: "3px solid var(--dusk-secondary)",
             borderRadius: 4,
             boxShadow: "none",
@@ -252,10 +271,10 @@ const styles = (_theme: Theme) => createStyles({
         alignItems: "center",
         gap: 16,
         padding: "10px 24px",
-        color: "#e9ecea",
-        background: "#202425",
+        color: "#f0f0f0",
+        background: "var(--dusk-panel, #202425)",
         borderTop: "4px solid var(--dusk-accent)",
-        borderBottom: "1px solid #3b4142",
+        borderBottom: "1px solid #3a3a3a",
         boxSizing: "border-box",
         "@media (max-width: 700px)": {
             padding: "9px 16px",
@@ -328,7 +347,7 @@ const styles = (_theme: Theme) => createStyles({
     }),
     meterFill: css({
         height: "100%",
-        background: "linear-gradient(90deg, #68b7a2 0%, #d6a94f 65%, #d86d62 100%)",
+        background: "linear-gradient(90deg, #3fae6a 0%, #ffaa00 62%, #cc3b30 100%)",
         transition: "width 70ms linear",
     }),
     meterValue: css({
@@ -477,6 +496,8 @@ const DuskView = withStyles(
             const skinStyle = {
                 "--dusk-accent": this.props.definition.accent,
                 "--dusk-secondary": this.props.definition.secondary,
+                "--dusk-bg": this.props.definition.background ?? "#1a1a1a",
+                "--dusk-panel": this.props.definition.panel ?? "#242424",
             } as React.CSSProperties;
             return (
                 <div className={classes.skin} style={skinStyle}>
