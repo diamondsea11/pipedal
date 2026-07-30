@@ -2892,9 +2892,10 @@ void PiPedalModel::OnNotifyMidiListen(uint8_t cc0, uint8_t cc1, uint8_t cc2)
         return; // Note off. Oopsie.
     }
     bool isControl = (cc0 & 0xF0) == 0xB0; // Control Change
-    if (!isNote && !isControl)
+    bool isProgram = (cc0 & 0xF0) == 0xC0; // Program Change
+    if (!isNote && !isControl && !isProgram)
     {
-        return; // Not a note on or control change.
+        return; // Not a note on, control change or program change.
     }
 
     for (int i = 0; i < midiEventListeners.size(); ++i)

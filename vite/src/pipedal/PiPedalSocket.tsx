@@ -270,8 +270,6 @@ class PiPedalSocket {
             try {
                 let ws = new WebSocket(this.url);
 
-                let self = this;
-
                 ws.onmessage = this.handleMessage.bind(this);
                 ws.onclose = (event: Event) => {
                     ws.onclose = null;
@@ -284,8 +282,8 @@ class PiPedalSocket {
                     reject("Connection not accepted.");
                 };
                 ws.onopen = (event: Event) => {
-                    ws.onerror = self.handleError.bind(self);
-                    ws.onclose = self.handleClose.bind(self);
+                    ws.onerror = this.handleError.bind(this);
+                    ws.onclose = this.handleClose.bind(this);
                     ws.onopen = null;
                     resolve(ws);
                 };

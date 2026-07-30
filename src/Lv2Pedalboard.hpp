@@ -195,6 +195,7 @@ namespace pipedal
             bool longPressTriggered = false;
             uint64_t pressFrame = 0;
             uint64_t previousPressFrame = 0;
+            int triggerKey = -1;
         };
         struct MidiActionToggleState
         {
@@ -205,6 +206,13 @@ namespace pipedal
         };
         std::vector<RuntimeMidiAction> midiActions;
         std::array<MidiActionToggleState, 64> midiActionToggleStates;
+
+        int GetMidiActionTogglePosition(int key) const;
+        void AdvanceMidiActionToggle(
+            int key,
+            int currentPosition,
+            int toggleGroup,
+            int resetGroup);
 
         std::vector<float *> PrepareItems(
             std::vector<PedalboardItem> &items,

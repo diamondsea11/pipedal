@@ -519,6 +519,8 @@ void TestIlleglUtf8Sequences()
 }   
 TEST_CASE("json variants", "[json_variants][Build][Dev]")
 {
+    const auto initialObjectAllocations = json_object::allocation_count();
+    const auto initialArrayAllocations = json_array::allocation_count();
     {
         TestIlleglUtf8Sequences();
 
@@ -557,6 +559,6 @@ TEST_CASE("json variants", "[json_variants][Build][Dev]")
             x[0] = "def";
         }
     }
-    REQUIRE(json_object::allocation_count() == 0);
-    REQUIRE(json_array::allocation_count() == 0);
+    REQUIRE(json_object::allocation_count() == initialObjectAllocations);
+    REQUIRE(json_array::allocation_count() == initialArrayAllocations);
 }

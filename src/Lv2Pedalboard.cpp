@@ -1215,6 +1215,62 @@ void Lv2Pedalboard::GatherPatchProperties(RealtimePatchPropertyRequest *pParamet
     }
 }
 
+int Lv2Pedalboard::GetMidiActionTogglePosition(int key) const
+{
+    for (const auto &state : midiActionToggleStates)
+    {
+        if (state.valid && state.key == key)
+        {
+            return state.position;
+        }
+    }
+    return 1;
+}
+
+void Lv2Pedalboard::AdvanceMidiActionToggle(
+    int key,
+    int currentPosition,
+    int toggleGroup,
+    int resetGroup)
+{
+    MidiActionToggleState *target = nullptr;
+    for (auto &state : midiActionToggleStates)
+    {
+        if (state.valid && resetGroup != 0 &&
+            state.group == resetGroup && state.key != key)
+        {
+            state.position = 1;
+        }
+        if (state.valid && state.key == key)
+        {
+            target = &state;
+        }
+        else if (!state.valid && target == nullptr)
+        {
+            target = &state;
+        }
+    }
+    if (target == nullptr)
+    {
+        return;
+    }
+
+    target->valid = true;
+    target->key = key;
+    target->position = currentPosition == 1 ? 2 : 1;
+    target->group = toggleGroup;
+    if (toggleGroup != 0)
+    {
+        for (auto &state : midiActionToggleStates)
+        {
+            if (state.valid && state.group == toggleGroup)
+            {
+                state.position = target->position;
+            }
+        }
+    }
+}
+
 size_t Lv2Pedalboard::CollectTriggeredMidiActions(
     const MidiEvent &event,
     const MidiAction **result,
@@ -1292,6 +1348,10 @@ size_t Lv2Pedalboard::CollectTriggeredMidiActions(
                 runtimeAction.pressed = true;
                 runtimeAction.longPressTriggered = false;
                 runtimeAction.pressFrame = currentFrameOffset;
+                runtimeAction.triggerKey =
+                    ((action.bindingType() & 0xFF) << 16) |
+                    (((channel + 1) & 0x1F) << 8) |
+                    (number & 0x7F);
             }
             else if (actionRelease)
             {
@@ -1317,19 +1377,12 @@ size_t Lv2Pedalboard::CollectTriggeredMidiActions(
 
         const int key =
             ((action.bindingType() & 0xFF) << 16) |
-            (((action.channel() + 1) & 0x1F) << 8) |
-            (action.number() & 0x7F);
+            (((channel + 1) & 0x1F) << 8) |
+            (number & 0x7F);
         if (toggleKey == -1)
         {
             toggleKey = key;
-            for (const auto &state : midiActionToggleStates)
-            {
-                if (state.valid && state.key == key)
-                {
-                    togglePosition = state.position;
-                    break;
-                }
-            }
+            togglePosition = GetMidiActionTogglePosition(key);
         }
         if (action.togglePosition() != 0)
         {
@@ -1347,40 +1400,8 @@ size_t Lv2Pedalboard::CollectTriggeredMidiActions(
 
     if (usesToggle && toggleKey != -1)
     {
-        MidiActionToggleState *target = nullptr;
-        for (auto &state : midiActionToggleStates)
-        {
-            if (state.valid && resetGroup != 0 &&
-                state.group == resetGroup && state.key != toggleKey)
-            {
-                state.position = 1;
-            }
-            if (state.valid && state.key == toggleKey)
-            {
-                target = &state;
-            }
-            else if (!state.valid && target == nullptr)
-            {
-                target = &state;
-            }
-        }
-        if (target != nullptr)
-        {
-            target->valid = true;
-            target->key = toggleKey;
-            target->position = togglePosition == 1 ? 2 : 1;
-            target->group = toggleGroup;
-            if (toggleGroup != 0)
-            {
-                for (auto &state : midiActionToggleStates)
-                {
-                    if (state.valid && state.group == toggleGroup)
-                    {
-                        state.position = target->position;
-                    }
-                }
-            }
-        }
+        AdvanceMidiActionToggle(
+            toggleKey, togglePosition, toggleGroup, resetGroup);
     }
     return count;
 }
@@ -1389,15 +1410,20 @@ size_t Lv2Pedalboard::CollectTimedMidiActions(
     const MidiAction **result,
     size_t capacity)
 {
+    struct DueToggle
+    {
+        int key;
+        int position;
+        int toggleGroup;
+        int resetGroup;
+    };
+    std::array<DueToggle, 64> dueToggles;
+    size_t dueToggleCount = 0;
     size_t count = 0;
     const uint64_t longPressFrames =
         (uint64_t)(pHost->GetSampleRate() * 0.6);
     for (auto &runtimeAction : midiActions)
     {
-        if (count >= capacity)
-        {
-            break;
-        }
         if ((MidiActionGesture)runtimeAction.action.gesture() ==
                 MidiActionGesture::LongPress &&
             runtimeAction.pressed &&
@@ -1405,12 +1431,59 @@ size_t Lv2Pedalboard::CollectTimedMidiActions(
             currentFrameOffset - runtimeAction.pressFrame >= longPressFrames)
         {
             runtimeAction.longPressTriggered = true;
-            if (runtimeAction.action.togglePosition() == 0 ||
-                runtimeAction.action.togglePosition() == 1)
+            const auto &action = runtimeAction.action;
+            const int key = runtimeAction.triggerKey;
+            if (key < 0)
             {
-                result[count++] = &runtimeAction.action;
+                continue;
+            }
+            const int position = GetMidiActionTogglePosition(key);
+            if ((action.togglePosition() == 0 ||
+                 action.togglePosition() == position) &&
+                count < capacity)
+            {
+                result[count++] = &action;
+            }
+            if (action.togglePosition() != 0)
+            {
+                size_t index = 0;
+                for (; index < dueToggleCount; ++index)
+                {
+                    if (dueToggles[index].key == key)
+                    {
+                        break;
+                    }
+                }
+                if (index == dueToggleCount && dueToggleCount < dueToggles.size())
+                {
+                    dueToggles[dueToggleCount++] = {
+                        key,
+                        position,
+                        action.toggleGroup(),
+                        action.resetGroup()};
+                }
+                else if (index < dueToggleCount)
+                {
+                    if (action.toggleGroup() != 0)
+                    {
+                        dueToggles[index].toggleGroup = action.toggleGroup();
+                    }
+                    if (action.resetGroup() != 0)
+                    {
+                        dueToggles[index].resetGroup = action.resetGroup();
+                    }
+                }
             }
         }
+    }
+    for (size_t i = 0; i < dueToggleCount; ++i)
+    {
+        const auto &toggle = dueToggles[i];
+        AdvanceMidiActionToggle(
+            toggle.key,
+            toggle.position,
+            toggle.toggleGroup,
+            toggle.resetGroup);
     }
     return count;
 }

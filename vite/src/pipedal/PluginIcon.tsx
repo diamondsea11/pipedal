@@ -158,7 +158,7 @@ function makeDefaultColorMap(): {[key:string]: string} {
 const iconColors: {[key:string]: string} = makeDefaultColorMap();
 
 export const getIconColor = (key?: string): string| undefined => {
-    if (iconColors.hasOwnProperty(key!))
+    if (key !== undefined && Object.prototype.hasOwnProperty.call(iconColors, key))
     {
         return iconColors[key!];
     }

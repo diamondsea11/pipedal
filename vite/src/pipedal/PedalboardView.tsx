@@ -925,7 +925,7 @@ const PedalboardView =
                     }
                 }
 
-                strokeConnector(output: ReactNode[], channels: number, enabled: Boolean, svgPath: string) {
+                strokeConnector(output: ReactNode[], channels: number, enabled: boolean, svgPath: string) {
                     let color = enabled ? ENABLED_CONNECTOR_COLOR : DISABLED_CONNECTOR_COLOR;
 
                     if (channels === 2) {

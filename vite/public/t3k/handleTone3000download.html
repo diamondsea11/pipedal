@@ -86,7 +86,7 @@
                 window.opener.postMessage({
                     type: 'tone3000DownloadCallback',
                     ...result,
-                }, '*');
+                }, window.location.origin);
             } else {
                 alert("No opener window found.");
             }
@@ -132,7 +132,7 @@
         //                         state: state,
         //                         tone_id: toneId,
         //                         toneId: toneId
-        //                     }, '*');
+                    //                     }, window.location.origin);
         //             } else {
         //                 alert("No opener window found.");
         //             }

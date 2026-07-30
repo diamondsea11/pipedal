@@ -520,7 +520,6 @@ const ToobNamView =
             handleModelMetadata(atomData: any) {
                 if (atomData && atomData.otype_ === "Vector" && atomData.value) {
                     let metadata = new ModelMetadata(atomData.value as number[]);
-                    metadata.hasInputLevelDBU || metadata.hasOutputLevelDBU
                     this.setState({
                         modelMetadata: metadata,
                         showEqSection: metadata.preset_version === 0,

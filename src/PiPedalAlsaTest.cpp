@@ -124,7 +124,7 @@ void TestConfigMigration()
 
 }
 
-TEST_CASE("ALSA Seq Test", "[pipedal_alsa_seq_test][Build][Dev]")
+TEST_CASE("ALSA Seq Test", "[.][pipedal_alsa_seq_test][hardware]")
 {
 
     // hw:CARD=VirMIDI,DEV=0 VirMIDI

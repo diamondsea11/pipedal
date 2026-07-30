@@ -164,9 +164,9 @@ class JsonAtom {
         }
         return false;
     }
-    asObject(type?: string): Object {
+    asObject(type?: string): object {
         if (this.isObject(type)) {
-            return this.json as Object;
+            return this.json as object;
         }
         throw new Error(`JsonAtom is not an Object of type ${type}`);
     }   

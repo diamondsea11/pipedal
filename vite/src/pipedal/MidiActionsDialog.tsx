@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Button,
     Dialog,
@@ -17,13 +17,16 @@ import AddIcon from '@mui/icons-material/Add';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import SensorsIcon from '@mui/icons-material/Sensors';
 import MidiBinding from './MidiBinding';
 import {
     MidiAction,
     MidiActionGesture,
     MidiActionType,
 } from './Pedalboard';
-import { PiPedalModelFactory } from './PiPedalModel';
+import { ListenHandle, PiPedalModelFactory } from './PiPedalModel';
+import { UiControl } from './Lv2Plugin';
 
 interface MidiActionsDialogProps {
     open: boolean;
@@ -53,10 +56,26 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
     const pedalboard = model.pedalboard.get();
     const [actions, setActions] = useState<MidiAction[]>(
         pedalboard.midiActions.map((action) => action.clone()));
+    const [learningIndex, setLearningIndex] = useState<number | null>(null);
+    const listenHandle = useRef<ListenHandle | null>(null);
     const pluginItems = useMemo(
         () => Array.from(pedalboard.itemsGenerator())
             .filter((item) => !item.isEmpty() && !item.isSplit()),
         [pedalboard]);
+    const pluginControls = useMemo(() => {
+        const result = new Map<number, UiControl[]>();
+        for (const item of pluginItems) {
+            const plugin = model.getUiPlugin(item.uri);
+            const controls = (plugin?.controls ?? [])
+                .filter((control) => control.is_input && !control.is_bypass)
+                .sort((left, right) => {
+                    const priority = left.display_priority - right.display_priority;
+                    return priority !== 0 ? priority : left.name.localeCompare(right.name);
+                });
+            result.set(item.instanceId, controls);
+        }
+        return result;
+    }, [model, pluginItems]);
 
     const update = (index: number, values: Partial<MidiAction>) => {
         setActions((current) => current.map((action, actionIndex) => {
@@ -71,11 +90,72 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
         [result[index], result[target]] = [result[target], result[index]];
         setActions(result);
     };
+    const duplicate = (index: number) => {
+        setActions((current) => {
+            const result = current.slice();
+            result.splice(index + 1, 0, current[index].clone());
+            return result;
+        });
+    };
+    const stopLearning = () => {
+        if (listenHandle.current) {
+            model.cancelListenForMidiEvent(listenHandle.current);
+            listenHandle.current = null;
+        }
+        setLearningIndex(null);
+    };
+    const learn = (index: number) => {
+        stopLearning();
+        setLearningIndex(index);
+        listenHandle.current = model.listenForMidiEvent((message) => {
+            let bindingType: number;
+            if (message.isNote()) {
+                bindingType = MidiBinding.BINDING_TYPE_NOTE;
+            } else if (message.isControl()) {
+                bindingType = MidiBinding.BINDING_TYPE_CONTROL;
+            } else if (message.isProgram()) {
+                bindingType = MidiBinding.BINDING_TYPE_PROGRAM;
+            } else {
+                return;
+            }
+            update(index, {
+                bindingType,
+                channel: message.cc0 & 0x0F,
+                number: message.cc1 & 0x7F,
+                gesture: MidiActionGesture.Press,
+            });
+            stopLearning();
+        });
+    };
+    useEffect(() => () => {
+        if (listenHandle.current) {
+            model.cancelListenForMidiEvent(listenHandle.current);
+            listenHandle.current = null;
+        }
+    }, [model]);
     const add = () => {
         const action = new MidiAction();
         action.actionType = MidiActionType.TogglePluginBypass;
         action.targetId = pluginItems[0]?.instanceId ?? -1;
         setActions((current) => [...current, action]);
+    };
+    const controlValues = (control: UiControl, toggle: boolean) => ({
+        symbol: control.symbol,
+        value: toggle ? control.max_value : control.default_value,
+        alternateValue: control.min_value,
+    });
+    const changeTarget = (index: number, action: MidiAction, targetId: number) => {
+        const controls = pluginControls.get(targetId) ?? [];
+        if (action.actionType === MidiActionType.TogglePluginBypass || controls.length === 0) {
+            update(index, { targetId });
+            return;
+        }
+        update(index, {
+            targetId,
+            ...controlValues(
+                controls[0],
+                action.actionType === MidiActionType.TogglePluginControl),
+        });
     };
 
     return (
@@ -85,7 +165,7 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                 <div style={{ minWidth: 1180 }}>
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: '42px 70px 100px 82px 86px 150px minmax(180px, 1fr) 90px 94px 76px 76px 74px 92px',
+                        gridTemplateColumns: '42px 70px 132px 82px 86px 150px minmax(180px, 1fr) 90px 94px 76px 76px 74px 110px',
                         gap: 8,
                         alignItems: 'center',
                         padding: '8px 16px',
@@ -110,10 +190,22 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                         const midiOutputAction =
                             action.actionType === MidiActionType.SendMidiControl ||
                             action.actionType === MidiActionType.SendMidiProgram;
+                        const controls = pluginControls.get(action.targetId) ?? [];
+                        const selectedControl = controls.find(
+                            (control) => control.symbol === action.symbol);
+                        const usesValue =
+                            action.actionType === MidiActionType.SetPluginControl ||
+                            action.actionType === MidiActionType.TogglePluginControl ||
+                            action.actionType === MidiActionType.TogglePluginBypass ||
+                            action.actionType === MidiActionType.SetPathMute ||
+                            action.actionType === MidiActionType.SendMidiControl;
+                        const usesAlternateValue =
+                            action.actionType === MidiActionType.TogglePluginControl ||
+                            action.actionType === MidiActionType.TogglePluginBypass;
                         return (
                             <div key={index} style={{
                                 display: 'grid',
-                                gridTemplateColumns: '42px 70px 100px 82px 86px 150px minmax(180px, 1fr) 90px 94px 76px 76px 74px 92px',
+                                gridTemplateColumns: '42px 70px 132px 82px 86px 150px minmax(180px, 1fr) 90px 94px 76px 76px 74px 110px',
                                 gap: 8,
                                 alignItems: 'center',
                                 padding: '8px 16px',
@@ -134,7 +226,16 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                     onChange={(event) => update(index, { enabled: event.target.checked })} />
                                 <div style={{ display: 'flex', gap: 4 }}>
                                     <Select size="small" value={action.bindingType}
-                                        onChange={(event) => update(index, { bindingType: Number(event.target.value) })}>
+                                        onChange={(event) => {
+                                            const bindingType = Number(event.target.value);
+                                            const values: Partial<MidiAction> = { bindingType };
+                                            if (bindingType === MidiBinding.BINDING_TYPE_PROGRAM &&
+                                                (action.gesture === MidiActionGesture.Release ||
+                                                 action.gesture === MidiActionGesture.LongPress)) {
+                                                values.gesture = MidiActionGesture.Press;
+                                            }
+                                            update(index, values);
+                                        }}>
                                         <MenuItem value={MidiBinding.BINDING_TYPE_NOTE}>Note</MenuItem>
                                         <MenuItem value={MidiBinding.BINDING_TYPE_CONTROL}>CC</MenuItem>
                                         <MenuItem value={MidiBinding.BINDING_TYPE_PROGRAM}>PC</MenuItem>
@@ -142,6 +243,16 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                     <TextField size="small" type="number" value={action.number}
                                         inputProps={{ min: 0, max: 127 }}
                                         onChange={(event) => update(index, { number: Number(event.target.value) })} />
+                                    <Tooltip title={
+                                        learningIndex === index ? 'Cancel MIDI learn' : 'Learn MIDI trigger'}>
+                                        <IconButton size="small"
+                                            color={learningIndex === index ? 'secondary' : 'default'}
+                                            onClick={() => learningIndex === index
+                                                ? stopLearning()
+                                                : learn(index)}>
+                                            <SensorsIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
                                 </div>
                                 <Select size="small" value={action.channel}
                                     onChange={(event) => update(index, { channel: Number(event.target.value) })}>
@@ -153,13 +264,38 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                 <Select size="small" value={action.gesture}
                                     onChange={(event) => update(index, { gesture: Number(event.target.value) })}>
                                     <MenuItem value={MidiActionGesture.Press}>Press</MenuItem>
-                                    <MenuItem value={MidiActionGesture.Release}>Release</MenuItem>
+                                    <MenuItem value={MidiActionGesture.Release}
+                                        disabled={action.bindingType === MidiBinding.BINDING_TYPE_PROGRAM}>
+                                        Release
+                                    </MenuItem>
                                     <MenuItem value={MidiActionGesture.AnyValue}>Any</MenuItem>
-                                    <MenuItem value={MidiActionGesture.LongPress}>Long</MenuItem>
+                                    <MenuItem value={MidiActionGesture.LongPress}
+                                        disabled={action.bindingType === MidiBinding.BINDING_TYPE_PROGRAM}>
+                                        Long
+                                    </MenuItem>
                                     <MenuItem value={MidiActionGesture.DoublePress}>Double</MenuItem>
                                 </Select>
                                 <Select size="small" value={action.actionType}
-                                    onChange={(event) => update(index, { actionType: Number(event.target.value) })}>
+                                    onChange={(event) => {
+                                        const actionType = Number(event.target.value) as MidiActionType;
+                                        const values: Partial<MidiAction> = { actionType };
+                                        if (actionType === MidiActionType.SetPluginControl ||
+                                            actionType === MidiActionType.TogglePluginControl) {
+                                            const control = controls[0];
+                                            if (control) {
+                                                Object.assign(values, controlValues(
+                                                    control,
+                                                    actionType === MidiActionType.TogglePluginControl));
+                                            }
+                                        } else if (actionType === MidiActionType.TogglePluginBypass) {
+                                            Object.assign(values, {
+                                                symbol: '',
+                                                value: 1,
+                                                alternateValue: 0,
+                                            });
+                                        }
+                                        update(index, values);
+                                    }}>
                                     {Array.from(actionNames).map(([value, label]) => (
                                         <MenuItem key={value} value={value}>{label}</MenuItem>
                                     ))}
@@ -187,7 +323,8 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                 ) : pluginAction ? (
                                     <div style={{ display: 'flex', gap: 6 }}>
                                         <Select size="small" value={action.targetId} sx={{ minWidth: 120 }}
-                                            onChange={(event) => update(index, { targetId: Number(event.target.value) })}>
+                                            onChange={(event) => changeTarget(
+                                                index, action, Number(event.target.value))}>
                                             {pluginItems.map((item) => (
                                                 <MenuItem key={item.instanceId} value={item.instanceId}>
                                                     {item.title || item.pluginName}
@@ -195,8 +332,31 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                             ))}
                                         </Select>
                                         {action.actionType !== MidiActionType.TogglePluginBypass && (
-                                            <TextField size="small" label="Symbol" value={action.symbol}
-                                                onChange={(event) => update(index, { symbol: event.target.value })} />
+                                            <Select size="small" value={
+                                                selectedControl?.symbol ?? ''}
+                                                displayEmpty
+                                                sx={{ minWidth: 150 }}
+                                                onChange={(event) => {
+                                                    const control = controls.find(
+                                                        (candidate) =>
+                                                            candidate.symbol === event.target.value);
+                                                    if (control) {
+                                                        update(index, controlValues(
+                                                            control,
+                                                            action.actionType ===
+                                                                MidiActionType.TogglePluginControl));
+                                                    }
+                                                }}>
+                                                {controls.length === 0 && (
+                                                    <MenuItem value="" disabled>No controls</MenuItem>
+                                                )}
+                                                {controls.map((control) => (
+                                                    <MenuItem key={control.symbol}
+                                                        value={control.symbol}>
+                                                        {control.name}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
                                         )}
                                     </div>
                                 ) : pathAction ? (
@@ -215,8 +375,20 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                     </Select>
                                 ) : <span />}
                                 <TextField size="small" type="number" value={action.value}
+                                    disabled={!usesValue}
+                                    inputProps={selectedControl ? {
+                                        min: selectedControl.min_value,
+                                        max: selectedControl.max_value,
+                                        step: selectedControl.integer_property ? 1 : 'any',
+                                    } : undefined}
                                     onChange={(event) => update(index, { value: Number(event.target.value) })} />
                                 <TextField size="small" type="number" value={action.alternateValue}
+                                    disabled={!usesAlternateValue}
+                                    inputProps={selectedControl ? {
+                                        min: selectedControl.min_value,
+                                        max: selectedControl.max_value,
+                                        step: selectedControl.integer_property ? 1 : 'any',
+                                    } : undefined}
                                     onChange={(event) => update(index, { alternateValue: Number(event.target.value) })} />
                                 <Select size="small" value={action.togglePosition}
                                     onChange={(event) => update(index, { togglePosition: Number(event.target.value) })}>
@@ -238,6 +410,11 @@ export default function MidiActionsDialog(props: MidiActionsDialogProps) {
                                         <IconButton size="small" onClick={() =>
                                             setActions((current) => current.filter((_, row) => row !== index))}>
                                             <DeleteOutlineIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Duplicate action">
+                                        <IconButton size="small" onClick={() => duplicate(index)}>
+                                            <ContentCopyIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
                                 </div>

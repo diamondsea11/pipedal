@@ -14,8 +14,6 @@ import './index.css'
 function ResponseComponent() {
 
     React.useEffect(() => {
-        alert("yyy: Delete me");
-        debugger;
         if (window.opener === null) {
             console.error('No window.opener found for OAuth callback');
             window.close();
@@ -27,7 +25,7 @@ function ResponseComponent() {
                 uri: window.location.href,
                 storedState: sessionStorage.getItem('t3k_state'),
                 codeVerifier: sessionStorage.getItem('t3k_code_verifier')   
-            }, '*'
+            }, window.location.origin
         );
 
     }, []);

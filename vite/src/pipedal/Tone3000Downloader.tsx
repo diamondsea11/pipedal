@@ -116,14 +116,16 @@ export class Tone3000DownloadHandler {
                 model.showAlert("TONE3000 authentication failed. Please try again.");
             }
         );
-        let this_ = this;
         this.messageEventListener = (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) {
+                return;
+            }
             if (event.data?.type === "t3k_response") {
                 let uri = event.data.uri;
                 this.handleTone3000DownloadComplete();
                 if (uri) {
 
-                    this_.handleT3kSelectResponse(uri, event.data.storedState, event.data.codeVerifier)
+                    this.handleT3kSelectResponse(uri, event.data.storedState, event.data.codeVerifier)
                         .then(() => { })
                         .catch((error) => {
                             model.showAlert(getErrorMessage(error));
@@ -398,18 +400,7 @@ export class Tone3000DownloadHandler {
                 let serverUrl = this.model.varServerUrl + "t3k_uploadAsset?path="
                     + encodeURIComponent(modelUploadPath);
 
-                // get the content length of modelResult from modelResult headers (modelresult is the return value from fetch())
-                const strContentLength = modelResult.headers.get('Content-Length');
-                let contentLength: number = 0;
-                if (strContentLength) {
-                    contentLength = parseInt(strContentLength);
-                    if (isNaN(contentLength)) {
-                        throw new Error("File download from Tone3000 server failed: Content-Length header is invalid.");
-                    }
-
-                }
                 // POST binary modelResult to serverUrl.
-                // Prefer streaming request body when available, else fall back to blob().
                 const uploadBody: Blob =
                     await modelResult.blob();
                 const uploadResponse = await fetch(serverUrl, {
@@ -417,8 +408,6 @@ export class Tone3000DownloadHandler {
                     body: uploadBody,
                     headers: {
                         'Content-Type': modelResult.headers.get('Content-Type') ?? 'application/octet-stream',
-                        "Content-Length": contentLength.toString(),
-                        "Transfer-Encoding": "chunked"
                     },
                 });
 
@@ -428,13 +417,13 @@ export class Tone3000DownloadHandler {
                 // discard the response body, if any, to free up memory
                 let uploadResult: any = await uploadResponse.json();
 
-                if (!uploadResult.ok === true) {
+                if (uploadResult.ok !== true) {
                     throw new Error(`Upload failed: ${uploadResult.error ?? "Unknown error."}`);
                 }
                 this.progress.progress++;
             }
             // the image file and readme.
-            let toobThubmnailUrl: string = "";
+            let toobThumbnailUrl: string = "";
             if (tone.images && tone.images.length > 0) {
 
                 await this.throttleRequests();
@@ -487,8 +476,6 @@ export class Tone3000DownloadHandler {
                     body: blob,
                     headers: {
                         'Content-Type': mediaType,
-                        "Content-Length": blob.size.toString(),
-                        "Transfer-Encoding": "chunked"
                     },
                 });
 
@@ -497,14 +484,14 @@ export class Tone3000DownloadHandler {
                 }
                  let uploadResult: any = await uploadResponse.json();
 
-                if (!uploadResult.ok === true) {
+                if (uploadResult.ok !== true) {
                     throw new Error(`Thumbnail upload failed: ${uploadResult.error ?? "Unknown error."}`);
                 } 
-                toobThubmnailUrl = "/var/t3k_thumbnail?id=" + tone.id;  
+                toobThumbnailUrl = "/var/t3k_thumbnail?id=" + tone.id;
 
             }
             let readmePath = toneUploadPath + "README.md";
-            this.model.writeTone3000Readme(readmePath, tone, toobThubmnailUrl);
+            this.model.writeTone3000Readme(readmePath, tone, toobThumbnailUrl);
 
             this.onTone3000DownloadComplete(toneUploadPath);
         } catch (error) {

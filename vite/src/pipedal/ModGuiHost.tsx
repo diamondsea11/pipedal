@@ -1292,15 +1292,6 @@ function ModGuiHost(props: ModGuiHostProps) {
         }
     }
 
-    if (!plugin.modGui) {
-        return (
-            <div>
-                <Typography variant="h6">No Mod GUI</Typography>
-            </div>
-        );
-    }
-
-    
     function addPortClass(element: Element, selector: string, className: string) {
         let children = element.querySelectorAll(selector);
         // call addClass to each element that matches the selector
@@ -1663,6 +1654,13 @@ function ModGuiHost(props: ModGuiHostProps) {
         };
     }, [hostDivRef, plugin, ready]);
 
+    if (!plugin.modGui) {
+        return (
+            <div>
+                <Typography variant="h6">No Mod GUI</Typography>
+            </div>
+        );
+    }
 
     return (
         <ModGuiErrorBoundary plugin={props.plugin} onClose={() => { props.onClose(); setErrorMessage(null); }}>

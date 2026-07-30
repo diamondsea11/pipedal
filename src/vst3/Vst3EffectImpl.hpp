@@ -90,6 +90,12 @@ namespace pipedal
 		virtual void SetControl(int index, float value);
 		virtual float GetControlValue(int index) const
 		{
+			if (index == -1)
+			{
+				return bypassControl == -1
+					? (bypassEnable ? 1.0f : 0.0f)
+					: parameterValues[bypassControl];
+			}
 			return this->parameterValues[index];
 		}
 

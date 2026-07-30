@@ -19,15 +19,20 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // PiPedal predates the TypeScript strict-style presets. Keep the linter
+      // focused on behavioral defects while the legacy typing is migrated.
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-this-alias': 'off',
+      'no-empty': 'off',
+      'no-unused-vars': 'off',
+      'no-var': 'off',
+      'prefer-const': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
-    },
-    server: {
-        proxy: {
-            '/var': 'http://localhost:8080'
-        }
     }
   },
 )

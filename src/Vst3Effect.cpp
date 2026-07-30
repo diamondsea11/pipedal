@@ -193,6 +193,11 @@ Vst3EffectImpl::~Vst3EffectImpl()
 
 void Vst3EffectImpl::SetControl(int index, float value)
 {
+	if (index == -1)
+	{
+		SetBypass(value != 0);
+		return;
+	}
 	this->parameterValues[index] = value;
 	ParamID paramId = lv2ToVstParam[index];
 

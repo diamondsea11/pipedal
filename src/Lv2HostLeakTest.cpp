@@ -32,6 +32,13 @@ using namespace pipedal;
 
 TEST_CASE( "PluginHost memory leak", "[lv2host_leak][Build][Dev]" ) {
 
+    // Lilv and loaded plugin libraries retain process-wide metadata on first use.
+    // Warm those caches before measuring the lifetime of a PluginHost instance.
+    {
+        PluginHost warmupHost;
+        warmupHost.LoadLilv("/usr/lib/lv2:/usr/local/lib/lv2:/usr/modep/lv2");
+    }
+
     MemStats initialMemory = GetMemStats();
     {
         PluginHost host;

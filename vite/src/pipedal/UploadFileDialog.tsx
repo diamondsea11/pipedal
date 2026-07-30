@@ -245,7 +245,7 @@ export default class UploadFileDialog extends ResizeResponsiveComponent<UploadFi
                     upload.statusMessage = "Uploaded.";
                     upload.abortController = undefined;
                 } catch (error: any) {
-                    // @ts-ignore: TS2367   // No overlap between FileUploadStatus.Updating and FileUploadStatus.Cancelled
+                    // @ts-expect-error TS2367: status can change asynchronously.
                     if (upload.status !== FileUploadStatus.Cancelled) {
                         upload.status = FileUploadStatus.Error;
                         if (error instanceof Error) {

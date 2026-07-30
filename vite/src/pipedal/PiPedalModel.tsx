@@ -298,6 +298,9 @@ export class MidiMessage {
     isControl() {
         return (this.cc0 & 0xF0) == 0xB0;
     }
+    isProgram() {
+        return (this.cc0 & 0xF0) == 0xC0;
+    }
 };
 
 class MidiEventListener {
@@ -2934,7 +2937,7 @@ export class PiPedalModel //implements PiPedalModel
                 try {
                     let item = pedalboard.getItem(instanceId);
                     if (item) {
-                        if (item.pathProperties.hasOwnProperty(uri)) {
+                        if (Object.prototype.hasOwnProperty.call(item.pathProperties, uri)) {
                             let value = item.pathProperties[uri];
                             let jsonValue = JSON.parse(value);
                             resolve(jsonValue as Type);
