@@ -437,7 +437,10 @@ const ToobNamView =
                     controls[EqPos] = null;
                 }
                 if (this.state.modelMetadata.hasSlimmableWeights) {
-                    let slimmableWeights = [ 0.5, 1.0];
+                    const slimmableWeights =
+                        this.state.modelMetadata.slimmableWeights.length > 0
+                            ? this.state.modelMetadata.slimmableWeights
+                            : [0.5, 1.0];
 
                     controls[ModelWeightControlPos] = (
                         host.makeStandardControl(this.modelSizeControl, this.props.item.controlValues, { slimmableWeights: slimmableWeights })

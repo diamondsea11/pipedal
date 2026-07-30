@@ -888,6 +888,8 @@ add_executable(pipedaladmind AdminMain.cpp CommandLineParser.hpp
     )
 target_link_libraries(pipedaladmind PRIVATE PiPedalCommon pthread atomic stdc++fs systemd asound)
 
+if(NOT PIPEDAL_DISABLE_COPYRIGHT_BUILD)
+
 add_executable(processcopyrights copyrightMain.cpp
     CommandLineParser.hpp
     PiPedalException.hpp
@@ -925,7 +927,6 @@ WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Updating copyright notices."
 )
 
-if(NOT PIPEDAL_DISABLE_COPYRIGHT_BUILD)
     add_custom_target (
         CopyrightBuild ALL
         DEPENDS ${REACT_NOTICES_FILE}

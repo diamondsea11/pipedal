@@ -65,6 +65,7 @@ import SnapshotDialog from './SnapshotDialog';
 import { css } from '@emotion/react';
 import { setDefaultModGuiPreference } from './ModGuiHost';
 import PluginNameDialog from './PluginNameDialog';
+import InlinePluginBrowser from './InlinePluginBrowser';
 
 
 const SPLIT_CONTROLBAR_THRESHHOLD = 750;
@@ -790,11 +791,15 @@ export const MainPage =
 
                                     ) :
                                         (
-                                            GetControlView(pedalboardItem, this.state.showModUi && canShowModUi,
-                                                (instanceId: number, showModGui: boolean) => {
-                                                    this.model.setPedalboardItemUseModUi(instanceId, showModGui)
-                                                    this.setState({ showModUi: showModGui });
-                                                }
+                                            pedalboardItem?.isEmpty() ? (
+                                                <InlinePluginBrowser onSelect={this.onLoadOk} />
+                                            ) : (
+                                                GetControlView(pedalboardItem, this.state.showModUi && canShowModUi,
+                                                    (instanceId: number, showModGui: boolean) => {
+                                                        this.model.setPedalboardItemUseModUi(instanceId, showModGui)
+                                                        this.setState({ showModUi: showModGui });
+                                                    }
+                                                )
                                             )
                                         )
                                 }

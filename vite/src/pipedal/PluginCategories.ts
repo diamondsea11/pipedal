@@ -108,23 +108,61 @@ export function getUiPluginCategory(plugin: UiPlugin): PluginCategory {
         return pluginCategories.amp;
     }
 
-    const name = `${plugin.name} ${plugin.plugin_display_type}`.toLowerCase();
+    const name = `${plugin.name} ${plugin.plugin_display_type} ${plugin.author_name}`.toLowerCase();
     if (/\b(cab|cabinet|cab ir|ir loader)\b/.test(name)) {
         return pluginCategories.cab;
+    }
+    if (/\b(nam|neural amp|amplifier|amp model|preamp|power amp)\b/.test(name)) {
+        return pluginCategories.amp;
+    }
+    if (/\b(reverb|verb|room|hall|plate|spring)\b/.test(name)) {
+        return pluginCategories.reverb;
+    }
+    if (/\b(delay|echo|slapback)\b/.test(name)) {
+        return pluginCategories.delay;
+    }
+    if (/\b(compressor|limiter|gate|expander|de[\s-]?esser|transient|dynamics)\b/.test(name)) {
+        return pluginCategories.dynamics;
+    }
+    if (/\b(eq|equalizer|equaliser|tone stack)\b/.test(name)) {
+        return pluginCategories.eq;
     }
     if (/\b(rotary|leslie|chorus|flanger|phaser|tremolo|vibrato)\b/.test(name)) {
         return pluginCategories.modulation;
     }
-    if (/\b(tape|vinyl|warmer|saturat|crusher|overdrive|fuzz)\b/.test(name)) {
+    if (/\b(tape|vinyl|warmer|saturat|crusher|overdrive|fuzz|distortion|drive)\b/.test(name)) {
         return pluginCategories.distortion;
+    }
+    if (/\b(pitch|harmoni[sz]er|octave|synth|oscillator)\b/.test(name)) {
+        return pluginCategories.pitch;
+    }
+    if (/\b(wah|auto[\s-]?wah|filter|lowpass|highpass|bandpass)\b/.test(name)) {
+        return pluginCategories.filter;
+    }
+    if (/\b(stereo tool|stereo width|spatial|mid[\s/]side)\b/.test(name)) {
+        return pluginCategories.spatial;
     }
     if (/\b(loudness compensator|meter|analyser|analyzer|utility)\b/.test(name)) {
         return pluginCategories.utility;
     }
-    if (/\b(wah|auto-wah|autowah)\b/.test(name)) {
-        return pluginCategories.filter;
-    }
     return getPluginCategory(plugin.plugin_type);
+}
+
+export function getPluginCategoryTags(plugin: UiPlugin): string[] {
+    const category = getUiPluginCategory(plugin);
+    const result = [category.label];
+    const subtype = plugin.plugin_display_type
+        .replace(/\s*\((?:Stereo|Mono)\)\s*$/i, '')
+        .trim();
+    if (subtype && subtype.toLowerCase() !== category.label.toLowerCase()) {
+        result.push(subtype);
+    }
+    if (plugin.audio_inputs === 2 || plugin.audio_outputs === 2) {
+        result.push('Stereo');
+    } else {
+        result.push('Mono');
+    }
+    return Array.from(new Set(result));
 }
 
 export function getPluginTypeColor(pluginType: PluginType): string {

@@ -1,7 +1,7 @@
 # PiPedal Performance Roadmap
 
 This roadmap tracks the Helix-inspired performance work on top of PiPedal
-2.0.108. "Complete" means implemented and included in a tagged build. Hardware
+2.0.110. "Complete" means implemented and included in a tagged build. Hardware
 acceptance items remain open until they have been exercised with real audio and
 MIDI controllers.
 
@@ -25,6 +25,10 @@ MIDI controllers.
   global EQ, bypass and parameter control.
 - [x] Add a Helix-style plugin browser with functional categories,
   subcategories, color cues, favorites and search.
+- [x] Show the categorized plugin browser directly in the lower editor when an
+  empty block is selected, with global text search and category tags.
+- [x] Prefer name and display-type evidence when categorizing plugins so effects
+  such as reverbs are not hidden under misleading LV2 classes.
 - [x] Apply NAM capture calibration automatically when calibration metadata is
   available, with interface-specific input calibration profiles and a 13 dBu
   Babyface Pro FS profile.
@@ -75,7 +79,7 @@ MIDI controllers.
 
 ## Build Line
 
-- Base release: `2.0.108`
+- Base release: `2.0.110`
 - Current development branch: `feature/multipath-v1`
-- Current tagged build: `pipedal-2.0.108-codex16`
-- Dusk compatibility build: `2.0.108+codex16`
+- Current tagged build: `pipedal-2.0.110-codex17`
+- Current package build: `2.0.110+codex17`

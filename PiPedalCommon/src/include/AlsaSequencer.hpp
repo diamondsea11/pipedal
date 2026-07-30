@@ -32,7 +32,7 @@
 namespace pipedal
 {
 
-    // event messages starting with 0xFF are meta events. 
+    // event messages starting with 0xFF are meta events.
     // data not in midi format, is variable length, and private and the second byte is the MetaEventType.
     enum class MetaEventType
     {
@@ -54,7 +54,7 @@ namespace pipedal
         AlsaSequencerPortSelection() = default;
         AlsaSequencerPortSelection(const std::string &id, const std::string &name, int32_t displaySortOrder)
             : id_(id), name_(name), sortOrder_(displaySortOrder) {}
-        AlsaSequencerPortSelection(const AlsaSequencerPortSelection &other) = default;  
+        AlsaSequencerPortSelection(const AlsaSequencerPortSelection &other) = default;
         AlsaSequencerPortSelection(AlsaSequencerPortSelection &&other) = default;
         AlsaSequencerPortSelection &operator=(const AlsaSequencerPortSelection &other) = default;
         AlsaSequencerPortSelection &operator=(AlsaSequencerPortSelection &&other) = default;
@@ -69,12 +69,15 @@ namespace pipedal
     };
     class AlsaSequencerConfiguration {
     private:
+        int32_t midiChannel_ = -1; // -1 -> OMNI, or channels 0..15.
         std::vector<AlsaSequencerPortSelection> connections_;
     public:
         const std::vector<AlsaSequencerPortSelection>& connections() const { return connections_; }
         std::vector<AlsaSequencerPortSelection>& connections() { return connections_; }
-        void connections(const std::vector<AlsaSequencerPortSelection>& value) { connections_ = value; }    
+        void connections(const std::vector<AlsaSequencerPortSelection>& value) { connections_ = value; }
 
+        int32_t midiChannel() const { return midiChannel_; }
+        void midiChannel(int32_t value) { this->midiChannel_ = value; }
 
         bool operator==(const AlsaSequencerConfiguration &other) const
         {
@@ -87,6 +90,10 @@ namespace pipedal
                 {
                     return false;
                 }
+            }
+            if (this->midiChannel() != other.midiChannel())
+            {
+                return false;
             }
             return true;
         }
@@ -127,7 +134,7 @@ namespace pipedal
 
     struct AlsaMidiMessage
     {
-        AlsaMidiMessage() 
+        AlsaMidiMessage()
         {
             size = 0;
             data = fixedBuffer;
