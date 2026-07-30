@@ -51,11 +51,15 @@ MIDI controllers.
   the selected sample rate, period size and period count.
 - [ ] Exercise every Dusk Audio effect with real audio, save/reload its state
   and verify automation for representative numeric, toggle and enum controls.
+  All seven effects now pass isolated DSP runs in PiPedal's own 64-frame LV2
+  host; the remaining work is audible signal and UI save/reload acceptance.
 - [x] Record CPU, temperature and XRUN results for representative live rigs at
   48 kHz with 48-, 64- and 96-frame periods.
 - [ ] Perform an end-to-end MIDI acceptance pass with the intended foot
   controller, including press, release, long press, expression, channel
   filtering and snapshot changes.
+  Synthetic ALSA input has verified Program Change, CC and Note events from
+  `PiPedal:in` through to preset switching and the web activity monitor.
 - [ ] Verify input and output routing on at least one non-RME multichannel
   interface to guard against device-specific assumptions.
 
@@ -81,8 +85,8 @@ MIDI controllers.
 
 - Base release: `2.0.110`
 - Current development branch: `feature/multipath-v1`
-- Current tagged build: `pipedal-2.0.110-codex18`
-- Current package build: `2.0.110+codex18`
+- Current tagged build: `pipedal-2.0.110-codex19`
+- Current package build: `2.0.110+codex19`
 
 ## Performance Record
 
@@ -93,3 +97,12 @@ MIDI controllers.
   52.7 degrees C.
 - 64 frames is the selected live default for this rig; it provided the best
   measured stability without the latency increase of 96 frames.
+- A physical round-trip latency result still requires a cable from a selected
+  Babyface output to an input. The installed tester detects the interface as
+  `hw:Pro73095311`; no mixer loopback control is exposed through ALSA.
+- 4K EQ, DuskVerb, Multi-Comp, Multi-Q, Spectrum Analyzer, TapeMachine and
+  TapeMachine 2 each completed an isolated PiPedal-hosted DSP run at 64 frames
+  with exit status zero.
+- Synthetic ALSA acceptance verified CC 7 values 100 and 0 and Note 60 velocity
+  127 in the web monitor. Program Change switched presets correctly; the
+  monitor was corrected to report Program Change and consumed binding events.

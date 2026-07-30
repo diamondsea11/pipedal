@@ -1013,36 +1013,38 @@ private:
         return (event.size == 3 && event.buffer[0] == 0xB0 && event.buffer[1] == 0x00);
     }
 
-    bool ProcessMidiMonitor(Lv2EventBufferWriter &eventBufferWriter, Lv2EventBufferWriter::LV2_EvBuf_Iterator &iterator, MidiEvent &event)
+    void NotifyMidiMonitor(const MidiEvent &event)
     {
-        // eventBufferWriter.writeMidiEvent(iterator, 0, event.size, event.buffer);
-
-        this->realtimeActivePedalboard->OnMidiMessage(
-            event, this, fnMidiValueChanged);
-        if (listenForMidiEvent)
+        if (!listenForMidiEvent || event.size < 2)
         {
-            if (event.size >= 3)
+            return;
+        }
+
+        uint8_t cmd = (uint8_t)(event.buffer[0] & 0xF0);
+        bool isProgram = cmd == 0xC0;
+        bool isNote = event.size >= 3 && cmd == 0x90 && event.buffer[2] != 0;
+        bool isControl = event.size >= 3 && cmd == 0xB0;
+        if (isControl)
+        {
+            // Ignore bank select and CC LSB values.
+            uint8_t cc1 = (uint8_t)(event.buffer[1]);
+            if (cc1 == 0 || (cc1 >= 32 && cc1 < 64))
             {
-                uint8_t cmd = (uint8_t)(event.buffer[0] & 0xF0);
-                bool isNote = cmd == 0x90 && event.buffer[2] != 0; // note on with velocity > 0.
-                bool isControl = cmd == 0xB0;
-                if (isControl)
-                {
-                    // ignore bank select, and CC LSB values.
-                    uint8_t cc1 = (uint8_t)(event.buffer[1]);
-                    if (cc1 == 0 || (cc1 >= 32 && cc1 < 64))
-                    {
-                        isControl = false;
-                    }
-                }
-                if (isNote || isControl)
-                {
-                    MidiNotifyBody notifyBody(event.buffer[0], event.buffer[1], event.buffer[2]);
-                    realtimeWriter.OnMidiListen(notifyBody);
-                }
+                isControl = false;
             }
         }
-        return true;
+        if (isNote || isControl || isProgram)
+        {
+            uint8_t value = event.size >= 3 ? event.buffer[2] : 0;
+            MidiNotifyBody notifyBody(event.buffer[0], event.buffer[1], value);
+            realtimeWriter.OnMidiListen(notifyBody);
+        }
+    }
+
+    void ForwardMidiToPedalboard(MidiEvent &event)
+    {
+        this->realtimeActivePedalboard->OnMidiMessage(
+            event, this, fnMidiValueChanged);
     }
 
     void OnSnapshotTriggered(int snapshotIndex)
@@ -1182,8 +1184,17 @@ private:
         }
     }
 
-    void ProcessMidiEvent(Lv2EventBufferWriter &eventBufferWriter, Lv2EventBufferWriter::LV2_EvBuf_Iterator &iterator, MidiEvent &event)
+    void ProcessMidiEvent(
+        Lv2EventBufferWriter &eventBufferWriter,
+        Lv2EventBufferWriter::LV2_EvBuf_Iterator &iterator,
+        MidiEvent &event,
+        bool notifyMonitor = true)
     {
+        if (notifyMonitor)
+        {
+            NotifyMidiMonitor(event);
+        }
+
         size_t actionCount = 0;
         if (realtimeActivePedalboard != nullptr)
         {
@@ -1307,7 +1318,7 @@ private:
         }
         else
         {
-            ProcessMidiMonitor(eventBufferWriter, iterator, event);
+            ForwardMidiToPedalboard(event);
         }
     }
 
@@ -1328,7 +1339,7 @@ private:
                 event.buffer = deferredMidiMessages + i;
                 event.frame = 0;
 
-                ProcessMidiEvent(eventBufferWriter, iterator, event);
+                ProcessMidiEvent(eventBufferWriter, iterator, event, false);
 
                 if (midiProgramChangePending)
                 {
