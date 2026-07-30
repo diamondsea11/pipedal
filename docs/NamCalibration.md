@@ -11,10 +11,17 @@ It is the analog input level, in dBu RMS, that produces a digital 1 kHz sine
 wave at 0 dBFS peak in your audio interface.
 
 For example, if the interface specification says that its maximum input level
-is `+13 dBu` at the gain setting you use, enter `13.0`. This PiPedal build
-defaults to `+13 dBu` for the connected interface; NAM Gateway itself defaults
-to `+12 dBu`. Changing the interface gain changes this calibration value, so
-use the value for the gain setting used while playing.
+is `+13 dBu` at the gain setting you use, enter `13.0`. PiPedal automatically
+recognizes many common interfaces using values from the
+[Ghost Note Audio Input Gain database](https://ghostnoteaudio.uk/pages/app-inputgain).
+Unknown interfaces default to NAM Gateway's `+12 dBu`. A value entered in the
+Audio Device dialog is stored for that specific ALSA device and always takes
+priority over automatic detection.
+
+Some database values require a particular input mode, Pad setting, or minimum
+gain. PiPedal can identify the interface model but cannot reliably read those
+settings on every USB interface. Changing the interface gain or reference mode
+therefore requires updating the stored calibration value to match.
 
 The `.nam` file can contain `input_level_dbu`, the corresponding reference
 level of the interface used to create the model. With Input Calibration on,

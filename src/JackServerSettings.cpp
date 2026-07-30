@@ -29,6 +29,7 @@
 #include "Lv2Log.hpp"
 #include "SysExec.hpp"
 #include "PiPedalAlsa.hpp"
+#include "NamInputCalibrationProfiles.hpp"
 
 #define DRC_FILENAME "/etc/jackdrc"
 
@@ -47,12 +48,11 @@ float JackServerSettings::GetNamInputCalibrationDbu() const
         return profile->second;
     }
 
-    std::string deviceName = alsaInputDeviceName_ + " " + alsaInputDevice_;
-    std::transform(deviceName.begin(), deviceName.end(), deviceName.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-    if (deviceName.find("babyface pro") != std::string::npos)
+    auto knownCalibration = FindNamInputCalibrationDbu(
+        alsaInputDeviceName_ + " " + alsaInputDevice_);
+    if (knownCalibration)
     {
-        return 13.0f;
+        return *knownCalibration;
     }
     return 12.0f;
 }

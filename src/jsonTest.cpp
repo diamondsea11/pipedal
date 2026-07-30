@@ -197,6 +197,38 @@ TEST_CASE("NAM calibration profiles follow the active interface", "[json_read_te
     REQUIRE(restored.GetNamInputCalibrationDbu() == 14.5f);
 }
 
+TEST_CASE("NAM calibration recognizes known audio interfaces", "[json_read_test][nam-calibration]")
+{
+    struct TestCase
+    {
+        const char *name;
+        float expected;
+    };
+    static constexpr TestCase testCases[] = {
+        {"Antelope Audio Discrete 8 Pro", 18.0f},
+        {"Arturia MiniFuse 2", 11.5f},
+        {"Audient iD4", 12.0f},
+        {"Audient iD44", 10.0f},
+        {"Behringer UMC204HD 192k", 17.0f},
+        {"Focusrite Scarlett 2i2 3rd Gen", 12.5f},
+        {"IK Multimedia AXE I/O One", 10.5f},
+        {"MOTU UltraLite-mk5", 18.0f},
+        {"PreSonus Quantum HD 8", 21.0f},
+        {"RME Babyface Pro (2359687)", 13.0f},
+        {"SSL 18 USB Audio", 15.0f},
+        {"Universal Audio UAD Volt 276", 12.5f},
+        {"Unknown USB Audio", 12.0f},
+    };
+
+    JackServerSettings settings("hw:Test", "hw:Test", 48000, 64, 3);
+    for (const auto &testCase : testCases)
+    {
+        settings.SetAlsaInputDevice("hw:Test", testCase.name);
+        INFO(testCase.name);
+        REQUIRE(settings.GetNamInputCalibrationDbu() == testCase.expected);
+    }
+}
+
 TEST_CASE("output matrix follows channel router JSON", "[json_read_test][multipath]")
 {
     ChannelRouterSettings source;

@@ -16,7 +16,7 @@
 // COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
+import { findNamInputCalibrationDbu } from "./NamInputCalibrationProfiles";
 
 
 export default class JackServerSettings {
@@ -67,8 +67,8 @@ export default class JackServerSettings {
         if (configured !== undefined) {
             return configured;
         }
-        const deviceName = `${this.alsaInputDeviceName} ${this.alsaInputDevice}`.toLowerCase();
-        return deviceName.includes("babyface pro") ? 13.0 : 12.0;
+        const deviceName = `${this.alsaInputDeviceName} ${this.alsaInputDevice}`;
+        return findNamInputCalibrationDbu(deviceName) ?? 12.0;
     }
 
     setNamInputCalibrationDbu(value: number): void {
