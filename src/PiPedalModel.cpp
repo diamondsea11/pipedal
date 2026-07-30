@@ -207,6 +207,7 @@ PiPedalModel::~PiPedalModel()
 }
 
 #include <fstream>
+#include <filesystem>
 
 void PiPedalModel::Init(const PiPedalConfiguration &configuration)
 {
@@ -2345,6 +2346,65 @@ static bool IsLegacyFactoryNamPath(const std::map<std::string, std::string> &pat
     return false;
 }
 
+// TooB NAM applies its interface calibration only when the loaded model exposes
+// an "input_level_dbu" field. Without it, calibration is a no-op (unity), so the
+// migration below must NOT strip a model's historical input trim -- doing so
+// would drive a hi-gain model ~18 dB too hot, producing aliased high-frequency
+// noise proportional to signal. This peeks at the .nam file to decide whether
+// calibration can actually replace the trim.
+static bool NamModelHasInputLevelCalibration(
+    const std::map<std::string, std::string> &pathProperties,
+    const std::filesystem::path &uploadDirectory)
+{
+    for (const auto &[key, value] : pathProperties)
+    {
+        if (key != "http://two-play.com/plugins/toob-nam#modelFile")
+        {
+            continue;
+        }
+        // value is a JSON Path atom: {"otype_":"Path","value":"<path>"}.
+        auto valueKey = value.find("\"value\"");
+        if (valueKey == std::string::npos)
+            return false;
+        auto colon = value.find(':', valueKey);
+        if (colon == std::string::npos)
+            return false;
+        auto firstQuote = value.find('"', colon);
+        if (firstQuote == std::string::npos)
+            return false;
+        auto secondQuote = value.find('"', firstQuote + 1);
+        if (secondQuote == std::string::npos)
+            return false;
+        std::string modelPath =
+            value.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+        if (modelPath.empty())
+            return false;
+
+        std::filesystem::path fullPath =
+            (!modelPath.empty() && modelPath.front() == '/')
+                ? std::filesystem::path(modelPath)
+                : uploadDirectory / modelPath;
+        std::error_code ec;
+        auto fileSize = std::filesystem::file_size(fullPath, ec);
+        if (ec)
+            return false;
+
+        // .nam files are JSON. Read the file (only on preset load, never on the
+        // audio thread) and scan for the calibration field. Cap the read so a
+        // pathological file can't stall startup or balloon memory.
+        constexpr std::uintmax_t MAX_SCAN_BYTES = 64 * 1024 * 1024;
+        std::ifstream f(fullPath, std::ios::binary);
+        if (!f)
+            return false;
+        std::string contents;
+        contents.resize((size_t)std::min(fileSize, MAX_SCAN_BYTES));
+        f.read(contents.data(), (std::streamsize)contents.size());
+        contents.resize((size_t)f.gcount());
+        return contents.find("input_level_dbu") != std::string::npos;
+    }
+    return false;
+}
+
 void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const PedalboardItem *pedalboardItem_)
 {
     std::shared_ptr<Lv2PluginInfo> pPlugin = pluginHost.GetPluginInfo(pedalboardItem_->uri());
@@ -2381,6 +2441,8 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
         if (pPlugin->uri() == "http://two-play.com/plugins/toob-nam")
         {
             float interfaceCalibration = jackServerSettings.GetNamInputCalibrationDbu();
+            bool modelHasCalibration = NamModelHasInputLevelCalibration(
+                snapshotValue.pathProperties_, storage.GetPluginUploadDirectory());
             ControlValue *pVersion = snapshotValue.GetControlValue("version");
             if (pVersion == nullptr)
             {
@@ -2432,7 +2494,8 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
                 // Old bundled presets compensated for the former calibration
                 // implementation with an input trim. Gateway-compatible
                 // calibration makes that trim incorrect.
-                if (IsLegacyFactoryNamPath(snapshotValue.pathProperties_))
+                if (modelHasCalibration &&
+                    IsLegacyFactoryNamPath(snapshotValue.pathProperties_))
                 {
                     snapshotValue.SetControlValue("inputGain", 0.0f);
                 }
@@ -2447,8 +2510,14 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
                 snapshotValue.SetControlValue("version", 5.0f);
             }
             snapshotValue.SetControlValue("calibration", interfaceCalibration);
+            // Always drive NAM at maximum ("A2") model quality.
             snapshotValue.SetControlValue("modelSize", 1.0f);
-            snapshotValue.SetControlValue("inputCalibrationMode", 1.0f);
+            // Auto-select calibrated input, but only for models that actually
+            // carry input_level_dbu metadata. Forcing it on for a model without
+            // that field leaves it at unity while its trim may have been
+            // stripped above -> over-driven (harsh aliasing).
+            snapshotValue.SetControlValue(
+                "inputCalibrationMode", modelHasCalibration ? 1.0f : 0.0f);
             snapshotValue.SetControlValue("version", 6.0f);
         }
         if (pPlugin->piPedalUI())
@@ -2507,6 +2576,8 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
         if (pPlugin->uri() == "http://two-play.com/plugins/toob-nam")
         {
             float interfaceCalibration = jackServerSettings.GetNamInputCalibrationDbu();
+            bool modelHasCalibration = NamModelHasInputLevelCalibration(
+                pedalboardItem->pathProperties_, storage.GetPluginUploadDirectory());
             ControlValue *pVersion = pedalboardItem->GetControlValue("version");
             if (pVersion == nullptr)
             {
@@ -2557,7 +2628,8 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
             {
                 // Preserve user trims, but remove the historical compensation
                 // from presets that shipped with TooB.
-                if (IsLegacyFactoryNamPath(pedalboardItem->pathProperties_))
+                if (modelHasCalibration &&
+                    IsLegacyFactoryNamPath(pedalboardItem->pathProperties_))
                 {
                     pedalboardItem->SetControlValue("inputGain", 0.0f);
                 }
@@ -2575,8 +2647,14 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
             // characteristic. Keep every NAM instance synchronized with the
             // currently selected capture device.
             pedalboardItem->SetControlValue("calibration", interfaceCalibration);
+            // Always drive NAM at maximum ("A2") model quality.
             pedalboardItem->SetControlValue("modelSize", 1.0f);
-            pedalboardItem->SetControlValue("inputCalibrationMode", 1.0f);
+            // Auto-select calibrated input, but only for models that actually
+            // carry input_level_dbu metadata. Forcing it on for a model without
+            // that field leaves it at unity while its trim may have been
+            // stripped above -> over-driven (harsh aliasing).
+            pedalboardItem->SetControlValue(
+                "inputCalibrationMode", modelHasCalibration ? 1.0f : 0.0f);
             pedalboardItem->SetControlValue("version", 6.0f);
         }
         for (size_t i = 0; i < pPlugin->ports().size(); ++i)

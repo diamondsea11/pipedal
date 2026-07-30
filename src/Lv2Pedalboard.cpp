@@ -973,6 +973,35 @@ bool Lv2Pedalboard::Run(
             }
         }
     };
+    // Fast path for the common single-path case: no path B, no extra paths, no
+    // direct outputs, no global EQ, centred pan, unmuted, and latency-aligned
+    // (delay == 0, which makes the delay compensators pure pass-through). This
+    // avoids the per-sample delay-line reads/writes, modulo ops, pan branches
+    // and array zero-inits that the general mixer below would otherwise run on
+    // every sample even when none of those features are engaged.
+    const bool simpleOutput =
+        !this->pathBEnabled &&
+        this->additionalPaths.empty() &&
+        !pathADirect &&
+        !this->globalEqEnabled &&
+        this->pathAPan == 0.0f &&
+        !this->pathAMute &&
+        maximumPathLatency == pathALatency;
+    if (simpleOutput)
+    {
+        const size_t lastChannel = this->pedalboardOutputBuffers.size() - 1;
+        for (size_t i = 0; i < samples; ++i)
+        {
+            float volume = outputVolume.Tick();
+            for (size_t c = 0; c < 2 && outputBuffers[c] != nullptr; ++c)
+            {
+                outputBuffers[c][i] =
+                    this->pedalboardOutputBuffers[std::min(c, lastChannel)][i] * volume;
+            }
+        }
+        this->currentFrameOffset += samples;
+        return true;
+    }
     for (size_t i = 0; i < samples; ++i)
     {
         float volume = this->pathAMute ? 0 : outputVolume.Tick();
