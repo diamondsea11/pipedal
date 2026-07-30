@@ -81,6 +81,7 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     pathC.name("Keys");
     pathC.inputChannels({4, 5});
     pathC.outputChannels({6, 7});
+    pathC.sourceSendsDb({{"A", -12.0f}, {"B", -18.0f}});
     pathC.inputVolumeDb(-2.0f);
     pathC.outputVolumeDb(1.5f);
     pathC.mute(false);
@@ -144,6 +145,8 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.additionalPaths()[0].name() == "Keys");
     REQUIRE(result.additionalPaths()[0].inputChannels() == std::vector<int64_t>{4, 5});
     REQUIRE(result.additionalPaths()[0].outputChannels() == std::vector<int64_t>{6, 7});
+    REQUIRE(result.additionalPaths()[0].sourceSendsDb().at("A") == -12.0f);
+    REQUIRE(result.additionalPaths()[0].sourceSendsDb().at("B") == -18.0f);
     REQUIRE(result.additionalPaths()[0].inputVolumeDb() == -2.0f);
     REQUIRE(result.additionalPaths()[0].outputVolumeDb() == 1.5f);
     REQUIRE(result.additionalPaths()[0].pan() == -0.5f);
@@ -169,6 +172,61 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.snapshots()[0]->additionalPathMixes_.size() == 2);
     REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].id() == "C");
     REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].pan() == -0.5f);
+}
+
+TEST_CASE("snapshot restoration preserves generic patch state", "[pedalboard][snapshot][patch-state]")
+{
+    PedalboardItem item;
+    item.instanceId(42);
+    item.uri("urn:test:patch-plugin");
+    item.pathProperties({
+        {"urn:test:model", R"({"otype_":"Path","value":"capture.nam"})"},
+        {"urn:test:quality", R"({"otype_":"Float","value":1.0})"},
+    });
+    SnapshotValue snapshot;
+    snapshot.instanceId_ = item.instanceId();
+    snapshot.isEnabled_ = false;
+    snapshot.pathProperties_ = item.pathProperties();
+
+    item.pathProperties({});
+    item.ApplySnapshotValue(&snapshot);
+
+    REQUIRE_FALSE(item.isEnabled());
+    REQUIRE(item.pathProperties() == snapshot.pathProperties_);
+}
+
+TEST_CASE("routing structure detects send graph changes", "[pedalboard][routing][send-return]")
+{
+    Pedalboard left = Pedalboard::MakeDefault();
+    PedalboardPath returnPath;
+    returnPath.id("C");
+    returnPath.sourceSendsDb({{"A", -12.0f}});
+    returnPath.items().push_back(left.MakeEmptyItem());
+    left.additionalPaths().push_back(returnPath);
+
+    Pedalboard right = left.DeepCopy();
+    REQUIRE(left.IsStructureIdentical(right));
+    right.additionalPaths()[0].sourceSendsDb({{"A", -6.0f}});
+    REQUIRE_FALSE(left.IsStructureIdentical(right));
+}
+
+TEST_CASE("pedalboard copies isolate plugin state", "[pedalboard][duplication][patch-state]")
+{
+    Pedalboard original = Pedalboard::MakeDefault();
+    auto &item = original.items().front();
+    item.pathProperties({{"urn:test:model", R"({"value":"original.nam"})"}});
+
+    Pedalboard copy = original.DeepCopy();
+    auto copiedProperties = copy.items().front().pathProperties();
+    copiedProperties["urn:test:model"] = R"({"value":"copy.nam"})";
+    copy.items().front().pathProperties(copiedProperties);
+
+    REQUIRE(
+        original.items().front().pathProperties().at("urn:test:model") ==
+        R"({"value":"original.nam"})");
+    REQUIRE(
+        copy.items().front().pathProperties().at("urn:test:model") ==
+        R"({"value":"copy.nam"})");
 }
 
 TEST_CASE("NAM calibration profiles follow the active interface", "[json_read_test][nam-calibration]")

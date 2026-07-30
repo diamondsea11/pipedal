@@ -515,6 +515,7 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         runtimePath->id = path.id();
         runtimePath->inputChannels = path.inputChannels();
         runtimePath->outputChannels = path.outputChannels();
+        runtimePath->sourceSendsDb = path.sourceSendsDb();
         runtimePath->mute = path.mute();
         runtimePath->pan = std::max(-1.0f, std::min(1.0f, path.pan()));
         runtimePath->inputVolume.SetSampleRate((float)this->pHost->GetSampleRate());
@@ -524,8 +525,68 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         runtimePath->inputVolume.SetTarget(path.inputVolumeDb());
         runtimePath->outputVolume.SetTarget(path.outputVolumeDb());
 
-        const size_t pathInputCount = std::max(runtimePath->inputChannels.size(), (size_t)1);
+        const size_t pathInputCount = runtimePath->sourceSendsDb.empty()
+            ? std::max(runtimePath->inputChannels.size(), (size_t)1)
+            : 2;
         runtimePath->inputBuffers = AllocateAudioBuffers((int)pathInputCount);
+        if (!runtimePath->sourceSendsDb.empty())
+        {
+            struct SendSource
+            {
+                const std::vector<float *> *buffers;
+                float gain;
+            };
+            std::vector<SendSource> sendSources;
+            for (const auto &[sourceId, levelDb] : runtimePath->sourceSendsDb)
+            {
+                const std::vector<float *> *sourceBuffers = nullptr;
+                if (sourceId == "A")
+                {
+                    sourceBuffers = &pedalboardOutputBuffers;
+                }
+                else if (sourceId == "B" && pathBEnabled)
+                {
+                    sourceBuffers = &pathBOutputBuffers;
+                }
+                else
+                {
+                    for (const auto &previousPath : additionalPaths)
+                    {
+                        if (previousPath->id == sourceId)
+                        {
+                            sourceBuffers = &previousPath->outputBuffers;
+                            break;
+                        }
+                    }
+                }
+                if (sourceBuffers != nullptr && !sourceBuffers->empty())
+                {
+                    sendSources.push_back({
+                        sourceBuffers,
+                        std::pow(10.0f, std::clamp(levelDb, -60.0f, 12.0f) / 20.0f)});
+                }
+            }
+            const auto returnInputs = runtimePath->inputBuffers;
+            processActions.push_back(
+                [returnInputs, sendSources](uint32_t frames)
+                {
+                    for (size_t channel = 0; channel < returnInputs.size(); ++channel)
+                    {
+                        float *destination = returnInputs[channel];
+                        for (uint32_t frame = 0; frame < frames; ++frame)
+                        {
+                            float value = 0;
+                            for (const auto &send : sendSources)
+                            {
+                                const size_t sourceChannel =
+                                    std::min(channel, send.buffers->size() - 1);
+                                value += (*send.buffers)[sourceChannel][frame] * send.gain;
+                            }
+                            destination[frame] = value;
+                        }
+                    }
+                });
+        }
         effectStart = effects.size();
         auto pathOutputs = PrepareItems(
             path.items(), runtimePath->inputBuffers, errorList, existingEffects);
@@ -826,8 +887,35 @@ bool Lv2Pedalboard::Run(
     uint32_t maximumPathLatency = std::max(pathALatency, pathBLatency);
     for (size_t pathIndex = 0; pathIndex < additionalPaths.size(); ++pathIndex)
     {
+        auto &path = *additionalPaths[pathIndex];
+        uint32_t sourceLatency = 0;
+        for (const auto &[sourceId, unusedLevel] : path.sourceSendsDb)
+        {
+            (void)unusedLevel;
+            if (sourceId == "A")
+            {
+                sourceLatency = std::max(sourceLatency, pathALatency);
+            }
+            else if (sourceId == "B")
+            {
+                sourceLatency = std::max(sourceLatency, pathBLatency);
+            }
+            else
+            {
+                for (size_t previousIndex = 0; previousIndex < pathIndex; ++previousIndex)
+                {
+                    if (additionalPaths[previousIndex]->id == sourceId)
+                    {
+                        sourceLatency = std::max(
+                            sourceLatency,
+                            additionalPathLatencies[previousIndex]);
+                        break;
+                    }
+                }
+            }
+        }
         additionalPathLatencies[pathIndex] =
-            getPathLatency(additionalPaths[pathIndex]->latencyEffects);
+            sourceLatency + getPathLatency(path.latencyEffects);
         maximumPathLatency = std::max(
             maximumPathLatency,
             additionalPathLatencies[pathIndex]);
@@ -1090,6 +1178,44 @@ void Lv2Pedalboard::ComputeVus(RealtimeVuBuffers *realtimeVuBuffers, uint32_t sa
             else if (this->pathBOutputBuffers.size() == 1)
             {
                 pUpdate->AccumulateInputs(this->pathBOutputBuffers[0], samples);
+            }
+        }
+        else if (
+            index == Pedalboard::PATH_C_START_CONTROL_ID ||
+            index == Pedalboard::PATH_C_END_CONTROL_ID ||
+            index == Pedalboard::PATH_D_START_CONTROL_ID ||
+            index == Pedalboard::PATH_D_END_CONTROL_ID)
+        {
+            const std::string pathId =
+                (index == Pedalboard::PATH_C_START_CONTROL_ID ||
+                 index == Pedalboard::PATH_C_END_CONTROL_ID)
+                    ? "C"
+                    : "D";
+            const bool isInput =
+                index == Pedalboard::PATH_C_START_CONTROL_ID ||
+                index == Pedalboard::PATH_D_START_CONTROL_ID;
+            for (const auto &path : additionalPaths)
+            {
+                if (path->id != pathId)
+                {
+                    continue;
+                }
+                const auto &buffers = isInput ? path->inputBuffers : path->outputBuffers;
+                if (buffers.size() >= 2)
+                {
+                    if (isInput)
+                        pUpdate->AccumulateOutputs(buffers[0], buffers[1], samples);
+                    else
+                        pUpdate->AccumulateInputs(buffers[0], buffers[1], samples);
+                }
+                else if (buffers.size() == 1)
+                {
+                    if (isInput)
+                        pUpdate->AccumulateOutputs(buffers[0], samples);
+                    else
+                        pUpdate->AccumulateInputs(buffers[0], samples);
+                }
+                break;
             }
         }
         else

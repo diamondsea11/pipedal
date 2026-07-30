@@ -216,6 +216,7 @@ namespace pipedal
         float pan_ = 0;
         std::vector<int64_t> inputChannels_ = {0};
         std::vector<int64_t> outputChannels_;
+        std::map<std::string, float> sourceSendsDb_;
         std::vector<PedalboardItem> items_;
     public:
         GETTER_SETTER_REF(id)
@@ -227,6 +228,7 @@ namespace pipedal
         GETTER_SETTER(pan)
         GETTER_SETTER_VEC(inputChannels)
         GETTER_SETTER_VEC(outputChannels)
+        GETTER_SETTER_REF(sourceSendsDb)
         GETTER_SETTER_VEC(items)
 
         DECLARE_JSON_MAP(PedalboardPath);
@@ -391,6 +393,10 @@ namespace pipedal
 
         static constexpr int64_t AUX_START_CONTROL_ID = -4; // synthetic PedalboardItem for aux input volume.
         static constexpr int64_t AUX_END_CONTROL_ID = -5;   // synthetic PedalboardItem for aux output volume.
+        static constexpr int64_t PATH_C_START_CONTROL_ID = -6;
+        static constexpr int64_t PATH_C_END_CONTROL_ID = -7;
+        static constexpr int64_t PATH_D_START_CONTROL_ID = -8;
+        static constexpr int64_t PATH_D_END_CONTROL_ID = -9;
 
 
         Pedalboard();

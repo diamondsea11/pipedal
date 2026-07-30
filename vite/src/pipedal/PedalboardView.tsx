@@ -49,6 +49,8 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import CallMergeIcon from '@mui/icons-material/CallMerge';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ControlPointDuplicateIcon from '@mui/icons-material/ControlPointDuplicate';
@@ -68,6 +70,8 @@ import {
     getPedalboardClipboardItem,
     hasPedalboardClipboard
 } from './PedalboardClipboard';
+import RoutingGraphDialog from './RoutingGraphDialog';
+import VuMeter from './VuMeter';
 
 // import MidiIcon from './svg/ic_midi.svg?react';
 // import { midiChannelBindingControlFeatureEnabled } from './MidiChannelBinding';
@@ -293,6 +297,7 @@ interface LayoutSize {
 type PedalboardState = {
     pedalboard?: Pedalboard;
     globalEqDialogOpen: boolean;
+    routingGraphOpen: boolean;
     contextMenu: {
         mouseX: number;
         mouseY: number;
@@ -503,6 +508,7 @@ const PedalboardView =
                     this.state = {
                         pedalboard: this.model.pedalboard.get(),
                         globalEqDialogOpen: false,
+                        routingGraphOpen: false,
                         contextMenu: null,
                     };
                     this.onPedalboardChanged = this.onPedalboardChanged.bind(this);
@@ -1671,6 +1677,52 @@ const PedalboardView =
                             </Select>
                         );
                     };
+                    const pathMeters = (startId: number, endId: number) => (
+                        <div
+                            style={{
+                                width: 42,
+                                height: 28,
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                alignItems: "center",
+                                justifyItems: "center",
+                                flex: "0 0 42px",
+                            }}
+                            title="Path input / output level"
+                        >
+                            <VuMeter
+                                instanceId={startId}
+                                display="output"
+                                height={24}
+                            />
+                            <VuMeter
+                                instanceId={endId}
+                                display="input"
+                                height={24}
+                            />
+                        </div>
+                    );
+                    const sendTargets = (sourceId: "A" | "B" | "C" | "D") =>
+                        (pedalboard?.additionalPaths ?? [])
+                            .filter((path) =>
+                                path.enabled &&
+                                path.sourceSendsDb[sourceId] !== undefined)
+                            .map((path) => path.id);
+                    const sendIndicator = (sourceId: "A" | "B" | "C" | "D") => {
+                        const targets = sendTargets(sourceId);
+                        if (targets.length === 0) return null;
+                        return (
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: "primary.main",
+                                    whiteSpace: "nowrap",
+                                }}
+                            >
+                                SEND {targets.join(" + ")}
+                            </Typography>
+                        );
+                    };
                     let contextMenuItem = this.state.contextMenu
                         ? this.state.pedalboard?.maybeGetItem(this.state.contextMenu.instanceId) ?? null
                         : null;
@@ -1687,6 +1739,10 @@ const PedalboardView =
                                 }} >
                                 <div className={classes.pathHeader} style={{ top: 0 }}>
                                     <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path A</Typography>
+                                    {pathMeters(
+                                        Pedalboard.START_CONTROL_ID,
+                                        Pedalboard.END_CONTROL_ID)}
+                                    {sendIndicator("A")}
                                     <Select
                                         size="small"
                                         value={pathAInput}
@@ -1702,24 +1758,15 @@ const PedalboardView =
                                     {pathOutputSelect(
                                         "A",
                                         pedalboard?.pathAOutputChannels ?? [])}
-                                    <Select
+                                    <Button
                                         size="small"
-                                        value=""
-                                        displayEmpty
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            if (value === "single" || value === "dual" || value === "guitar-vocal") {
-                                                this.model.applyRoutingTemplate(value);
-                                            }
-                                        }}
+                                        startIcon={<AccountTreeIcon />}
+                                        onClick={() => this.setState({ routingGraphOpen: true })}
                                         aria-label="Routing template"
-                                        style={{ height: 28, minWidth: 116 }}
+                                        style={{ height: 28 }}
                                     >
-                                        <MenuItem value="">Routing</MenuItem>
-                                        <MenuItem value="single">Single input</MenuItem>
-                                        <MenuItem value="dual">Dual inputs</MenuItem>
-                                        <MenuItem value="guitar-vocal">Guitar + Vocal</MenuItem>
-                                    </Select>
+                                        Routing
+                                    </Button>
                                     <IconButton
                                         size="small"
                                         color={pedalboard?.pathAMute ? "primary" : "default"}
@@ -1775,6 +1822,10 @@ const PedalboardView =
                                             style={{ top: layoutSize.height + PATH_GAP }}
                                         >
                                             <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path B</Typography>
+                                            {pathMeters(
+                                                Pedalboard.AUX_START_CONTROL_ID,
+                                                Pedalboard.AUX_END_CONTROL_ID)}
+                                            {sendIndicator("B")}
                                             <Select
                                                 size="small"
                                                 value={pathBInput}
@@ -1843,25 +1894,46 @@ const PedalboardView =
                                             <Typography variant="subtitle2" style={{ minWidth: 54 }}>
                                                 Path {path.id}
                                             </Typography>
-                                            <Select
-                                                size="small"
-                                                value={path.inputChannels[0] ?? 0}
-                                                onChange={(event) =>
-                                                    this.model.configureAdditionalPath(
-                                                        path.id,
-                                                        true,
-                                                        Number(event.target.value),
-                                                        path.mute,
-                                                        path.pan)}
-                                                aria-label={`Path ${path.id} input`}
-                                                style={{ height: 28, minWidth: 82 }}
-                                            >
-                                                {inputPorts.map((_port, index) => (
-                                                    <MenuItem key={index} value={index}>
-                                                        IN {index + 1}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
+                                            {pathMeters(path.startId, path.endId)}
+                                            {Object.keys(
+                                                pedalboard?.additionalPaths.find(
+                                                    (candidate) => candidate.id === path.id)
+                                                    ?.sourceSendsDb ?? {}).length > 0 ? (
+                                                <Button
+                                                    size="small"
+                                                    startIcon={<CallMergeIcon />}
+                                                    onClick={() =>
+                                                        this.setState({ routingGraphOpen: true })}
+                                                    aria-label={`Path ${path.id} return sources`}
+                                                    style={{ height: 28 }}
+                                                >
+                                                    Return {Object.keys(
+                                                        pedalboard?.additionalPaths.find(
+                                                            (candidate) => candidate.id === path.id)
+                                                            ?.sourceSendsDb ?? {}).join(" + ")}
+                                                </Button>
+                                            ) : (
+                                                <Select
+                                                    size="small"
+                                                    value={path.inputChannels[0] ?? 0}
+                                                    onChange={(event) =>
+                                                        this.model.configureAdditionalPath(
+                                                            path.id,
+                                                            true,
+                                                            Number(event.target.value),
+                                                            path.mute,
+                                                            path.pan)}
+                                                    aria-label={`Path ${path.id} input`}
+                                                    style={{ height: 28, minWidth: 82 }}
+                                                >
+                                                    {inputPorts.map((_port, index) => (
+                                                        <MenuItem key={index} value={index}>
+                                                            IN {index + 1}
+                                                        </MenuItem>
+                                                    ))}
+                                                </Select>
+                                            )}
+                                            {sendIndicator(path.id)}
                                             {pathOutputSelect(
                                                 path.id as "C" | "D",
                                                 path.outputChannels)}
@@ -1916,6 +1988,13 @@ const PedalboardView =
                                     </React.Fragment>
                                 ))}
                             </div>
+                            {pedalboard && (
+                                <RoutingGraphDialog
+                                    open={this.state.routingGraphOpen}
+                                    pedalboard={pedalboard}
+                                    onClose={() => this.setState({ routingGraphOpen: false })}
+                                />
+                            )}
                             <Dialog
                                 open={this.state.globalEqDialogOpen}
                                 onClose={() => this.setState({ globalEqDialogOpen: false })}

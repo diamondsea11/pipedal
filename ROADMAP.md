@@ -51,7 +51,7 @@ MIDI controllers.
   the selected sample rate, period size and period count.
 - [ ] Exercise every Dusk Audio effect with real audio, save/reload its state
   and verify automation for representative numeric, toggle and enum controls.
-- [ ] Record CPU, temperature and XRUN results for representative live rigs at
+- [x] Record CPU, temperature and XRUN results for representative live rigs at
   48 kHz with 48-, 64- and 96-frame periods.
 - [ ] Perform an end-to-end MIDI acceptance pass with the intended foot
   controller, including press, release, long press, expression, channel
@@ -61,25 +61,35 @@ MIDI controllers.
 
 ## Next Features
 
-- [ ] Replace the routing template selector with a compact visual split/merge
+- [x] Replace the routing template selector with a compact visual split/merge
   editor while retaining templates as fast starting points.
-- [ ] Add explicit send/return blocks so parallel paths can share selected
+- [x] Add explicit send/return blocks so parallel paths can share selected
   effects without duplicating processor instances.
-- [ ] Add per-path input and output meters to make gain staging and hardware
+- [x] Add per-path input and output meters to make gain staging and hardware
   routing visible before opening an effect.
-- [ ] Add reusable MIDI controller profiles and an import/export format for
+- [x] Add reusable MIDI controller profiles and an import/export format for
   complete assignments.
-- [ ] Add a MIDI activity and action monitor for troubleshooting controller
+- [x] Add a MIDI activity and action monitor for troubleshooting controller
   mappings without SSH access.
-- [ ] Add focused, grouped Dusk Audio skins. The current build exposes all
-  supported controls, but complex processors such as DuskVerb remain denser
-  than the tailored Chow, Calf and Dragonfly layouts.
-- [ ] Add automated integration tests for path routing, snapshot restoration,
+- [x] Add focused, grouped Dusk Audio skins. DuskVerb, Multi-Comp, Multi-Q,
+  4K EQ, both TapeMachine variants and Spectrum Analyzer now use compact
+  processor-specific groups; Multi-Comp also exposes its live GR telemetry.
+- [x] Add automated integration tests for path routing, snapshot restoration,
   plugin duplication and generic LV2 patch-property persistence.
 
 ## Build Line
 
 - Base release: `2.0.110`
 - Current development branch: `feature/multipath-v1`
-- Current tagged build: `pipedal-2.0.110-codex17`
-- Current package build: `2.0.110+codex17`
+- Current tagged build: `pipedal-2.0.110-codex18`
+- Current package build: `2.0.110+codex18`
+
+## Performance Record
+
+- Current Fender Clean live rig, 48 kHz, three periods, 35-second steady-state
+  windows: 48 frames = 6 underruns, 64 frames = 2, 96 frames = 3.
+- DSP headroom averaged 27.9-30.0%; short peaks, rather than average CPU load,
+  caused the remaining underruns. Soak temperature stayed between 51.6 and
+  52.7 degrees C.
+- 64 frames is the selected live default for this rig; it provided the best
+  measured stability without the latency increase of 96 frames.

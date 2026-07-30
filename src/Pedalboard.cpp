@@ -445,6 +445,7 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
             leftPath.enabled() != rightPath.enabled() ||
             leftPath.inputChannels() != rightPath.inputChannels() ||
             leftPath.outputChannels() != rightPath.outputChannels() ||
+            leftPath.sourceSendsDb() != rightPath.sourceSendsDb() ||
             leftPath.items().size() != rightPath.items().size())
         {
             return false;
@@ -747,6 +748,7 @@ JSON_MAP_BEGIN(PedalboardPath)
     JSON_MAP_REFERENCE(PedalboardPath,pan)
     JSON_MAP_REFERENCE(PedalboardPath,inputChannels)
     JSON_MAP_REFERENCE(PedalboardPath,outputChannels)
+    JSON_MAP_REFERENCE(PedalboardPath,sourceSendsDb)
     JSON_MAP_REFERENCE(PedalboardPath,items)
 JSON_MAP_END()
 

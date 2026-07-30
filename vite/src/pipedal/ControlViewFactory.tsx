@@ -37,6 +37,7 @@ import ToobNamViewFactory from './ToobNamView';
 import ToobParametericEqViewFactory from './ToobParametricEqView';
 import {ToobParametricEqViewFactoryStereo} from './ToobParametricEqView';
 import { dragonflyViewFactories } from './DragonflyView';
+import { duskViewFactories } from './DuskView';
 
 
 let pluginFactories: IControlViewFactory[] = [
@@ -50,6 +51,7 @@ let pluginFactories: IControlViewFactory[] = [
     new ToobParametericEqViewFactory(),
     new ToobParametricEqViewFactoryStereo(),
     ...dragonflyViewFactories,
+    ...duskViewFactories,
 ];
 
 

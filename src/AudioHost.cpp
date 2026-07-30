@@ -2541,6 +2541,14 @@ public:
             {
                 index = Pedalboard::AUX_END_CONTROL_ID;
             }
+            else if (
+                instanceId == Pedalboard::PATH_C_START_CONTROL_ID ||
+                instanceId == Pedalboard::PATH_C_END_CONTROL_ID ||
+                instanceId == Pedalboard::PATH_D_START_CONTROL_ID ||
+                instanceId == Pedalboard::PATH_D_END_CONTROL_ID)
+            {
+                index = instanceId;
+            }
             else
             {
                 index = this->currentPedalboard->GetIndexOfInstanceId(instanceId);
@@ -2591,7 +2599,11 @@ public:
                         instanceId == Pedalboard::START_CONTROL_ID ||
                         instanceId == Pedalboard::END_CONTROL_ID ||
                         instanceId == Pedalboard::AUX_START_CONTROL_ID ||
-                        instanceId == Pedalboard::AUX_END_CONTROL_ID)
+                        instanceId == Pedalboard::AUX_END_CONTROL_ID ||
+                        instanceId == Pedalboard::PATH_C_START_CONTROL_ID ||
+                        instanceId == Pedalboard::PATH_C_END_CONTROL_ID ||
+                        instanceId == Pedalboard::PATH_D_START_CONTROL_ID ||
+                        instanceId == Pedalboard::PATH_D_END_CONTROL_ID)
                     {
                         auto index = GetRealtimeItemIndex(instanceId);
                         VuUpdateX v;
@@ -2617,6 +2629,12 @@ public:
                             nChannels = pedalboard->IsPathBEnabled()
                                 ? pedalboard->GetNumberOfAudioOutputChannels()
                                 : this->pHost->GetChannelSelection().auxOutputChannels().size();
+                            break;
+                        case Pedalboard::PATH_C_START_CONTROL_ID:
+                        case Pedalboard::PATH_C_END_CONTROL_ID:
+                        case Pedalboard::PATH_D_START_CONTROL_ID:
+                        case Pedalboard::PATH_D_END_CONTROL_ID:
+                            nChannels = 2;
                             break;
                         }
                         v.isStereoInput_ = v.isStereoOutput_ = nChannels > 1;

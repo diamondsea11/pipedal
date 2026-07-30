@@ -544,8 +544,7 @@ export const VuMeter =
 
             componentDidMount() {
                 this.model.state.addOnChangedHandler(this.onStateChanged);
-
-                //this.addVuSubscription();
+                this.addVuSubscription();
             }
             componentWillUnmount() {
                 this.removeVuSubscription();
@@ -556,6 +555,5 @@ export const VuMeter =
     ));
 
 export default VuMeter;
-
 
 

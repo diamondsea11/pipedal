@@ -387,6 +387,7 @@ export class PedalboardPath {
         this.pan = input.pan ?? 0;
         this.inputChannels = input.inputChannels?.slice() ?? [0];
         this.outputChannels = input.outputChannels?.slice() ?? [];
+        this.sourceSendsDb = { ...(input.sourceSendsDb ?? {}) };
         this.items = PedalboardItem.deserializeArray(input.items ?? []);
         return this;
     }
@@ -399,6 +400,7 @@ export class PedalboardPath {
     pan: number = 0;
     inputChannels: number[] = [0];
     outputChannels: number[] = [];
+    sourceSendsDb: Record<string, number> = {};
     items: PedalboardItem[] = [];
 }
 

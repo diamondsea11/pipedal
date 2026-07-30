@@ -121,10 +121,10 @@ export function getUiPluginCategory(plugin: UiPlugin): PluginCategory {
     if (/\b(delay|echo|slapback)\b/.test(name)) {
         return pluginCategories.delay;
     }
-    if (/\b(compressor|limiter|gate|expander|de[\s-]?esser|transient|dynamics)\b/.test(name)) {
+    if (/\b(compressor|multi[\s-]?comp|limiter|gate|expander|de[\s-]?esser|transient|dynamics)\b/.test(name)) {
         return pluginCategories.dynamics;
     }
-    if (/\b(eq|equalizer|equaliser|tone stack)\b/.test(name)) {
+    if (/\b(eq|multi[\s-]?q|4k[\s-]?eq|equalizer|equaliser|tone stack)\b/.test(name)) {
         return pluginCategories.eq;
     }
     if (/\b(rotary|leslie|chorus|flanger|phaser|tremolo|vibrato)\b/.test(name)) {

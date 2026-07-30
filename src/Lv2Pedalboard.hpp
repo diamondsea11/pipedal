@@ -129,6 +129,7 @@ namespace pipedal
             std::string id;
             std::vector<int64_t> inputChannels;
             std::vector<int64_t> outputChannels;
+            std::map<std::string, float> sourceSendsDb;
             std::vector<float *> inputBuffers;
             std::vector<float *> outputBuffers;
             DbDezipper inputVolume;
@@ -309,6 +310,10 @@ namespace pipedal
         const std::vector<int64_t> &GetAdditionalPathInputChannels(size_t index) const
         {
             return this->additionalPaths.at(index)->inputChannels;
+        }
+        const std::string &GetAdditionalPathId(size_t index) const
+        {
+            return this->additionalPaths.at(index)->id;
         }
 
         int GetControlIndex(uint64_t instanceId, const std::string &symbol);

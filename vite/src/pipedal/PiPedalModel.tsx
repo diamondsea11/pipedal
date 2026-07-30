@@ -2403,6 +2403,26 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
     }
 
+    configurePathSends(
+        id: "C" | "D",
+        sourceSendsDb: Record<string, number>
+    ): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        newPedalboard.addAdditionalPath(id, 0);
+        const path = newPedalboard.additionalPaths.find((value) => value.id === id)!;
+        const allowedSources = id === "C" ? ["A", "B"] : ["A", "B", "C"];
+        path.sourceSendsDb = Object.fromEntries(
+            Object.entries(sourceSendsDb)
+                .filter(([source, level]) =>
+                    allowedSources.includes(source) && Number.isFinite(level))
+                .map(([source, level]) => [
+                    source,
+                    Math.max(-60, Math.min(12, level))
+                ]));
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
     setMidiActions(actions: MidiAction[]): void {
         const newPedalboard = this.pedalboard.get().clone();
         newPedalboard.midiActions = actions.map((action) => action.clone());
@@ -3218,7 +3238,7 @@ export class PiPedalModel //implements PiPedalModel
     handleNotifyMidiListener(clientHandle: number, cc0: number, cc1: number, cc2: number): void {
         let midiMessage = new MidiMessage(cc0, cc1, cc2);
 
-        if (!midiMessage.isNote() && !midiMessage.isControl()) {
+        if (!midiMessage.isNote() && !midiMessage.isControl() && !midiMessage.isProgram()) {
             return;
         }
         for (let i = 0; i < this.midiListeners.length; ++i) {
