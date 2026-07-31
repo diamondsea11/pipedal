@@ -111,6 +111,23 @@ static void setCacheControl(HttpResponse &res, const fs::path &path)
         res.set("Cache-Control", "no-cache, no-store, must-revalidate");
     }
 }
+// For MOD-GUI template/stylesheet, which are small and can change when a skin is
+// updated: keep an ETag/Last-Modified but require revalidation, so an edited
+// skin is picked up immediately instead of being served from a year-long cache.
+static void setRevalidateCacheControl(HttpResponse &res, const fs::path &path)
+{
+    if (fs::exists(path))
+    {
+        res.set("Cache-Control", "no-cache");
+        auto lastModified = std::filesystem::last_write_time(path);
+        res.set(HttpField::LastModified, HtmlHelper::timeToHttpDate(lastModified));
+        res.set("ETag", pipedal::HtmlHelper::generateEtag(path));
+    }
+    else
+    {
+        res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+    }
+}
 void ModWebInterceptImpl::get_response(
     const uri &request_uri,
     HttpRequest &req,
@@ -154,7 +171,7 @@ void ModWebInterceptImpl::get_response(
                 res.setBody(GenerateTemplate(
                     pluginInfo->modGui()->iconTemplate(),
                     pluginInfo));
-                setCacheControl(res, pluginInfo->modGui()->iconTemplate());
+                setRevalidateCacheControl(res, pluginInfo->modGui()->iconTemplate());
             }
             else if (segment == "stylesheet")
             {
@@ -162,7 +179,7 @@ void ModWebInterceptImpl::get_response(
                 res.setBody(GenerateTemplate(
                     pluginInfo->modGui()->stylesheet(),
                     pluginInfo));
-                setCacheControl(res, pluginInfo->modGui()->stylesheet());
+                setRevalidateCacheControl(res, pluginInfo->modGui()->stylesheet());
 
             }
 

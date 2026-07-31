@@ -1454,6 +1454,7 @@ function ModGuiHost(props: ModGuiHostProps) {
         };
     }
     function createPatchDialControl(control: Element, property: Lv2PatchPropertyInfo) {
+        (control as HTMLElement).classList.add("mod-dial");
         let uiControl = property.toUiControl();
         let modGuiControl = new FilmstripControl({
             instanceId: props.instanceId,
@@ -1483,6 +1484,7 @@ function ModGuiHost(props: ModGuiHostProps) {
     // template to pre-declare <enumeration-option> children; for generated patch
     // enums it is simpler and more robust to build a real dropdown here.
     function createPatchSelectControl(control: Element, property: Lv2PatchPropertyInfo) {
+        (control as HTMLElement).classList.add("mod-select");
         let uiControl = property.toUiControl();
         let select = document.createElement("select");
         for (let sp of uiControl.scale_points) {
@@ -1512,6 +1514,7 @@ function ModGuiHost(props: ModGuiHostProps) {
     }
     // Styled on/off toggle bound to a boolean (toggled) patch property.
     function createPatchSwitchControl(control: Element, property: Lv2PatchPropertyInfo) {
+        (control as HTMLElement).classList.add("mod-switch");
         let uiControl = property.toUiControl();
         let onValue = uiControl.max_value;
         let offValue = uiControl.min_value;
@@ -1615,10 +1618,10 @@ function ModGuiHost(props: ModGuiHostProps) {
                         if (patchProperty) {
                             let patchWidget = control.getAttribute("mod-widget") || "";
                             if (patchWidget === "select" || patchWidget === "custom-select"
-                                || (patchProperty.enumeration && patchProperty.scalePoints.length > 0)) {
+                                || (patchProperty.enumeration && patchProperty.scalePoints.length > 2)) {
                                 createPatchSelectControl(control, patchProperty);
-                            } else if (patchWidget === "switch"
-                                || (patchProperty.toggled && patchProperty.scalePoints.length === 0)) {
+                            } else if (patchWidget === "switch" || patchProperty.toggled
+                                || (patchProperty.enumeration && patchProperty.scalePoints.length === 2)) {
                                 createPatchSwitchControl(control, patchProperty);
                             } else {
                                 createPatchDialControl(control, patchProperty);
