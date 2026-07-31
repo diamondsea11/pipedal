@@ -1733,6 +1733,23 @@ function ModGuiHost(props: ModGuiHostProps) {
             model.getPatchProperty<number>(props.instanceId, property.uri)
                 .then((v) => { if (typeof v === "number") applyVisibility(v); })
                 .catch(() => { });
+            // Couple directly to the control's <select> as well: its DOM value is
+            // always available (unlike the async patch value, which may not be
+            // reported at mount) and its "change" fires on user selection. This
+            // is what actually drives the engine-panel swap.
+            let controlEl = element.querySelector('[mod-port-symbol="' + symbol + '"]');
+            let sel = controlEl ? controlEl.querySelector("select") as HTMLSelectElement | null : null;
+            if (sel) {
+                let fromSelect = () => {
+                    let v = Number.parseFloat(sel!.value);
+                    if (!Number.isNaN(v)) applyVisibility(v);
+                };
+                sel.addEventListener("change", fromSelect);
+                fromSelect();
+                // re-apply once any async initial value has populated the select.
+                setTimeout(fromSelect, 80);
+                setTimeout(fromSelect, 400);
+            }
             modGuiControls.push({
                 onMounted() { },
                 onUnmount() { model.cancelMonitorPatchProperty(handle as any); },

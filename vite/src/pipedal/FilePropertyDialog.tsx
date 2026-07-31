@@ -170,6 +170,7 @@ export interface FilePropertyDialogState {
     } | null;
     menuAnchorEl: null | HTMLElement;
     menuMultiselectAnchorEl: null | HTMLElement;
+    contextMenuPos: null | { mouseX: number, mouseY: number };
     newFolderDialogOpen: boolean;
     renameDialogOpen: boolean;
     moveDialogOpen: boolean;
@@ -248,6 +249,7 @@ export default withStyles(
                 confirmCopyDialogState: null,
                 menuAnchorEl: null,
                 menuMultiselectAnchorEl: null,
+                contextMenuPos: null,
                 newFolderDialogOpen: false,
                 renameDialogOpen: false,
                 moveDialogOpen: false,
@@ -411,6 +413,40 @@ export default withStyles(
 
         }
         dragTarget: HTMLButtonElement | null = null;
+        // Anchor index for Shift+click / Shift+Arrow range selection.
+        anchorIndex: number = -1;
+
+        private fileIndex(pathname: string): number {
+            let files = this.state.fileResult.files;
+            for (let i = 0; i < files.length; ++i) {
+                if (files[i].pathname === pathname) return i;
+            }
+            return -1;
+        }
+        // Select the inclusive range [a,b] of non-protected entries.
+        private selectRange(a: number, b: number) {
+            let files = this.state.fileResult.files;
+            let lo = Math.max(0, Math.min(a, b));
+            let hi = Math.min(files.length - 1, Math.max(a, b));
+            let selectedFiles: string[] = [];
+            for (let i = lo; i <= hi; ++i) {
+                if (!files[i].isProtected) selectedFiles.push(files[i].pathname);
+            }
+            if (selectedFiles.length === 0) {
+                this.setState({ multiSelect: false, selectedFiles: [] });
+            } else if (selectedFiles.length === 1) {
+                let f = this.getFileEntry(files, selectedFiles[0]);
+                this.setState({
+                    multiSelect: false, selectedFiles: [],
+                    selectedFile: selectedFiles[0],
+                    selectedFileIsDirectory: f ? f.isDirectory : false,
+                    selectedFileProtected: f ? f.isProtected : false,
+                    hasSelection: true,
+                });
+            } else {
+                this.setState({ multiSelect: true, selectedFiles: selectedFiles });
+            }
+        }
 
 
         updateReorderPosition(element: HTMLButtonElement, point: Point) {
@@ -715,10 +751,18 @@ export default withStyles(
             if (event.shiftKey) {
                 event.stopPropagation();
                 event.preventDefault();
+                if (fileEntry.isProtected) {
+                    return;
+                }
+                let clicked = this.fileIndex(fileEntry.pathname);
+                let anchor = this.anchorIndex;
+                if (anchor < 0) anchor = this.fileIndex(this.state.selectedFile);
+                if (anchor < 0) anchor = clicked;
+                this.selectRange(anchor, clicked);
                 return;
-
             }
             this.requestScroll = true;
+            this.anchorIndex = this.fileIndex(fileEntry.pathname);
             if (!fileEntry.isDirectory) {
                 if (!this.isFolderArtwork(fileEntry.pathname)) {
                     this.handleApply(this.props.fileProperty, fileEntry.pathname);
@@ -762,6 +806,73 @@ export default withStyles(
         }
         handleMenuMultiSelectClose() {
             this.setState({ menuMultiselectAnchorEl: null });
+        }
+        handleContextMenuClose() {
+            this.setState({ contextMenuPos: null });
+        }
+        handleFileContextMenu(event: React.MouseEvent<HTMLElement>, fileEntry: FileEntry) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (fileEntry.isProtected) {
+                return;
+            }
+            let inSelection = this.state.multiSelect
+                ? this.state.selectedFiles.indexOf(fileEntry.pathname) !== -1
+                : this.state.selectedFile === fileEntry.pathname;
+            if (!inSelection) {
+                this.anchorIndex = this.fileIndex(fileEntry.pathname);
+                this.setState({
+                    multiSelect: false, selectedFiles: [],
+                    selectedFile: fileEntry.pathname,
+                    selectedFileIsDirectory: fileEntry.isDirectory,
+                    selectedFileProtected: fileEntry.isProtected,
+                    hasSelection: true,
+                    hasFileSelection: !fileEntry.isDirectory && !fileEntry.isProtected,
+                });
+            }
+            this.setState({ contextMenuPos: { mouseX: event.clientX + 2, mouseY: event.clientY - 4 } });
+        }
+        handleListKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+            let files = this.state.fileResult.files;
+            if (files.length === 0) return;
+            if (event.key === "Delete") {
+                let canDel = this.state.multiSelect
+                    ? this.state.selectedFiles.length > 0
+                    : (this.state.hasSelection && !this.state.selectedFileProtected);
+                if (canDel) {
+                    event.preventDefault();
+                    this.handleDelete();
+                }
+                return;
+            }
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                let current = this.state.multiSelect
+                    ? (this.state.selectedFiles.length > 0
+                        ? this.fileIndex(this.state.selectedFiles[this.state.selectedFiles.length - 1]) : -1)
+                    : this.fileIndex(this.state.selectedFile);
+                if (current < 0) current = this.anchorIndex;
+                let step = event.key === "ArrowDown" ? 1 : -1;
+                let next = current;
+                do { next += step; } while (next >= 0 && next < files.length && files[next].isProtected);
+                if (next < 0 || next >= files.length) return;
+                this.requestScroll = true;
+                if (event.shiftKey) {
+                    let anchor = this.anchorIndex >= 0 ? this.anchorIndex : current;
+                    this.selectRange(anchor, next);
+                } else {
+                    let f = files[next];
+                    this.anchorIndex = next;
+                    this.setState({
+                        multiSelect: false, selectedFiles: [],
+                        selectedFile: f.pathname,
+                        selectedFileIsDirectory: f.isDirectory,
+                        selectedFileProtected: f.isProtected,
+                        hasSelection: true,
+                        hasFileSelection: !f.isDirectory && !f.isProtected,
+                    });
+                }
+            }
         }
         canDeleteEntry(fileEntry: FileEntry): boolean {
             return fileEntry.isProtected;
@@ -1308,6 +1419,20 @@ export default withStyles(
 
                                 </Toolbar>
                             )}
+                            <Menu
+                                id="menu-file-context"
+                                open={this.state.contextMenuPos !== null}
+                                onClose={() => { this.handleContextMenuClose(); }}
+                                anchorReference="anchorPosition"
+                                anchorPosition={this.state.contextMenuPos
+                                    ? { top: this.state.contextMenuPos.mouseY, left: this.state.contextMenuPos.mouseX }
+                                    : undefined}
+                            >
+                                {canMove && (<MenuItem onClick={() => { this.handleContextMenuClose(); this.handleMove(); }}>Move</MenuItem>)}
+                                {canMove && (<MenuItem onClick={() => { this.handleContextMenuClose(); this.handleCopy(); }}>Copy</MenuItem>)}
+                                {!(this.state.selectedFileProtected && !this.state.multiSelect) && (
+                                    <MenuItem onClick={() => { this.handleContextMenuClose(); this.handleDelete(); }}>Delete</MenuItem>)}
+                            </Menu>
                             {!(this.state.reordering || this.state.multiSelect) && (
                                 <>
                                     <Toolbar style={{ padding: 0 }}>
@@ -1409,10 +1534,13 @@ export default withStyles(
 
                             <div
                                 ref={(element) => { this.listContainerElementRef = element; this.onMeasureRef(element); }}
+                                tabIndex={0}
+                                onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => this.handleListKeyDown(e)}
                                 style={{
                                     flex: "1 1 100%", display: "flex", flexFlow: "row wrap",
                                     position: "relative", justifyContent: "flex-start", alignContent: "flex-start",
                                     paddingLeft: 16, paddingBottom: 16, paddingTop: 16,
+                                    outline: "none",
                                 }}>
                                 {
                                     (this.state.columns !== 0) && // don't render until we have number of columns derived from layout.
@@ -1491,6 +1619,7 @@ export default withStyles(
 
                                                     style={dragButtonStyle}
                                                     onClick={(e) => this.handleFileClick(e, value)}
+                                                    onContextMenu={(e: React.MouseEvent<HTMLElement>) => this.handleFileContextMenu(e, value)}
                                                     onDoubleClick={() => { this.onDoubleClickValue(value.pathname); }}
 
                                                     onLongPressEnd={(e) => {
