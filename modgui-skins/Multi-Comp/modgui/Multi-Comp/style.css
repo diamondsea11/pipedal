@@ -61,9 +61,18 @@
 .dusk-ctl { display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 54px; }
 .dusk-lbl { font-size: 9.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; text-align: center; max-width: 80px; }
 
-/* ---- Multiband ---- */
-.dusk-mb-band { margin-top: 10px; padding-top: 10px; border-top: 1px solid #2c2c2c; width: 100%; }
-.dusk-mb-band h3 { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+/* ---- Multiband: 2-up compact bands so all four fit without clipping ---- */
+.dusk-mb-band {
+    margin-top: 10px; padding: 10px 10px 4px; border: 1px solid #2c2c2c; border-radius: 5px;
+    display: inline-block; vertical-align: top; width: calc(50% - 8px);
+}
+.dusk-mb-band:nth-child(even) { margin-right: 10px; }
+.dusk-mb-band h3 { margin: 0 0 8px; font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+.dusk-mb .dusk-knob-row { gap: 12px 12px; }
+.dusk-mb-band .dusk-cell.mod-dial { width: 40px; height: 40px; }
+.dusk-mb-band .dusk-cell.mod-dial::after { height: 11px; }
+.dusk-mb-band .dusk-ctl { min-width: 46px; gap: 5px; }
+.dusk-mb-band .dusk-cell.mod-switch { height: 40px; }
 
 /* ---- Rotating knob (host rotates the .dusk-cell element) ---- */
 .dusk-cell.mod-dial {

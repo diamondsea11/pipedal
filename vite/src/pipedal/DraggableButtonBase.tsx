@@ -207,6 +207,9 @@ export default function DraggableButtonBase(props: DraggableButtonBaseProps) {
                 e.stopPropagation();
                 if (e.button === -1) { // touch long press
                     startLongPress(e.currentTarget as HTMLButtonElement,e);
+                } else if (props.onContextMenu) {
+                    // Forward real right-clicks so hosts can show a context menu.
+                    props.onContextMenu(e);
                 }
                 return false;
             }}
