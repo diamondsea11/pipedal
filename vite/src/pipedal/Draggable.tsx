@@ -224,9 +224,16 @@ const Draggable =
 
             dragTarget?: HTMLDivElement;
 
+            dragDisabled: boolean = false;
             onPointerDown(e: PointerEvent<HTMLDivElement>): void {
 
-                if (this.props.draggable !== undefined && !this.props.draggable) return;
+                let dragDisabled = (this.props.draggable !== undefined && !this.props.draggable);
+                this.dragDisabled = dragDisabled;
+                // Non-draggable elements still get a touch long-press so hosts can
+                // show a context menu (e.g. paste into an empty pedalboard slot).
+                if (dragDisabled && !(e.pointerType === "touch" && this.props.onLongPress)) {
+                    return;
+                }
 
                 // any new pointer down cancles a drag in progress.
                 this.cancelDrag();
@@ -242,7 +249,9 @@ const Draggable =
 
                 if (!this.mouseDown && this.isValidPointer(e)) {
 
-                    this.longPressTimer = setTimeout(() => this.longPressTimerTick(), LONG_PRESS_TIME_MS);
+                    if (!dragDisabled) {
+                        this.longPressTimer = setTimeout(() => this.longPressTimerTick(), LONG_PRESS_TIME_MS);
+                    }
                     if (e.pointerType === "touch" && this.props.onLongPress) {
                         this.contextMenuTimer = setTimeout(() => {
                             let clientX = this.startClientX;
@@ -414,7 +423,7 @@ const Draggable =
                         clearTimeout(this.contextMenuTimer);
                         this.contextMenuTimer = undefined;
                     }
-                    if (!this.dragStarted && this.dragThresholdExceeded(e)) {
+                    if (!this.dragStarted && !this.dragDisabled && this.dragThresholdExceeded(e)) {
                         this.startDrag();
 
 
