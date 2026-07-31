@@ -343,6 +343,12 @@ namespace pipedal
         float globalEqHighGainDb_ = 0;
         float globalEqHighCutHz_ = 20000;
         std::vector<SnapshotPathMix> additionalPathMixes_;
+        // Per-snapshot MIDI actions (Helix Command Center style): when
+        // hasMidiActions_ is set, selecting this snapshot replaces the
+        // pedalboard's active MIDI actions with these. Snapshots saved before
+        // this feature leave it false and keep the pedalboard-global actions.
+        bool hasMidiActions_ = false;
+        std::vector<MidiAction> midiActions_;
 
         DECLARE_JSON_MAP(Snapshot);
     };

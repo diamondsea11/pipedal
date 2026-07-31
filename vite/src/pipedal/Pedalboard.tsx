@@ -306,6 +306,9 @@ export class Snapshot {
         this.globalEqHighCutHz = input.globalEqHighCutHz ?? 20000;
         this.additionalPathMixes = (input.additionalPathMixes ?? [])
             .map((value: any) => new SnapshotPathMix().deserialize(value));
+        this.hasMidiActions = input.hasMidiActions ?? false;
+        this.midiActions = (input.midiActions ?? [])
+            .map((value: any) => new MidiAction().deserialize(value));
         return this;
     }
     static deserializeArray(input: any): (Snapshot| null)[] {
@@ -358,6 +361,10 @@ export class Snapshot {
     globalEqHighGainDb: number = 0;
     globalEqHighCutHz: number = 20000;
     additionalPathMixes: SnapshotPathMix[] = [];
+    // Per-snapshot MIDI actions (Helix Command Center style). When
+    // hasMidiActions is set, this snapshot carries its own MIDI action set.
+    hasMidiActions: boolean = false;
+    midiActions: MidiAction[] = [];
 };
 
 export class SnapshotPathMix {
@@ -746,6 +753,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             mix.pan = path.pan;
             return mix;
         });
+        // Capture the current MIDI actions with the snapshot so each snapshot
+        // keeps its own Command-Center-style mappings.
+        result.hasMidiActions = true;
+        result.midiActions = this.midiActions.map((a) => a.clone());
         let it = this.itemsGenerator();
         while (true)
         {

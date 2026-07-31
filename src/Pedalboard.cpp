@@ -306,6 +306,15 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
         }
     }
 
+    // Per-snapshot MIDI actions: replace the active actions with this
+    // snapshot's set. Old snapshots leave hasMidiActions_ false and keep the
+    // pedalboard-global actions. FirePedalboardChanged() reloads the engine
+    // afterward, so the new bindings take effect without touching the RT path.
+    if (snapshot->hasMidiActions_)
+    {
+        this->midiActions_ = snapshot->midiActions_;
+    }
+
     for (auto &value: snapshot->values_)
     {
         indexedValues[value.instanceId_] = &value;
@@ -790,4 +799,6 @@ JSON_MAP_BEGIN(Snapshot)
     JSON_MAP_REFERENCE(Snapshot,globalEqHighGainDb)
     JSON_MAP_REFERENCE(Snapshot,globalEqHighCutHz)
     JSON_MAP_REFERENCE(Snapshot,additionalPathMixes)
+    JSON_MAP_REFERENCE(Snapshot,hasMidiActions)
+    JSON_MAP_REFERENCE(Snapshot,midiActions)
 JSON_MAP_END()
