@@ -171,6 +171,7 @@ export interface FilePropertyDialogState {
     menuAnchorEl: null | HTMLElement;
     menuMultiselectAnchorEl: null | HTMLElement;
     contextMenuPos: null | { mouseX: number, mouseY: number };
+    marqueeRect: null | { left: number, top: number, width: number, height: number };
     newFolderDialogOpen: boolean;
     renameDialogOpen: boolean;
     moveDialogOpen: boolean;
@@ -250,6 +251,7 @@ export default withStyles(
                 menuAnchorEl: null,
                 menuMultiselectAnchorEl: null,
                 contextMenuPos: null,
+                marqueeRect: null,
                 newFolderDialogOpen: false,
                 renameDialogOpen: false,
                 moveDialogOpen: false,
@@ -810,6 +812,64 @@ export default withStyles(
         handleContextMenuClose() {
             this.setState({ contextMenuPos: null });
         }
+        marqueeStartPoint: { x: number, y: number } | null = null;
+        marqueeBaseSelection: string[] = [];
+        private currentSelectionArray(): string[] {
+            if (this.state.multiSelect) return this.state.selectedFiles.slice();
+            if (this.state.selectedFile && this.state.selectedFile !== "") return [this.state.selectedFile];
+            return [];
+        }
+        handleListMouseDown(e: React.MouseEvent<HTMLDivElement>) {
+            if (e.button !== 0 || this.state.reordering) return;
+            let target = e.target as HTMLElement;
+            // Marquee only from empty space, never from a file item (that is a click).
+            if (target.closest("[data-file-index]")) return;
+            this.marqueeStartPoint = { x: e.clientX, y: e.clientY };
+            this.marqueeBaseSelection = (e.ctrlKey || e.shiftKey) ? this.currentSelectionArray() : [];
+            window.addEventListener("mousemove", this.marqueeMove);
+            window.addEventListener("mouseup", this.marqueeUp);
+        }
+        marqueeMove = (e: MouseEvent) => {
+            if (!this.marqueeStartPoint) return;
+            let x0 = this.marqueeStartPoint.x, y0 = this.marqueeStartPoint.y;
+            let left = Math.min(x0, e.clientX), top = Math.min(y0, e.clientY);
+            let width = Math.abs(e.clientX - x0), height = Math.abs(e.clientY - y0);
+            if (width < 3 && height < 3) return;
+            this.setState({ marqueeRect: { left, top, width, height } });
+            let files = this.state.fileResult.files;
+            let selected = this.marqueeBaseSelection.slice();
+            let container = this.listContainerElementRef;
+            if (container) {
+                container.querySelectorAll("[data-file-index]").forEach((el) => {
+                    let r = el.getBoundingClientRect();
+                    let hit = !(r.right < left || r.left > left + width || r.bottom < top || r.top > top + height);
+                    if (hit) {
+                        let ix = parseInt(el.getAttribute("data-file-index") || "-1", 10);
+                        if (ix >= 0 && ix < files.length && !files[ix].isProtected) {
+                            if (selected.indexOf(files[ix].pathname) === -1) selected.push(files[ix].pathname);
+                        }
+                    }
+                });
+            }
+            if (selected.length > 1) {
+                this.setState({ multiSelect: true, selectedFiles: selected });
+            } else if (selected.length === 1) {
+                let f = this.getFileEntry(files, selected[0]);
+                this.setState({
+                    multiSelect: false, selectedFiles: [], selectedFile: selected[0],
+                    selectedFileIsDirectory: f ? f.isDirectory : false,
+                    selectedFileProtected: f ? f.isProtected : false, hasSelection: true,
+                });
+            } else {
+                this.setState({ multiSelect: false, selectedFiles: [] });
+            }
+        };
+        marqueeUp = () => {
+            this.marqueeStartPoint = null;
+            window.removeEventListener("mousemove", this.marqueeMove);
+            window.removeEventListener("mouseup", this.marqueeUp);
+            if (this.state.marqueeRect) this.setState({ marqueeRect: null });
+        };
         handleFileContextMenu(event: React.MouseEvent<HTMLElement>, fileEntry: FileEntry) {
             event.preventDefault();
             event.stopPropagation();
@@ -1433,6 +1493,15 @@ export default withStyles(
                                 {!(this.state.selectedFileProtected && !this.state.multiSelect) && (
                                     <MenuItem onClick={() => { this.handleContextMenuClose(); this.handleDelete(); }}>Delete</MenuItem>)}
                             </Menu>
+                            {this.state.marqueeRect && (
+                                <div style={{
+                                    position: "fixed",
+                                    left: this.state.marqueeRect.left, top: this.state.marqueeRect.top,
+                                    width: this.state.marqueeRect.width, height: this.state.marqueeRect.height,
+                                    border: "1px solid #7ab7ff", background: "rgba(122,183,255,0.16)",
+                                    pointerEvents: "none", zIndex: 2000,
+                                }} />
+                            )}
                             {!(this.state.reordering || this.state.multiSelect) && (
                                 <>
                                     <Toolbar style={{ padding: 0 }}>
@@ -1536,6 +1605,7 @@ export default withStyles(
                                 ref={(element) => { this.listContainerElementRef = element; this.onMeasureRef(element); }}
                                 tabIndex={0}
                                 onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>) => this.handleListKeyDown(e)}
+                                onMouseDown={(e: React.MouseEvent<HTMLDivElement>) => this.handleListMouseDown(e)}
                                 style={{
                                     flex: "1 1 100%", display: "flex", flexFlow: "row wrap",
                                     position: "relative", justifyContent: "flex-start", alignContent: "flex-start",
@@ -1611,6 +1681,7 @@ export default withStyles(
                                             return (
                                                 <DraggableButtonBase key={value.pathname}
                                                     longPressDelay={this.state.reordering ? 300 : undefined}
+                                                    data-file-index={index}
                                                     data-position={dataPosition}
                                                     data-pathname={
                                                         value.metadata ? value.metadata.fileName : null
