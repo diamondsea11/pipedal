@@ -49,7 +49,10 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
     const [plugins, setPlugins] = useState<UiPlugin[]>(model.ui_plugins.get());
     const [favorites, setFavorites] = useState<FavoritesList>(model.favorites.get());
     const [categoryId, setCategoryId] = useState<string | null>(null);
+    const [manufacturer, setManufacturer] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+
+    const selectCategory = (id: string | null) => { setCategoryId(id); setManufacturer(null); };
 
     useEffect(() => {
         const onPluginsChanged = (value: UiPlugin[]) => setPlugins(value);
@@ -82,6 +85,9 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
             if (!searchText && categoryId && category.id !== categoryId) {
                 continue;
             }
+            if (!searchText && manufacturer && (plugin.author_name || 'Other') !== manufacturer) {
+                continue;
+            }
             const tags = getPluginCategoryTags(plugin);
             let score = searchFilter.score(
                 plugin.name,
@@ -110,13 +116,32 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
             return left.plugin.name.localeCompare(right.plugin.name);
         });
         return scored.map((entry) => entry.plugin);
-    }, [categoryId, favorites, plugins, search]);
+    }, [categoryId, manufacturer, favorites, plugins, search]);
+
+    // Manufacturers (by author) within the selected category, as a sub-level.
+    const manufacturers = useMemo(() => {
+        if (!categoryId) return [] as Array<{ name: string; count: number }>;
+        const counts = new Map<string, number>();
+        for (const plugin of plugins) {
+            if (getUiPluginCategory(plugin).id !== categoryId) continue;
+            const name = plugin.author_name || 'Other';
+            counts.set(name, (counts.get(name) ?? 0) + 1);
+        }
+        return Array.from(counts.entries())
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [categoryId, plugins]);
 
     const selectedCategory: PluginCategory | undefined =
         categoryId === null
             ? undefined
             : orderedPluginCategories.find((category) => category.id === categoryId);
-    const showPluginList = search.trim().length !== 0 || selectedCategory !== undefined;
+    const searching = search.trim().length !== 0;
+    // If a category has only one manufacturer, skip the sub-level.
+    const showManufacturerList = !searching && selectedCategory !== undefined
+        && manufacturer === null && manufacturers.length > 1;
+    const showPluginList = searching
+        || (selectedCategory !== undefined && !showManufacturerList);
 
     return (
         <div style={{
@@ -131,10 +156,13 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
                 marginBottom: 14,
                 maxWidth: 760,
             }}>
-                {selectedCategory && search.trim().length === 0 && (
+                {selectedCategory && !searching && (
                     <IconButton
-                        aria-label="Back to plugin categories"
-                        onClick={() => setCategoryId(null)}
+                        aria-label="Back"
+                        onClick={() => {
+                            if (manufacturer !== null) { setManufacturer(null); }
+                            else { selectCategory(null); }
+                        }}
                         size="small"
                     >
                         <ArrowBackIcon />
@@ -159,6 +187,43 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
             </div>
 
             {!showPluginList ? (
+                showManufacturerList ? (
+                    <div>
+                        <Typography sx={{ fontSize: '1rem', fontWeight: 650, marginBottom: 1 }}>
+                            {selectedCategory?.label}
+                        </Typography>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                            gap: 8,
+                            maxWidth: 1040,
+                        }}>
+                            {manufacturers.map(({ name, count }) => (
+                                <ButtonBase
+                                    key={name}
+                                    onClick={() => setManufacturer(name)}
+                                    aria-label={`${name}, ${count} plugins`}
+                                    sx={{
+                                        minHeight: 60,
+                                        border: '1px solid',
+                                        borderColor: 'divider',
+                                        borderRadius: '6px',
+                                        px: 1.5,
+                                        justifyContent: 'space-between',
+                                        textAlign: 'left',
+                                    }}
+                                >
+                                    <Typography noWrap sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                                        {name}
+                                    </Typography>
+                                    <Typography color="text.secondary" sx={{ fontSize: '0.75rem', marginLeft: 1 }}>
+                                        {count}
+                                    </Typography>
+                                </ButtonBase>
+                            ))}
+                        </div>
+                    </div>
+                ) : (
                 <div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
@@ -168,7 +233,7 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
                     {categories.map(({ category, count }) => (
                         <ButtonBase
                             key={category.id}
-                            onClick={() => setCategoryId(category.id)}
+                            onClick={() => selectCategory(category.id)}
                             aria-label={`${category.label}, ${count} plugins`}
                             sx={{
                                 minHeight: 76,
@@ -199,6 +264,7 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
                         </ButtonBase>
                     ))}
                 </div>
+                )
             ) : (
                 <div>
                     <div style={{
@@ -208,7 +274,11 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
                         marginBottom: 8,
                     }}>
                         <Typography sx={{ fontSize: '1rem', fontWeight: 650 }}>
-                            {search.trim() ? 'Search' : selectedCategory?.label}
+                            {searching
+                                ? 'Search'
+                                : manufacturer
+                                    ? `${selectedCategory?.label} · ${manufacturer}`
+                                    : selectedCategory?.label}
                         </Typography>
                         <Typography color="text.secondary" sx={{ fontSize: '0.75rem' }}>
                             {visiblePlugins.length}
