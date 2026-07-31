@@ -1,0 +1,14 @@
+@prefix modgui: <http://moddevices.com/ns/modgui#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+
+<https://dusk-audio.github.io/plugins/multi-comp>
+    modgui:gui <https://dusk-audio.github.io/plugins/multi-comp#PiPedalUI> .
+
+<https://dusk-audio.github.io/plugins/multi-comp#PiPedalUI>
+    a modgui:Gui ;
+    modgui:resourcesDirectory <modgui/Multi-Comp> ;
+    modgui:iconTemplate <modgui/Multi-Comp/icon.html> ;
+    modgui:stylesheet <modgui/Multi-Comp/style.css> ;
+    modgui:brand "Dusk Audio" ;
+    modgui:label "Multi-Comp" ;
+    modgui:model "Multi-Comp" .

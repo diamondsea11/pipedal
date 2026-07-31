@@ -1,0 +1,56 @@
+<div class="dusk-mc">
+    <header class="dusk-mc-header">
+        <div class="dusk-mc-mark"></div>
+        <div class="dusk-mc-brand">
+            <strong>Multi-Comp</strong>
+            <span>DUSK AUDIO &middot; MULTI-MODE DYNAMICS</span>
+        </div>
+        <div class="dusk-mc-mode">
+            <label>Engine</label>
+            <div class="dusk-select" mod-role="input-control-port" mod-port-symbol="mode" mod-widget="select"></div>
+        </div>
+        <div class="dusk-mc-gr" mod-role="output-control-port" mod-port-symbol="gr_meter"
+             mod-meter-scale="gain-reduction" mod-meter-max="24" mod-meter-release="0.82">
+            <div class="dusk-gr-track"><div class="dusk-gr-fill"></div></div>
+            <div class="dusk-gr-scale"><span>GR</span><span mod-role="output-control-value">0.0 dB</span></div>
+        </div>
+    </header>
+
+    <main class="dusk-mc-body">
+        <section class="dusk-mc-panel">
+            <h2>Classic VCA</h2>
+            <div class="dusk-knob-row">
+                <div class="dusk-ctl">
+                    <div class="dusk-knob" mod-role="input-control-port" mod-port-symbol="vca_threshold" mod-widget-rotation="270"></div>
+                    <span class="dusk-lbl">Threshold</span>
+                </div>
+                <div class="dusk-ctl">
+                    <div class="dusk-knob" mod-role="input-control-port" mod-port-symbol="vca_ratio" mod-widget-rotation="270"></div>
+                    <span class="dusk-lbl">Ratio</span>
+                </div>
+                <div class="dusk-ctl">
+                    <div class="dusk-knob" mod-role="input-control-port" mod-port-symbol="vca_attack" mod-widget-rotation="270"></div>
+                    <span class="dusk-lbl">Attack</span>
+                </div>
+                <div class="dusk-ctl">
+                    <div class="dusk-knob" mod-role="input-control-port" mod-port-symbol="vca_release" mod-widget-rotation="270"></div>
+                    <span class="dusk-lbl">Release</span>
+                </div>
+                <div class="dusk-ctl">
+                    <div class="dusk-knob" mod-role="input-control-port" mod-port-symbol="vca_output" mod-widget-rotation="270"></div>
+                    <span class="dusk-lbl">Makeup</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="dusk-mc-panel dusk-mc-master">
+            <h2>Output</h2>
+            <div class="dusk-knob-row">
+                <div class="dusk-ctl">
+                    <div class="dusk-knob dusk-knob-lg" mod-role="input-control-port" mod-port-symbol="mix" mod-widget-rotation="270"></div>
+                    <span class="dusk-lbl">Mix</span>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
