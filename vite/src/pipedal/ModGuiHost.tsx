@@ -21,7 +21,7 @@
  *   SOFTWARE.
  */
 
-import { UiPlugin, UiControl, ControlType, UiFileProperty } from './Lv2Plugin';
+import { UiPlugin, UiControl, ControlType, UiFileProperty, Lv2PatchPropertyInfo } from './Lv2Plugin';
 import React from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import IconButtonEx from './IconButtonEx';
@@ -1418,6 +1418,78 @@ function ModGuiHost(props: ModGuiHostProps) {
         }
         bypassLightControl.onMounted();
     }
+    // ---- Patch (atom) property binding -------------------------------------
+    // MOD GUIs traditionally bind to control ports by symbol. Plugins such as
+    // the Dusk Audio series expose every control as an LV2 patch property
+    // instead, so when a mod-port-symbol has no matching control port we bind
+    // the same widgets to a patch property, routing values through
+    // setPatchProperty / monitorPatchProperty rather than the port APIs.
+    function makePatchMonitor(propertyUri: string) {
+        return (
+            instanceId: number,
+            _symbol: string,
+            _interval: number,
+            callback: (value: number) => void): MonitorPortHandle => {
+            let handle = model.monitorPatchProperty(
+                instanceId, propertyUri,
+                (_i, _u, v) => { if (typeof v === "number") callback(v); });
+            model.getPatchProperty<number>(instanceId, propertyUri)
+                .then((v) => { if (typeof v === "number") callback(v); })
+                .catch(() => { });
+            return handle as unknown as MonitorPortHandle;
+        };
+    }
+    function patchUnmonitor(handle: MonitorPortHandle) {
+        model.cancelMonitorPatchProperty(handle as any);
+    }
+    function makePatchValueSetter(propertyUri: string) {
+        return (instanceId: number, _symbol: string, value: number) => {
+            void model.setPatchProperty(instanceId, propertyUri, value).catch(() => { });
+        };
+    }
+    function createPatchDialControl(control: Element, property: Lv2PatchPropertyInfo) {
+        let uiControl = property.toUiControl();
+        let modGuiControl = new FilmstripControl({
+            instanceId: props.instanceId,
+            pluginControl: uiControl,
+            filmStrip: "",
+            verticalStrip: false,
+            onValueChanged: makePatchValueSetter(property.uri),
+            monitorPort: makePatchMonitor(property.uri),
+            unmonitorPort: patchUnmonitor
+        });
+        modGuiControls.push(modGuiControl);
+        modGuiControl.attach(control as HTMLElement);
+        let el = modGuiControl.render();
+        if (el !== null) control.appendChild(el);
+        modGuiControl.onMounted();
+    }
+    function createPatchSelectControl(control: Element, property: Lv2PatchPropertyInfo) {
+        let uiControl = property.toUiControl();
+        let sel = new CustomSelectControl({
+            instanceId: props.instanceId,
+            pluginControl: uiControl,
+            onValueChanged: makePatchValueSetter(property.uri),
+            monitorPort: makePatchMonitor(property.uri),
+            unmonitorPort: patchUnmonitor
+        });
+        sel.attach(control as HTMLElement);
+        modGuiControls.push(sel);
+        let el = sel.render();
+        if (el !== null) control.appendChild(el);
+        sel.onMounted();
+    }
+    function createPatchMeterControl(control: Element, property: Lv2PatchPropertyInfo) {
+        let meter = new OutputMeterControl({
+            instanceId: props.instanceId,
+            symbol: property.shortName || property.uri,
+            frameElement: control as HTMLElement,
+            monitorPort: makePatchMonitor(property.uri),
+            unmonitorPort: patchUnmonitor
+        });
+        modGuiControls.push(meter);
+        meter.onMounted();
+    }
     function createDialControl(control: Element, pluginControl: UiControl) {
         let modGui = plugin.modGui;
         if (!modGui) {
@@ -1472,6 +1544,19 @@ function ModGuiHost(props: ModGuiHostProps) {
                 if (symbol) {
                     let pluginControl: UiControl | undefined = plugin.getControl(symbol);
                     if (!pluginControl) {
+                        // No control port with this symbol: fall back to a
+                        // patch property of the same name (Dusk-style plugins).
+                        let patchProperty = plugin.getPatchPropertyBySymbol(symbol);
+                        if (patchProperty) {
+                            let patchWidget = control.getAttribute("mod-widget") || "";
+                            if (patchWidget === "select" || patchWidget === "custom-select"
+                                || (patchProperty.enumeration && patchProperty.scalePoints.length > 0)) {
+                                createPatchSelectControl(control, patchProperty);
+                            } else {
+                                createPatchDialControl(control, patchProperty);
+                            }
+                            return;
+                        }
                         setModError(`No plugin info found for symbol ${symbol}`);
                         return;
                     }
@@ -1513,6 +1598,13 @@ function ModGuiHost(props: ModGuiHostProps) {
                     return;
                 }
                 if (!plugin.getControl(symbol)) {
+                    // Fall back to a readable patch property (Dusk-style plugins
+                    // expose meters such as gr_meter as patch properties).
+                    let patchProperty = plugin.getPatchPropertyBySymbol(symbol);
+                    if (patchProperty) {
+                        createPatchMeterControl(control, patchProperty);
+                        return;
+                    }
                     setModError(`No plugin info found for output meter ${symbol}`);
                     return;
                 }

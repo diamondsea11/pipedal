@@ -1135,6 +1135,24 @@ export class UiPlugin implements Deserializable<UiPlugin> {
         return undefined;
     }
 
+    // Match a MOD-GUI mod-port-symbol against a patch (atom) property. Plugins
+    // like the Dusk Audio series expose all of their controls as patch
+    // properties rather than control ports, so a modgui template refers to them
+    // by short symbol; resolve that to the property's full URI.
+    getPatchPropertyBySymbol(symbol: string): Lv2PatchPropertyInfo | undefined {
+        for (let i = 0; i < this.patchProperties.length; ++i) {
+            let property = this.patchProperties[i];
+            if (property.shortName === symbol
+                || property.uri === symbol
+                || property.uri.endsWith(":" + symbol)
+                || property.uri.endsWith("#" + symbol)
+                || property.uri.endsWith("/" + symbol)) {
+                return property;
+            }
+        }
+        return undefined;
+    }
+
     getPortGroupByUri(uri: string): PortGroup | null {
         for (let i = 0; i < this.port_groups.length; ++i) {
             let port_group = this.port_groups[i];

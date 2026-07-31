@@ -82,10 +82,16 @@ export function GetControlView(
             />
         );
     } else {
-        for (let i = 0; i < pluginFactories.length; ++i) {
-            let factory = pluginFactories[i];
-            if (factory.uri === pedalboardItem.uri) {
-                return factory.Create(model, pedalboardItem);
+        // A custom control view (e.g. DuskView) is the default, but when the
+        // user switches on the MOD UI we must fall through to PluginControlView,
+        // which hosts the plugin's modgui. Otherwise the custom factory would
+        // short-circuit the toggle and the MOD UI could never be shown.
+        if (!showModUi) {
+            for (let i = 0; i < pluginFactories.length; ++i) {
+                let factory = pluginFactories[i];
+                if (factory.uri === pedalboardItem.uri) {
+                    return factory.Create(model, pedalboardItem);
+                }
             }
         }
         let uiPlugin = model.getUiPlugin(pedalboardItem.uri);
