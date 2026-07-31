@@ -825,7 +825,13 @@ class OutputMeterControl implements ModGuiControl {
     private valueToDb(value: number): number {
         const scale = this.props.frameElement.getAttribute("mod-meter-scale") ?? "db";
         if (scale === "gain-reduction") {
+            // value is a linear gain (0..1); show attenuation in dB.
             return -20 * Math.log10(Math.max(value, 1.0e-9));
+        }
+        if (scale === "gain-reduction-db") {
+            // value already carries the reduction in dB as a non-positive number
+            // (0 = none, -30 = 30 dB of reduction). Show its magnitude.
+            return Math.max(0, -value);
         }
         return Math.max(0, value);
     }
@@ -1464,20 +1470,79 @@ function ModGuiHost(props: ModGuiHostProps) {
         if (el !== null) control.appendChild(el);
         modGuiControl.onMounted();
     }
+    function nearestScaleValue(uiControl: UiControl, value: number): number {
+        let best = value;
+        let bestError = Number.POSITIVE_INFINITY;
+        for (let sp of uiControl.scale_points) {
+            let error = Math.abs(sp.value - value);
+            if (error < bestError) { bestError = error; best = sp.value; }
+        }
+        return best;
+    }
+    // Native <select> bound to a patch property. CustomSelectControl expects the
+    // template to pre-declare <enumeration-option> children; for generated patch
+    // enums it is simpler and more robust to build a real dropdown here.
     function createPatchSelectControl(control: Element, property: Lv2PatchPropertyInfo) {
         let uiControl = property.toUiControl();
-        let sel = new CustomSelectControl({
-            instanceId: props.instanceId,
-            pluginControl: uiControl,
-            onValueChanged: makePatchValueSetter(property.uri),
-            monitorPort: makePatchMonitor(property.uri),
-            unmonitorPort: patchUnmonitor
+        let select = document.createElement("select");
+        for (let sp of uiControl.scale_points) {
+            let opt = document.createElement("option");
+            opt.value = String(sp.value);
+            opt.textContent = sp.label;
+            select.appendChild(opt);
+        }
+        control.appendChild(select);
+        select.addEventListener("change", () => {
+            let v = Number.parseFloat(select.value);
+            if (!Number.isNaN(v)) {
+                void model.setPatchProperty(props.instanceId, property.uri, v).catch(() => { });
+            }
         });
-        sel.attach(control as HTMLElement);
-        modGuiControls.push(sel);
-        let el = sel.render();
-        if (el !== null) control.appendChild(el);
-        sel.onMounted();
+        let handle = model.monitorPatchProperty(props.instanceId, property.uri, (_i, _u, v) => {
+            if (typeof v === "number") select.value = String(nearestScaleValue(uiControl, v));
+        });
+        model.getPatchProperty<number>(props.instanceId, property.uri)
+            .then((v) => { if (typeof v === "number") select.value = String(nearestScaleValue(uiControl, v)); })
+            .catch(() => { });
+        modGuiControls.push({
+            onMounted() { },
+            onUnmount() { model.cancelMonitorPatchProperty(handle as any); },
+            render() { return null; }
+        });
+    }
+    // Styled on/off toggle bound to a boolean (toggled) patch property.
+    function createPatchSwitchControl(control: Element, property: Lv2PatchPropertyInfo) {
+        let uiControl = property.toUiControl();
+        let onValue = uiControl.max_value;
+        let offValue = uiControl.min_value;
+        let button = document.createElement("button");
+        button.type = "button";
+        button.className = "dusk-switch";
+        button.setAttribute("aria-pressed", "false");
+        control.appendChild(button);
+        let current = offValue;
+        let apply = (v: number) => {
+            current = v;
+            let on = v > (onValue + offValue) / 2;
+            button.classList.toggle("on", on);
+            button.setAttribute("aria-pressed", on ? "true" : "false");
+        };
+        button.addEventListener("click", () => {
+            let next = current > (onValue + offValue) / 2 ? offValue : onValue;
+            apply(next);
+            void model.setPatchProperty(props.instanceId, property.uri, next).catch(() => { });
+        });
+        let handle = model.monitorPatchProperty(props.instanceId, property.uri, (_i, _u, v) => {
+            if (typeof v === "number") apply(v);
+        });
+        model.getPatchProperty<number>(props.instanceId, property.uri)
+            .then((v) => { if (typeof v === "number") apply(v); })
+            .catch(() => { });
+        modGuiControls.push({
+            onMounted() { },
+            onUnmount() { model.cancelMonitorPatchProperty(handle as any); },
+            render() { return null; }
+        });
     }
     function createPatchMeterControl(control: Element, property: Lv2PatchPropertyInfo) {
         let meter = new OutputMeterControl({
@@ -1552,6 +1617,9 @@ function ModGuiHost(props: ModGuiHostProps) {
                             if (patchWidget === "select" || patchWidget === "custom-select"
                                 || (patchProperty.enumeration && patchProperty.scalePoints.length > 0)) {
                                 createPatchSelectControl(control, patchProperty);
+                            } else if (patchWidget === "switch"
+                                || (patchProperty.toggled && patchProperty.scalePoints.length === 0)) {
+                                createPatchSwitchControl(control, patchProperty);
                             } else {
                                 createPatchDialControl(control, patchProperty);
                             }
@@ -1633,6 +1701,41 @@ function ModGuiHost(props: ModGuiHostProps) {
                 // stub: mod-widget="custom-select-path".  Are there other widgets for this?
                 createCustomSelectPathControl(control);
             });
+        wirePanelVisibility(element);
+    }
+    // Show/hide template panels based on a (patch) parameter value. A panel
+    // carries data-mod-show-symbol="<symbol>" and data-mod-show-value="2 4"
+    // (space/comma separated); it is shown only when the parameter equals one of
+    // those values. Used e.g. to swap the Multi-Comp engine panels by "mode".
+    function wirePanelVisibility(element: Element) {
+        let panels = Array.from(element.querySelectorAll('[data-mod-show-symbol]'));
+        if (panels.length === 0) return;
+        let symbols = new Set<string>();
+        panels.forEach((p) => { let s = p.getAttribute("data-mod-show-symbol"); if (s) symbols.add(s); });
+        symbols.forEach((symbol) => {
+            let property = plugin.getPatchPropertyBySymbol(symbol);
+            if (!property) return;
+            let relevant = panels.filter((p) => p.getAttribute("data-mod-show-symbol") === symbol);
+            let applyVisibility = (value: number) => {
+                relevant.forEach((p) => {
+                    let raw = p.getAttribute("data-mod-show-value") || "";
+                    let allowed = raw.split(/[ ,]+/).map((x) => Number.parseFloat(x)).filter((x) => !Number.isNaN(x));
+                    let show = allowed.some((a) => Math.abs(a - value) < 0.5);
+                    (p as HTMLElement).style.display = show ? "" : "none";
+                });
+            };
+            let handle = model.monitorPatchProperty(props.instanceId, property.uri, (_i, _u, v) => {
+                if (typeof v === "number") applyVisibility(v);
+            });
+            model.getPatchProperty<number>(props.instanceId, property.uri)
+                .then((v) => { if (typeof v === "number") applyVisibility(v); })
+                .catch(() => { });
+            modGuiControls.push({
+                onMounted() { },
+                onUnmount() { model.cancelMonitorPatchProperty(handle as any); },
+                render() { return null; }
+            });
+        });
     }
     function setModError(message: string) {
         setErrorMessage(ModMessage(message));
