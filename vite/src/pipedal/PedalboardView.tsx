@@ -44,6 +44,7 @@ import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import HubIcon from '@mui/icons-material/Hub';
 import GridViewIcon from '@mui/icons-material/GridView';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ControlHubDialog from './ControlHubDialog';
 import GigViewDialog from './GigViewDialog';
 import GlobalEqDialog from './GlobalEqDialog';
@@ -91,7 +92,7 @@ const DISABLED_CONNECTOR_COLOR = isDarkMode() ? "#666" : "#CCC";
 const CELL_WIDTH: number = 96;
 const CELL_HEIGHT: number = 64;
 const FRAME_SIZE: number = 36;
-const PATH_HEADER_HEIGHT: number = 48;
+const PATH_HEADER_HEIGHT: number = 60;
 const PATH_GAP: number = 8;
 
 const STROKE_WIDTH = 3;
@@ -129,57 +130,108 @@ const pedalboardStyles = (theme: Theme) => createStyles({
     container: css({
         position: "relative",
         overflow: "visible",
-
+        minWidth: "100%",
     }),
     pathHeader: css({
         position: "absolute",
-        left: 8,
-        right: 8,
+        left: 0,
+        right: 0,
         height: PATH_HEADER_HEIGHT,
         display: "flex",
         alignItems: "center",
-        gap: 6,
-        padding: "5px 0",
+        gap: 10,
+        padding: "8px 12px",
+        boxSizing: "border-box",
+        background: alpha(theme.palette.background.paper, 0.38),
         borderBottom: `1px solid ${theme.palette.divider}`,
         zIndex: 2,
     }),
     pathTitle: css({
-        minWidth: 58,
-        height: 36,
+        minWidth: 64,
+        height: 42,
         display: "flex",
         alignItems: "center",
-        padding: "0 8px",
-        borderLeft: `3px solid ${theme.palette.primary.main}`,
-        background: alpha(theme.palette.primary.main, 0.08),
+        padding: "0 10px",
+        borderLeft: `4px solid ${theme.palette.primary.main}`,
+        background: alpha(theme.palette.primary.main, 0.1),
         whiteSpace: "nowrap",
     }),
+    pathSignalGroup: css({
+        minWidth: 0,
+        display: "flex",
+        alignItems: "center",
+        gap: 9,
+    }),
+    pathRouteGroup: css({
+        height: 42,
+        display: "flex",
+        alignItems: "center",
+        gap: 2,
+        padding: "0 4px",
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: 4,
+        background: alpha(theme.palette.background.default, 0.42),
+        '& .MuiOutlinedInput-notchedOutline': {
+            border: "0 !important",
+        },
+    }),
+    pathActionGroup: css({
+        marginLeft: "auto",
+        display: "flex",
+        alignItems: "stretch",
+        gap: 8,
+    }),
     pathSelect: css({
-        height: "36px !important",
-        background: alpha(theme.palette.background.paper, 0.65),
+        height: "40px !important",
+        background: "transparent",
     }),
     pathIconButton: css({
-        width: "36px !important",
-        height: "36px !important",
+        width: "40px !important",
+        height: "40px !important",
         border: `1px solid ${theme.palette.divider} !important`,
         borderRadius: "4px !important",
     }),
     pathToolButton: css({
-        height: "36px !important",
-        minWidth: "82px !important",
-        padding: "0 10px !important",
-        border: `1px solid ${theme.palette.divider} !important`,
+        height: "42px !important",
+        minWidth: "104px !important",
+        padding: "0 12px !important",
+        border: "0 !important",
         borderRadius: "4px !important",
-        background: `${alpha(theme.palette.background.paper, 0.72)} !important`,
+        background: `${alpha(theme.palette.text.primary, 0.055)} !important`,
+        color: `${theme.palette.text.secondary} !important`,
         whiteSpace: "nowrap",
         letterSpacing: "0 !important",
-        '& .MuiButton-startIcon': { marginRight: 6 },
+        '& .MuiButton-startIcon': { marginRight: 7 },
+        '&:hover': {
+            background: `${alpha(theme.palette.text.primary, 0.1)} !important`,
+            color: `${theme.palette.text.primary} !important`,
+        },
+        '@media (max-width: 1180px)': {
+            minWidth: "44px !important",
+            width: "44px !important",
+            padding: "0 !important",
+            '& .MuiButton-startIcon': { margin: 0 },
+        },
+    }),
+    pathToolLabel: css({
+        '@media (max-width: 1180px)': {
+            display: "none",
+        },
     }),
     pathPrimaryTool: css({
-        borderColor: `${alpha(theme.palette.primary.main, 0.65)} !important`,
-        background: `${alpha(theme.palette.primary.main, 0.11)} !important`,
+        boxShadow: `inset 0 2px 0 ${alpha(theme.palette.primary.main, 0.7)}`,
+        background: `${alpha(theme.palette.primary.main, 0.09)} !important`,
         color: `${theme.palette.primary.light} !important`,
         '&:hover': {
-            background: `${alpha(theme.palette.primary.main, 0.2)} !important`,
+            background: `${alpha(theme.palette.primary.main, 0.16)} !important`,
+        },
+    }),
+    pathLiveTool: css({
+        background: `${theme.palette.primary.main} !important`,
+        color: `${theme.palette.primary.contrastText} !important`,
+        boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.28)}`,
+        '&:hover': {
+            background: `${theme.palette.primary.dark} !important`,
         },
     }),
     splitItem: css({
@@ -1789,92 +1841,98 @@ const PedalboardView =
                                     width: frameWidth, height: frameHeight,
                                 }} >
                                 <div className={classes.pathHeader} style={{ top: 0 }}>
-                                    <Typography variant="subtitle2" className={classes.pathTitle}>Path A</Typography>
-                                    {pathMeters(
-                                        Pedalboard.START_CONTROL_ID,
-                                        Pedalboard.END_CONTROL_ID)}
-                                    {sendIndicator("A")}
-                                    <Select
-                                        size="small"
-                                        value={pathAInput}
-                                        onChange={(event) =>
-                                            this.model.configurePathAInput(Number(event.target.value))}
-                                        aria-label="Path A input"
-                                        className={classes.pathSelect}
-                                        style={{ minWidth: 82 }}
-                                    >
-                                        {inputPorts.map((_port, index) => (
-                                            <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
-                                        ))}
-                                    </Select>
-                                    {pathOutputSelect(
-                                        "A",
-                                        pedalboard?.pathAOutputChannels ?? [])}
-                                    <Button
-                                        size="small"
-                                        startIcon={<AccountTreeIcon />}
-                                        onClick={() => this.setState({ routingGraphOpen: true })}
-                                        aria-label="Routing template"
-                                        variant="outlined"
-                                        className={classes.pathToolButton}
-                                    >
-                                        Routing
-                                    </Button>
-                                    <IconButton
-                                        size="small"
-                                        color={pedalboard?.pathAMute ? "primary" : "default"}
-                                        title="Mute Path A"
-                                        aria-label="Mute Path A"
-                                        className={classes.pathIconButton}
-                                        onClick={() => this.model.configurePathMix(
-                                            "A", !pedalboard?.pathAMute, pedalboard?.pathAPan ?? 0)}
-                                    >
-                                        <VolumeOffIcon fontSize="small" />
-                                    </IconButton>
-                                    <Select
-                                        size="small"
-                                        value={pedalboard?.pathAPan ?? 0}
-                                        onChange={(event) => this.model.configurePathMix(
-                                            "A", pedalboard?.pathAMute ?? false, Number(event.target.value))}
-                                        aria-label="Path A pan"
-                                        className={classes.pathSelect}
-                                        style={{ minWidth: 58 }}
-                                    >
-                                        <MenuItem value={-1}>L</MenuItem>
-                                        <MenuItem value={0}>C</MenuItem>
-                                        <MenuItem value={1}>R</MenuItem>
-                                    </Select>
-                                    <Button
-                                        size="small"
-                                        startIcon={<EqualizerIcon />}
-                                        onClick={() => this.setState({ globalEqDialogOpen: true })}
-                                        variant="outlined"
-                                        className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
-                                        aria-label="Global EQ"
-                                    >
-                                        Global EQ
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        startIcon={<HubIcon />}
-                                        onClick={() => this.setState({ controlHubOpen: true })}
-                                        variant="outlined"
-                                        className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
-                                        aria-label="Control Hub"
-                                    >
-                                        Control Hub
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        startIcon={<GridViewIcon />}
-                                        onClick={() => this.setState({ gigViewOpen: true })}
-                                        variant="outlined"
-                                        className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
-                                        aria-label="Gig View"
-                                    >
-                                        Live
-                                    </Button>
-                                    {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
+                                    <div className={classes.pathSignalGroup}>
+                                        <Typography variant="subtitle2" className={classes.pathTitle}>Path A</Typography>
+                                        {pathMeters(
+                                            Pedalboard.START_CONTROL_ID,
+                                            Pedalboard.END_CONTROL_ID)}
+                                        {sendIndicator("A")}
+                                        <div className={classes.pathRouteGroup}>
+                                            <Select
+                                                size="small"
+                                                value={pathAInput}
+                                                onChange={(event) =>
+                                                    this.model.configurePathAInput(Number(event.target.value))}
+                                                aria-label="Path A input"
+                                                className={classes.pathSelect}
+                                                style={{ minWidth: 82 }}
+                                            >
+                                                {inputPorts.map((_port, index) => (
+                                                    <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
+                                                ))}
+                                            </Select>
+                                            <ArrowForwardIcon fontSize="small" color="disabled" />
+                                            {pathOutputSelect(
+                                                "A",
+                                                pedalboard?.pathAOutputChannels ?? [])}
+                                        </div>
+                                        <IconButton
+                                            size="small"
+                                            color={pedalboard?.pathAMute ? "primary" : "default"}
+                                            title="Mute Path A"
+                                            aria-label="Mute Path A"
+                                            className={classes.pathIconButton}
+                                            onClick={() => this.model.configurePathMix(
+                                                "A", !pedalboard?.pathAMute, pedalboard?.pathAPan ?? 0)}
+                                        >
+                                            <VolumeOffIcon fontSize="small" />
+                                        </IconButton>
+                                        <Select
+                                            size="small"
+                                            value={pedalboard?.pathAPan ?? 0}
+                                            onChange={(event) => this.model.configurePathMix(
+                                                "A", pedalboard?.pathAMute ?? false, Number(event.target.value))}
+                                            aria-label="Path A pan"
+                                            className={classes.pathSelect}
+                                            style={{ minWidth: 58 }}
+                                        >
+                                            <MenuItem value={-1}>L</MenuItem>
+                                            <MenuItem value={0}>C</MenuItem>
+                                            <MenuItem value={1}>R</MenuItem>
+                                        </Select>
+                                    </div>
+                                    <div className={classes.pathActionGroup}>
+                                        <Button
+                                            size="small"
+                                            startIcon={<AccountTreeIcon />}
+                                            onClick={() => this.setState({ routingGraphOpen: true })}
+                                            aria-label="Routing template"
+                                            title="Routing"
+                                            className={classes.pathToolButton}
+                                        >
+                                            <span className={classes.pathToolLabel}>Routing</span>
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            startIcon={<EqualizerIcon />}
+                                            onClick={() => this.setState({ globalEqDialogOpen: true })}
+                                            className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
+                                            aria-label="Global EQ"
+                                            title="Global EQ"
+                                        >
+                                            <span className={classes.pathToolLabel}>Global EQ</span>
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            startIcon={<HubIcon />}
+                                            onClick={() => this.setState({ controlHubOpen: true })}
+                                            className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
+                                            aria-label="Control Hub"
+                                            title="Control Hub"
+                                        >
+                                            <span className={classes.pathToolLabel}>Control Hub</span>
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            startIcon={<GridViewIcon />}
+                                            onClick={() => this.setState({ gigViewOpen: true })}
+                                            className={`${classes.pathToolButton} ${classes.pathLiveTool}`}
+                                            aria-label="Gig View"
+                                            title="Gig View"
+                                        >
+                                            <span className={classes.pathToolLabel}>Gig View</span>
+                                        </Button>
+                                        {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
                                         <Button
                                             size="small"
                                             startIcon={<AddIcon />}
@@ -1886,14 +1944,14 @@ const PedalboardView =
                                                         nextAdditionalPathId, true, 0);
                                                 }
                                             }}
-                                            style={{ marginLeft: "auto" }}
-                                            variant="outlined"
                                             className={classes.pathToolButton}
                                             aria-label="Add path"
+                                            title="Add path"
                                         >
-                                            Add path
+                                            <span className={classes.pathToolLabel}>Add path</span>
                                         </Button>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                                 {this.renderChain(layoutChain, layoutSize)}
                                 {pathBLayout.length !== 0 && (
