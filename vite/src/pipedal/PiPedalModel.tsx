@@ -2337,8 +2337,32 @@ export class PiPedalModel //implements PiPedalModel
     }
 
     configurePathAInput(inputChannel: number): void {
-        let newPedalboard = this.pedalboard.get().clone();
-        newPedalboard.pathAInputChannels = [inputChannel];
+        this.configurePathInput("A", [inputChannel]);
+    }
+
+    configurePathInput(
+        pathId: "A" | "B" | "C" | "D",
+        inputChannels: number[]
+    ): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        const sanitizedChannels = inputChannels
+            .filter((channel, index) =>
+                Number.isInteger(channel) &&
+                channel >= 0 &&
+                inputChannels.indexOf(channel) === index)
+            .slice(0, 2);
+        if (sanitizedChannels.length === 0) return;
+        if (pathId === "A") {
+            newPedalboard.pathAInputChannels = sanitizedChannels;
+        } else if (pathId === "B") {
+            newPedalboard.pathBInputChannels = sanitizedChannels;
+        } else {
+            const path = newPedalboard.additionalPaths.find(
+                (value) => value.id === pathId);
+            if (!path) return;
+            path.inputChannels = sanitizedChannels;
+            path.sourceSendsDb = {};
+        }
         this.setModelPedalboard(newPedalboard);
         this.updateServerPedalboard();
     }

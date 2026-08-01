@@ -56,6 +56,12 @@ import ToolTipEx from './ToolTipEx';
 import MidiChannelBindingControl from './MidiChannelBindingControl';
 import MidiChannelBinding from './MidiChannelBinding';
 import PatchPropertyControl from './PatchPropertyControl';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import InputIcon from '@mui/icons-material/Input';
+import OutputIcon from '@mui/icons-material/Output';
 
 
 export const StandardItemSize = { width: 80, height: 110 };
@@ -261,6 +267,22 @@ const styles = (theme: Theme) => createStyles({
         display: "flex", flexFlow: "row nowrap",
         flex: "0 0 auto",
         height: 116
+    }),
+    terminalRoutingControl: css({
+        flex: "0 0 250px",
+        width: 250,
+        height: 116,
+        padding: "7px 18px 0 18px",
+        boxSizing: "border-box",
+        borderLeft: `3px solid ${theme.palette.primary.main}`,
+        background: "transparent",
+    }),
+    terminalRoutingHeading: css({
+        height: 28,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        color: theme.palette.text.secondary,
     }),
     controlSpacer: css({
         display: "none",
@@ -1002,12 +1024,135 @@ const PluginControlView =
             makeCustomControl(title: string, mainControl: ReactNode, editControl?: ReactNode): ReactNode {
                 return (<CustomPluginControl title={title} mainControl={mainControl} editControl={editControl} />);
             }
+            getTerminalPath(instanceId: number): {
+                pathId: "A" | "B" | "C" | "D";
+                input: boolean;
+            } | null {
+                switch (instanceId) {
+                    case Pedalboard.START_CONTROL_ID: return { pathId: "A", input: true };
+                    case Pedalboard.END_CONTROL_ID: return { pathId: "A", input: false };
+                    case Pedalboard.AUX_START_CONTROL_ID: return { pathId: "B", input: true };
+                    case Pedalboard.AUX_END_CONTROL_ID: return { pathId: "B", input: false };
+                    case Pedalboard.PATH_C_START_CONTROL_ID: return { pathId: "C", input: true };
+                    case Pedalboard.PATH_C_END_CONTROL_ID: return { pathId: "C", input: false };
+                    case Pedalboard.PATH_D_START_CONTROL_ID: return { pathId: "D", input: true };
+                    case Pedalboard.PATH_D_END_CONTROL_ID: return { pathId: "D", input: false };
+                    default: return null;
+                }
+            }
+            terminalChannelValue(channels: number[], input: boolean): string {
+                if (!input && channels.length === 0) return "main";
+                if (channels.length >= 2) return `stereo:${channels[0]}:${channels[1]}`;
+                return `mono:${channels[0] ?? 0}`;
+            }
+            terminalPortName(rawName: string, index: number, input: boolean): string {
+                const separator = Math.max(
+                    rawName.lastIndexOf("/"),
+                    rawName.lastIndexOf("::"),
+                    rawName.lastIndexOf(":"));
+                const rawLabel = separator >= 0
+                    ? rawName.substring(separator + (rawName[separator + 1] === ":" ? 2 : 1))
+                    : rawName;
+                const fallback = `${input ? "IN" : "OUT"} ${index + 1}`;
+                const normalized = rawLabel.trim();
+                if (!normalized || /^(ch|in|out|capture|playback)[-_ ]?\d+$/i.test(normalized)) {
+                    return fallback;
+                }
+                return `${fallback} - ${normalized}`;
+            }
+            renderTerminalRouting(pedalboardItem: PedalboardItem): ReactNode {
+                const terminal = this.getTerminalPath(pedalboardItem.instanceId);
+                if (!terminal) return null;
+                const classes = withStyles.getClasses(this.props);
+                const pedalboard = this.model.pedalboard.get();
+                const jackConfiguration = this.model.jackConfiguration.get();
+                const ports = terminal.input
+                    ? jackConfiguration.inputAudioPorts
+                    : jackConfiguration.outputAudioPorts;
+                let channels: number[] = [];
+                if (terminal.pathId === "A") {
+                    channels = terminal.input
+                        ? pedalboard.pathAInputChannels
+                        : pedalboard.pathAOutputChannels;
+                    if (terminal.input && channels.length === 0) {
+                        channels = Array.from(new Set(
+                            this.model.channelRouterSettings.get().mainInputChannels
+                                .filter((channel) => channel >= 0)));
+                    }
+                } else if (terminal.pathId === "B") {
+                    channels = terminal.input
+                        ? pedalboard.pathBInputChannels
+                        : pedalboard.pathBOutputChannels;
+                } else {
+                    const path = pedalboard.additionalPaths.find(
+                        (value) => value.id === terminal.pathId);
+                    channels = terminal.input
+                        ? path?.inputChannels ?? [0]
+                        : path?.outputChannels ?? [];
+                }
+                const selectedValue = this.terminalChannelValue(channels, terminal.input);
+                const standardValues = new Set<string>();
+                if (!terminal.input) standardValues.add("main");
+                ports.forEach((_port, index) => standardValues.add(`mono:${index}`));
+                for (let index = 0; index + 1 < ports.length; index += 2) {
+                    standardValues.add(`stereo:${index}:${index + 1}`);
+                }
+                const commitSelection = (encodedValue: string) => {
+                    if (encodedValue === "main") {
+                        this.model.configurePathOutput(terminal.pathId, []);
+                        return;
+                    }
+                    const selectedChannels = encodedValue
+                        .split(":")
+                        .slice(1)
+                        .map((value) => Number(value));
+                    if (terminal.input) {
+                        this.model.configurePathInput(terminal.pathId, selectedChannels);
+                    } else {
+                        this.model.configurePathOutput(terminal.pathId, selectedChannels);
+                    }
+                };
+                return <div key="terminal-routing" className={classes.terminalRoutingControl}>
+                    <div className={classes.terminalRoutingHeading}>
+                        {terminal.input ? <InputIcon fontSize="small" /> : <OutputIcon fontSize="small" />}
+                        <Typography variant="subtitle2">
+                            {terminal.input ? "Input source" : "Output destination"}
+                        </Typography>
+                    </div>
+                    <FormControl variant="standard" fullWidth sx={{ mt: 1 }}>
+                        <InputLabel id={`terminal-route-${pedalboardItem.instanceId}`}>Channel</InputLabel>
+                        <Select
+                            labelId={`terminal-route-${pedalboardItem.instanceId}`}
+                            value={selectedValue}
+                            onChange={(event) => commitSelection(String(event.target.value))}
+                            aria-label={`${terminal.input ? "Input" : "Output"} channel for Path ${terminal.pathId}`}
+                        >
+                            {!terminal.input && <MenuItem value="main">Main bus</MenuItem>}
+                            {Array.from({ length: Math.floor(ports.length / 2) }, (_, pair) => pair * 2)
+                                .map((index) => <MenuItem
+                                    key={`stereo-${index}`}
+                                    value={`stereo:${index}:${index + 1}`}
+                                >
+                                    {this.terminalPortName(ports[index], index, terminal.input)} / {this.terminalPortName(ports[index + 1], index + 1, terminal.input)}
+                                </MenuItem>)}
+                            {ports.map((port, index) => <MenuItem
+                                key={`mono-${index}`}
+                                value={`mono:${index}`}
+                            >
+                                {this.terminalPortName(port, index, terminal.input)} mono
+                            </MenuItem>)}
+                            {!standardValues.has(selectedValue) && <MenuItem value={selectedValue}>
+                                {channels.map((channel) => `${terminal.input ? "IN" : "OUT"} ${channel + 1}`).join(" / ")}
+                            </MenuItem>}
+                        </Select>
+                    </FormControl>
+                </div>;
+            }
             renderPiPedalControl(pedalboardItem?: PedalboardItem): ReactNode {
                 this.controlKeyIndex = 0;
 
 
                 const classes = withStyles.getClasses(this.props);
-                let pedalboard = this.model.pedalboard.get();
 
                 if (!pedalboardItem)
                     return (<div className={classes.frame} ></div>);
@@ -1018,10 +1163,8 @@ const PluginControlView =
                 let plugin: UiPlugin;
                 if (pedalboardItem.isStart()) {
                     plugin = startPluginInfo;
-                    controlValues = [new ControlValue("volume_db", pedalboard.input_volume_db)];
                 } else if (pedalboardItem.isEnd()) {
                     plugin = endPluginInfo;
-                    controlValues = [new ControlValue("volume_db", pedalboard.output_volume_db)];
                 } else {
                     plugin = nullCast(this.model.getUiPlugin(pedalboardItem.uri));
                 }
@@ -1045,6 +1188,9 @@ const PluginControlView =
                 }
 
                 let nodes = this.controlNodesToNodes(controlNodes);
+                if (pedalboardItem.isStart() || pedalboardItem.isEnd()) {
+                    nodes.unshift(this.renderTerminalRouting(pedalboardItem));
+                }
 
                 if (plugin.has_midi_input && !pedalboardItem.midiChannelBinding) {
                     pedalboardItem.midiChannelBinding = MidiChannelBinding.CreateMissingValue();
