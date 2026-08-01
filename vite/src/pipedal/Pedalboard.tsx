@@ -1124,6 +1124,43 @@ export class Pedalboard implements Deserializable<Pedalboard> {
 
 
     }
+    private wrapItemInParallelSplit_(
+        items: PedalboardItem[],
+        instanceId: number
+    ): number | null {
+        for (let i = 0; i < items.length; ++i) {
+            const item = items[i];
+            if (item.instanceId === instanceId) {
+                if (item.isEmpty() || item.isSplit() || item.isStart() || item.isEnd()) {
+                    return null;
+                }
+                const split = this.createEmptySplit();
+                split.setControlValue(PedalboardSplitItem.TYPE_KEY, SplitType.Mix);
+                split.bottomChain = [item];
+                items[i] = split;
+                return split.instanceId;
+            }
+            if (item.isSplit()) {
+                const split = item as PedalboardSplitItem;
+                const topResult = this.wrapItemInParallelSplit_(split.topChain, instanceId);
+                if (topResult !== null) return topResult;
+                const bottomResult = this.wrapItemInParallelSplit_(split.bottomChain, instanceId);
+                if (bottomResult !== null) return bottomResult;
+            }
+        }
+        return null;
+    }
+    wrapItemInParallelSplit(instanceId: number): number | null {
+        let result = this.wrapItemInParallelSplit_(this.items, instanceId);
+        if (result === null) {
+            result = this.wrapItemInParallelSplit_(this.pathBItems, instanceId);
+        }
+        for (const path of this.additionalPaths) {
+            if (result !== null) break;
+            result = this.wrapItemInParallelSplit_(path.items, instanceId);
+        }
+        return result;
+    }
     createEmptyItem(): PedalboardItem {
         let result: PedalboardItem = new PedalboardItem();
         result.uri = EMPTY_PEDALBOARD_ITEM_URI;

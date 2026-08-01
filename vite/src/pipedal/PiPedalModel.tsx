@@ -2532,6 +2532,16 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
 
     }
+    movePedalboardItemToNewParallelPath(instanceId: number): number | null {
+        const newPedalboard = this.pedalboard.get().clone();
+        this.updateVst3State(newPedalboard);
+        const splitInstanceId = newPedalboard.wrapItemInParallelSplit(instanceId);
+        if (splitInstanceId === null) return null;
+        newPedalboard.selectedPlugin = instanceId;
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+        return splitInstanceId;
+    }
     addPedalboardItem(instanceId: number, append: boolean): number {
         let pedalboard = this.pedalboard.get();
         if (instanceId === Pedalboard.START_CONTROL_ID && append) {

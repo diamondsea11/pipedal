@@ -50,6 +50,7 @@ import GigViewDialog from './GigViewDialog';
 import GlobalEqDialog from './GlobalEqDialog';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import ControlPointDuplicateIcon from '@mui/icons-material/ControlPointDuplicate';
@@ -234,6 +235,22 @@ const pedalboardStyles = (theme: Theme) => createStyles({
             background: `${theme.palette.primary.dark} !important`,
         },
     }),
+    parallelDropHint: css({
+        position: "absolute",
+        width: CELL_WIDTH,
+        height: CELL_HEIGHT,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: theme.palette.primary.light,
+        background: alpha(theme.palette.primary.main, 0.12),
+        border: `2px dashed ${alpha(theme.palette.primary.main, 0.9)}`,
+        borderRadius: 6,
+        boxSizing: "border-box",
+        pointerEvents: "none",
+        zIndex: 4,
+        boxShadow: `0 0 12px ${alpha(theme.palette.primary.main, 0.22)}`,
+    }),
     splitItem: css({
         position: "absolute",
         display: "flex",
@@ -391,6 +408,7 @@ type PedalboardState = {
     controlHubOpen: boolean;
     gigViewOpen: boolean;
     routingGraphOpen: boolean;
+    parallelDropInstanceId: number | null;
     contextMenu: {
         mouseX: number;
         mouseY: number;
@@ -606,6 +624,7 @@ const PedalboardView =
                         controlHubOpen: false,
                         gigViewOpen: false,
                         routingGraphOpen: false,
+                        parallelDropInstanceId: null,
                         contextMenu: null,
                     };
                     this.onPedalboardChanged = this.onPedalboardChanged.bind(this);
@@ -633,7 +652,50 @@ const PedalboardView =
                     return splitter.isChild(item.instanceId);
                 }
 
+                getParallelDropLayout(
+                    instanceId: number,
+                    clientX: number,
+                    clientY: number
+                ): PedalLayout | null {
+                    if (!this.currentLayout || !this.frameRef.current) return null;
+                    const sourceItem = this.state.pedalboard?.maybeGetItem(instanceId);
+                    if (!sourceItem || sourceItem.isEmpty() || sourceItem.isSplit()) return null;
+                    const frameBounds = this.frameRef.current.getBoundingClientRect();
+                    const x = clientX - frameBounds.left;
+                    const y = clientY - frameBounds.top;
+                    const iterator = chainIterator(this.currentLayout);
+                    while (true) {
+                        const next = iterator.next();
+                        if (next.done) break;
+                        const layout = next.value;
+                        if (layout.pedalItem?.instanceId !== instanceId) continue;
+                        const withinHorizontalLane = x >= layout.bounds.x - CELL_WIDTH * 0.75
+                            && x <= layout.bounds.right + CELL_WIDTH * 0.75;
+                        const belowBlock = y >= layout.bounds.bottom + 12
+                            && y <= layout.bounds.bottom + CELL_HEIGHT * 1.75;
+                        return withinHorizontalLane && belowBlock ? layout : null;
+                    }
+                    return null;
+                }
+
+                onDragMove(instanceId: number, clientX: number, clientY: number): void {
+                    const nextId = this.getParallelDropLayout(instanceId, clientX, clientY)
+                        ? instanceId
+                        : null;
+                    if (this.state.parallelDropInstanceId !== nextId) {
+                        this.setState({ parallelDropInstanceId: nextId });
+                    }
+                }
+
+                clearParallelDropHint(): void {
+                    if (this.state.parallelDropInstanceId !== null) {
+                        this.setState({ parallelDropInstanceId: null });
+                    }
+                }
+
                 onDragEnd(instanceId: number, clientX: number, clientY: number) {
+                    const parallelDrop = this.getParallelDropLayout(instanceId, clientX, clientY);
+                    this.clearParallelDropHint();
                     if (!this.props.enableStructureEditing) {
                         return;
                     }
@@ -773,6 +835,11 @@ const PedalboardView =
                             }
 
                         }
+                    }
+                    if (parallelDrop) {
+                        this.model.movePedalboardItemToNewParallelPath(instanceId);
+                        this.setSelection(instanceId);
+                        return;
                     }
                     // delete the plugin.
                     let newId = this.model.setPedalboardItemEmpty(instanceId);
@@ -1319,7 +1386,9 @@ const PedalboardView =
                                     </SelectHoverBackground>
                                 </div>
                                 <Draggable draggable={draggable && (this.props.enableStructureEditing)} getScrollContainer={() => this.getScrollContainer()}
+                                    onDragMove={(x, y) => { this.onDragMove(instanceId, x, y); }}
                                     onDragEnd={(x, y) => { this.onDragEnd(instanceId, x, y) }}
+                                    onDragCancel={() => { this.clearParallelDropHint(); }}
                                     onLongPress={(x, y) => { this.openItemContextMenu(instanceId, x, y); }}
                                     style={{ opacity: enabled ? 0.99 : 0.3 }}
 
@@ -1954,6 +2023,25 @@ const PedalboardView =
                                     </div>
                                 </div>
                                 {this.renderChain(layoutChain, layoutSize)}
+                                {this.state.parallelDropInstanceId !== null && (() => {
+                                    const iterator = chainIterator(this.currentLayout ?? []);
+                                    while (true) {
+                                        const next = iterator.next();
+                                        if (next.done) return null;
+                                        const item = next.value;
+                                        if (item.pedalItem?.instanceId === this.state.parallelDropInstanceId) {
+                                            return <div
+                                                className={classes.parallelDropHint}
+                                                style={{
+                                                    left: item.bounds.x,
+                                                    top: item.bounds.bottom + 8,
+                                                }}
+                                            >
+                                                <CallSplitIcon />
+                                            </div>;
+                                        }
+                                    }
+                                })()}
                                 {pathBLayout.length !== 0 && (
                                     <>
                                         <div
