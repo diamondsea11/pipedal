@@ -347,8 +347,10 @@ export const MainPage =
                                 if (split.instanceId === undefined) throw new PiPedalStateError("Split without valid id.");
                                 this.model.setPedalboardControl(split.instanceId, cv.key, cv.value);
                             }
-                        } else {
+                        } else if (item.isEmpty()) {
                             this.setState({ loadDialogOpen: true });
+                        } else {
+                            this.model.setPedalboardItemEnabled(item.instanceId, !item.isEnabled);
                         }
                     }
                 }

@@ -2403,6 +2403,16 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
     }
 
+    configureAdditionalPathMix(id: "C" | "D", mute: boolean, pan: number): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        const path = newPedalboard.additionalPaths.find((value) => value.id === id);
+        if (!path) return;
+        path.mute = mute;
+        path.pan = Math.max(-1, Math.min(1, pan));
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
     configurePathSends(
         id: "C" | "D",
         sourceSendsDb: Record<string, number>

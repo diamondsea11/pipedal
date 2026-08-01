@@ -43,7 +43,9 @@ import CloseIcon from '@mui/icons-material/Close';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import HubIcon from '@mui/icons-material/Hub';
+import GridViewIcon from '@mui/icons-material/GridView';
 import ControlHubDialog from './ControlHubDialog';
+import GigViewDialog from './GigViewDialog';
 import GlobalEqDialog from './GlobalEqDialog';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
@@ -335,6 +337,7 @@ type PedalboardState = {
     pedalboard?: Pedalboard;
     globalEqDialogOpen: boolean;
     controlHubOpen: boolean;
+    gigViewOpen: boolean;
     routingGraphOpen: boolean;
     contextMenu: {
         mouseX: number;
@@ -549,6 +552,7 @@ const PedalboardView =
                         pedalboard: this.model.pedalboard.get(),
                         globalEqDialogOpen: false,
                         controlHubOpen: false,
+                        gigViewOpen: false,
                         routingGraphOpen: false,
                         contextMenu: null,
                     };
@@ -892,7 +896,7 @@ const PedalboardView =
                     event.preventDefault();
                     event.stopPropagation();
 
-                    if (this.props.onDoubleClick && instanceId && this.props.enableStructureEditing) {
+                    if (this.props.onDoubleClick && instanceId) {
                         this.props.onDoubleClick(instanceId);
                     }
 
@@ -1860,6 +1864,16 @@ const PedalboardView =
                                     >
                                         Control Hub
                                     </Button>
+                                    <Button
+                                        size="small"
+                                        startIcon={<GridViewIcon />}
+                                        onClick={() => this.setState({ gigViewOpen: true })}
+                                        variant="outlined"
+                                        className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
+                                        aria-label="Gig View"
+                                    >
+                                        Live
+                                    </Button>
                                     {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
                                         <Button
                                             size="small"
@@ -2019,24 +2033,16 @@ const PedalboardView =
                                                 title={`Mute Path ${path.id}`}
                                                 aria-label={`Mute Path ${path.id}`}
                                                 className={classes.pathIconButton}
-                                                onClick={() => this.model.configureAdditionalPath(
-                                                    path.id,
-                                                    true,
-                                                    path.inputChannels[0] ?? 0,
-                                                    !path.mute,
-                                                    path.pan)}
+                                                onClick={() => this.model.configureAdditionalPathMix(
+                                                    path.id, !path.mute, path.pan)}
                                             >
                                                 <VolumeOffIcon fontSize="small" />
                                             </IconButton>
                                             <Select
                                                 size="small"
                                                 value={path.pan}
-                                                onChange={(event) => this.model.configureAdditionalPath(
-                                                    path.id,
-                                                    true,
-                                                    path.inputChannels[0] ?? 0,
-                                                    path.mute,
-                                                    Number(event.target.value))}
+                                                onChange={(event) => this.model.configureAdditionalPathMix(
+                                                    path.id, path.mute, Number(event.target.value))}
                                                 aria-label={`Path ${path.id} pan`}
                                                 className={classes.pathSelect}
                                                 style={{ minWidth: 58 }}
@@ -2075,6 +2081,13 @@ const PedalboardView =
                                 <ControlHubDialog
                                     open={this.state.controlHubOpen}
                                     onClose={() => this.setState({ controlHubOpen: false })}
+                                />
+                            )}
+                            {pedalboard && (
+                                <GigViewDialog
+                                    open={this.state.gigViewOpen}
+                                    pedalboard={pedalboard}
+                                    onClose={() => this.setState({ gigViewOpen: false })}
                                 />
                             )}
                             {pedalboard && <GlobalEqDialog
