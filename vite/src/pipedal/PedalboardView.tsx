@@ -49,6 +49,8 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
+import HubIcon from '@mui/icons-material/Hub';
+import ControlHubDialog from './ControlHubDialog';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -297,6 +299,7 @@ interface LayoutSize {
 type PedalboardState = {
     pedalboard?: Pedalboard;
     globalEqDialogOpen: boolean;
+    controlHubOpen: boolean;
     routingGraphOpen: boolean;
     contextMenu: {
         mouseX: number;
@@ -508,6 +511,7 @@ const PedalboardView =
                     this.state = {
                         pedalboard: this.model.pedalboard.get(),
                         globalEqDialogOpen: false,
+                        controlHubOpen: false,
                         routingGraphOpen: false,
                         contextMenu: null,
                     };
@@ -1796,6 +1800,13 @@ const PedalboardView =
                                     >
                                         Global EQ
                                     </Button>
+                                    <Button
+                                        size="small"
+                                        startIcon={<HubIcon />}
+                                        onClick={() => this.setState({ controlHubOpen: true })}
+                                    >
+                                        Control Hub
+                                    </Button>
                                     {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
                                         <Button
                                             size="small"
@@ -1993,6 +2004,12 @@ const PedalboardView =
                                     open={this.state.routingGraphOpen}
                                     pedalboard={pedalboard}
                                     onClose={() => this.setState({ routingGraphOpen: false })}
+                                />
+                            )}
+                            {this.state.controlHubOpen && (
+                                <ControlHubDialog
+                                    open={this.state.controlHubOpen}
+                                    onClose={() => this.setState({ controlHubOpen: false })}
                                 />
                             )}
                             <Dialog

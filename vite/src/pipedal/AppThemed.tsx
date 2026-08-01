@@ -73,6 +73,8 @@ import EditBanksIcon from './svg/ic_edit_banks.svg?react';
 import SettingsIcon from './svg/ic_settings.svg?react';
 import HelpOutlineIcon from './svg/ic_help_outline.svg?react';
 import FxAmplifierIcon from './svg/fx_amplifier.svg?react';
+import HubIcon from '@mui/icons-material/Hub';
+import ControlHubDialog from './ControlHubDialog';
 import { PerformanceView } from './PerformanceView';
 
 
@@ -305,6 +307,7 @@ type AppState = {
     alertDialogMessage: string;
     updateDialogOpen: boolean;
     isSettingsDialogOpen: boolean;
+    controlHubDialogOpen: boolean;
     onboarding: boolean;
     isDebug: boolean;
 
@@ -368,6 +371,7 @@ export
             alertDialogMessage: "",
             presetName: this.model_.presets.get().getSelectedText(),
             isSettingsDialogOpen: false,
+            controlHubDialogOpen: false,
             updateDialogOpen: false,
             onboarding: false,
             isDebug: true,
@@ -504,6 +508,13 @@ export
             onboarding: true
         });
 
+    }
+
+    handleDrawerControlHubClick() {
+        this.setState({
+            isDrawerOpen: false,
+            controlHubDialogOpen: true
+        });
     }
 
     handleDrawerManageBanks() {
@@ -970,6 +981,17 @@ export
                             </List>
                             <Divider />
                             <List>
+                                <ListItemButton key='ControlHub'
+                                    onClick={(ev: any) => {
+                                        ev.stopPropagation();
+                                        this.hideDrawer(true);
+                                        this.handleDrawerControlHubClick();
+                                    }}>
+                                    <ListItemIcon>
+                                        <HubIcon color="inherit" className={classes.menuIcon} />
+                                    </ListItemIcon>
+                                    <ListItemText primary='Control Hub' />
+                                </ListItemButton>
                                 <ListItemButton key='Settings'
                                     onClick={(ev: any) => {
                                         ev.stopPropagation();
@@ -1026,6 +1048,11 @@ export
                             (
                                 <AboutDialog open={this.state.aboutDialogOpen} onClose={() => this.setState({ aboutDialogOpen: false })} />
                             )}
+                        {this.state.controlHubDialogOpen && (
+                            <ControlHubDialog
+                                open={this.state.controlHubDialogOpen}
+                                onClose={() => this.setState({ controlHubDialogOpen: false })} />
+                        )}
                         {this.state.isSettingsDialogOpen && (
                             <SettingsDialog
                                 open={this.state.isSettingsDialogOpen}
