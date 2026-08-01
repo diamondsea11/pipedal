@@ -1915,6 +1915,42 @@ export class PiPedalModel //implements PiPedalModel
         let changed: boolean;
         let newPedalboard = pedalboard.clone();
 
+        const isInputGateControl = key === "input_gate" ||
+            key === "input_gate_threshold_db" ||
+            key === "input_gate_decay_ms";
+        const isInputTerminal = instanceId === Pedalboard.START_CONTROL_ID ||
+            instanceId === Pedalboard.AUX_START_CONTROL_ID ||
+            instanceId === Pedalboard.PATH_C_START_CONTROL_ID ||
+            instanceId === Pedalboard.PATH_D_START_CONTROL_ID;
+        if (isInputTerminal && isInputGateControl) {
+            const enabled = key === "input_gate" ? value >= 0.5 : undefined;
+            const thresholdDb = key === "input_gate_threshold_db"
+                ? Math.max(-96, Math.min(0, value))
+                : undefined;
+            const decayMs = key === "input_gate_decay_ms"
+                ? Math.max(10, Math.min(2000, value))
+                : undefined;
+            if (instanceId === Pedalboard.START_CONTROL_ID) {
+                if (enabled !== undefined) newPedalboard.inputGateEnabled = enabled;
+                if (thresholdDb !== undefined) newPedalboard.inputGateThresholdDb = thresholdDb;
+                if (decayMs !== undefined) newPedalboard.inputGateDecayMs = decayMs;
+            } else if (instanceId === Pedalboard.AUX_START_CONTROL_ID) {
+                if (enabled !== undefined) newPedalboard.pathBInputGateEnabled = enabled;
+                if (thresholdDb !== undefined) newPedalboard.pathBInputGateThresholdDb = thresholdDb;
+                if (decayMs !== undefined) newPedalboard.pathBInputGateDecayMs = decayMs;
+            } else {
+                const pathId = instanceId === Pedalboard.PATH_C_START_CONTROL_ID ? "C" : "D";
+                const path = newPedalboard.additionalPaths.find((item) => item.id === pathId);
+                if (!path) return;
+                if (enabled !== undefined) path.inputGateEnabled = enabled;
+                if (thresholdDb !== undefined) path.inputGateThresholdDb = thresholdDb;
+                if (decayMs !== undefined) path.inputGateDecayMs = decayMs;
+            }
+            this.setModelPedalboard(newPedalboard);
+            if (notifyServer) this.updateServerPedalboard();
+            return;
+        }
+
         if (instanceId === Pedalboard.START_CONTROL_ID && key === "volume_db") {
             this._setInputVolume(value, notifyServer);
             return;
@@ -2141,7 +2177,15 @@ export class PiPedalModel //implements PiPedalModel
         // respect "expensive" port attribute.
 
         // Handle special cases for input/output volume
-        if (instanceId === Pedalboard.START_CONTROL_ID && key === "volume_db") {
+        if ((instanceId === Pedalboard.START_CONTROL_ID ||
+             instanceId === Pedalboard.AUX_START_CONTROL_ID ||
+             instanceId === Pedalboard.PATH_C_START_CONTROL_ID ||
+             instanceId === Pedalboard.PATH_D_START_CONTROL_ID) &&
+            (key === "input_gate" ||
+             key === "input_gate_threshold_db" ||
+             key === "input_gate_decay_ms")) {
+            return;
+        } else if (instanceId === Pedalboard.START_CONTROL_ID && key === "volume_db") {
             this.previewInputVolume(value);
             return;
         } else if (instanceId === Pedalboard.END_CONTROL_ID) {

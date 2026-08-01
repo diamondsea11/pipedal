@@ -471,6 +471,16 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
     outputVolume.SetTarget(pedalboard.output_volume_db());
     pathBInputVolume.SetTarget(pedalboard.pathBInputVolumeDb());
     pathBOutputVolume.SetTarget(pedalboard.pathBOutputVolumeDb());
+    inputGate.Configure(
+        (float)this->pHost->GetSampleRate(),
+        pedalboard.inputGateEnabled(),
+        pedalboard.inputGateThresholdDb(),
+        pedalboard.inputGateDecayMs());
+    pathBInputGate.Configure(
+        (float)this->pHost->GetSampleRate(),
+        pedalboard.pathBInputGateEnabled(),
+        pedalboard.pathBInputGateThresholdDb(),
+        pedalboard.pathBInputGateDecayMs());
     this->pathAMute = pedalboard.pathAMute();
     this->pathAPan = std::max(-1.0f, std::min(1.0f, pedalboard.pathAPan()));
     this->pathBMute = pedalboard.pathBMute();
@@ -580,6 +590,11 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
         runtimePath->outputVolume.SetMinDb(-60);
         runtimePath->inputVolume.SetTarget(path.inputVolumeDb());
         runtimePath->outputVolume.SetTarget(path.outputVolumeDb());
+        runtimePath->inputGate.Configure(
+            (float)this->pHost->GetSampleRate(),
+            path.inputGateEnabled(),
+            path.inputGateThresholdDb(),
+            path.inputGateDecayMs());
 
         const size_t pathInputCount = runtimePath->sourceSendsDb.empty()
             ? std::max(runtimePath->inputChannels.size(), (size_t)1)
@@ -623,13 +638,15 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
                 }
             }
             const auto returnInputs = runtimePath->inputBuffers;
+            auto *inputVolume = &runtimePath->inputVolume;
+            auto *inputGate = &runtimePath->inputGate;
             processActions.push_back(
-                [returnInputs, sendSources](uint32_t frames)
+                [returnInputs, sendSources, inputVolume, inputGate](uint32_t frames)
                 {
-                    for (size_t channel = 0; channel < returnInputs.size(); ++channel)
+                    for (uint32_t frame = 0; frame < frames; ++frame)
                     {
-                        float *destination = returnInputs[channel];
-                        for (uint32_t frame = 0; frame < frames; ++frame)
+                        float level = 0;
+                        for (size_t channel = 0; channel < returnInputs.size(); ++channel)
                         {
                             float value = 0;
                             for (const auto &send : sendSources)
@@ -638,7 +655,13 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
                                     std::min(channel, send.buffers->size() - 1);
                                 value += (*send.buffers)[sourceChannel][frame] * send.gain;
                             }
-                            destination[frame] = value;
+                            returnInputs[channel][frame] = value;
+                            level = std::max(level, std::abs(value));
+                        }
+                        const float gain = inputGate->Tick(level) * inputVolume->Tick();
+                        for (size_t channel = 0; channel < returnInputs.size(); ++channel)
+                        {
+                            returnInputs[channel][frame] *= gain;
                         }
                     }
                 });
@@ -876,9 +899,15 @@ bool Lv2Pedalboard::Run(
     for (size_t i = 0; i < samples; ++i)
     {
         float volume = this->inputVolume.Tick();
+        float level = 0;
+        for (size_t c = 0; c < this->pedalboardInputBuffers.size(); ++c)
+        {
+            level = std::max(level, std::abs(inputBuffers[c][i]));
+        }
+        const float gateGain = this->inputGate.Tick(level);
         for (int c = 0; c < this->pedalboardInputBuffers.size(); ++c)
         {
-            this->pedalboardInputBuffers[c][i] = inputBuffers[c][i] * volume;
+            this->pedalboardInputBuffers[c][i] = inputBuffers[c][i] * volume * gateGain;
         }
     }
     if (this->pathBEnabled)
@@ -886,6 +915,15 @@ bool Lv2Pedalboard::Run(
         for (size_t i = 0; i < samples; ++i)
         {
             float volume = this->pathBInputVolume.Tick();
+            float level = 0;
+            for (size_t c = 0; c < this->pathBInputBuffers.size(); ++c)
+            {
+                float *source = pathBHardwareInputBuffers == nullptr
+                    ? nullptr
+                    : pathBHardwareInputBuffers[c];
+                if (source != nullptr) level = std::max(level, std::abs(source[i]));
+            }
+            const float gateGain = this->pathBInputGate.Tick(level);
             for (size_t c = 0; c < this->pathBInputBuffers.size(); ++c)
             {
                 float *source = pathBHardwareInputBuffers == nullptr
@@ -893,7 +931,7 @@ bool Lv2Pedalboard::Run(
                     : pathBHardwareInputBuffers[c];
                 this->pathBInputBuffers[c][i] = source == nullptr
                     ? 0
-                    : source[i] * volume;
+                    : source[i] * volume * gateGain;
             }
         }
     }
@@ -905,13 +943,25 @@ bool Lv2Pedalboard::Run(
             pathIndex < additionalPathHardwareInputCount
                 ? additionalPathHardwareInputBuffers[pathIndex]
                 : nullptr;
-        for (size_t i = 0; i < samples; ++i)
+        if (path.sourceSendsDb.empty())
         {
-            float volume = path.inputVolume.Tick();
-            for (size_t channel = 0; channel < path.inputBuffers.size(); ++channel)
+            for (size_t i = 0; i < samples; ++i)
             {
-                float *source = hardwareInputs == nullptr ? nullptr : hardwareInputs[channel];
-                path.inputBuffers[channel][i] = source == nullptr ? 0 : source[i] * volume;
+                float volume = path.inputVolume.Tick();
+                float level = 0;
+                for (size_t channel = 0; channel < path.inputBuffers.size(); ++channel)
+                {
+                    float *source = hardwareInputs == nullptr ? nullptr : hardwareInputs[channel];
+                    if (source != nullptr) level = std::max(level, std::abs(source[i]));
+                }
+                const float gateGain = path.inputGate.Tick(level);
+                for (size_t channel = 0; channel < path.inputBuffers.size(); ++channel)
+                {
+                    float *source = hardwareInputs == nullptr ? nullptr : hardwareInputs[channel];
+                    path.inputBuffers[channel][i] = source == nullptr
+                        ? 0
+                        : source[i] * volume * gateGain;
+                }
             }
         }
     }

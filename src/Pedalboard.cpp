@@ -279,6 +279,12 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
         output_volume_db_ = snapshot->outputVolumeDb_;
         pathBInputVolumeDb_ = snapshot->pathBInputVolumeDb_;
         pathBOutputVolumeDb_ = snapshot->pathBOutputVolumeDb_;
+        inputGateEnabled_ = snapshot->inputGateEnabled_;
+        inputGateThresholdDb_ = snapshot->inputGateThresholdDb_;
+        inputGateDecayMs_ = snapshot->inputGateDecayMs_;
+        pathBInputGateEnabled_ = snapshot->pathBInputGateEnabled_;
+        pathBInputGateThresholdDb_ = snapshot->pathBInputGateThresholdDb_;
+        pathBInputGateDecayMs_ = snapshot->pathBInputGateDecayMs_;
         pathAMute_ = snapshot->pathAMute_;
         pathAPan_ = snapshot->pathAPan_;
         pathBMute_ = snapshot->pathBMute_;
@@ -300,6 +306,9 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
                 if (path.id() == mix.id())
                 {
                     path.inputVolumeDb(mix.inputVolumeDb());
+                    path.inputGateEnabled(mix.inputGateEnabled());
+                    path.inputGateThresholdDb(mix.inputGateThresholdDb());
+                    path.inputGateDecayMs(mix.inputGateDecayMs());
                     path.outputVolumeDb(mix.outputVolumeDb());
                     path.mute(mix.mute());
                     path.pan(mix.pan());
@@ -438,10 +447,16 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
         this->pathAOutputChannels_ != other.pathAOutputChannels_ ||
         this->pathAMute_ != other.pathAMute_ ||
         this->pathAPan_ != other.pathAPan_ ||
+        this->inputGateEnabled_ != other.inputGateEnabled_ ||
+        this->inputGateThresholdDb_ != other.inputGateThresholdDb_ ||
+        this->inputGateDecayMs_ != other.inputGateDecayMs_ ||
         this->pathBInputChannels_ != other.pathBInputChannels_ ||
         this->pathBOutputChannels_ != other.pathBOutputChannels_ ||
         this->pathBMute_ != other.pathBMute_ ||
         this->pathBPan_ != other.pathBPan_ ||
+        this->pathBInputGateEnabled_ != other.pathBInputGateEnabled_ ||
+        this->pathBInputGateThresholdDb_ != other.pathBInputGateThresholdDb_ ||
+        this->pathBInputGateDecayMs_ != other.pathBInputGateDecayMs_ ||
         this->globalEqEnabled_ != other.globalEqEnabled_ ||
         this->globalEqLowCutHz_ != other.globalEqLowCutHz_ ||
         this->globalEqLowCutSlopeDb_ != other.globalEqLowCutSlopeDb_ ||
@@ -473,6 +488,9 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
             leftPath.inputChannels() != rightPath.inputChannels() ||
             leftPath.outputChannels() != rightPath.outputChannels() ||
             leftPath.sourceSendsDb() != rightPath.sourceSendsDb() ||
+            leftPath.inputGateEnabled() != rightPath.inputGateEnabled() ||
+            leftPath.inputGateThresholdDb() != rightPath.inputGateThresholdDb() ||
+            leftPath.inputGateDecayMs() != rightPath.inputGateDecayMs() ||
             leftPath.items().size() != rightPath.items().size())
         {
             return false;
@@ -639,6 +657,12 @@ Snapshot Pedalboard::MakeSnapshotFromCurrentSettings(const Pedalboard &previousP
     snapshot.outputVolumeDb_ = output_volume_db_;
     snapshot.pathBInputVolumeDb_ = pathBInputVolumeDb_;
     snapshot.pathBOutputVolumeDb_ = pathBOutputVolumeDb_;
+    snapshot.inputGateEnabled_ = inputGateEnabled_;
+    snapshot.inputGateThresholdDb_ = inputGateThresholdDb_;
+    snapshot.inputGateDecayMs_ = inputGateDecayMs_;
+    snapshot.pathBInputGateEnabled_ = pathBInputGateEnabled_;
+    snapshot.pathBInputGateThresholdDb_ = pathBInputGateThresholdDb_;
+    snapshot.pathBInputGateDecayMs_ = pathBInputGateDecayMs_;
     snapshot.pathAMute_ = pathAMute_;
     snapshot.pathAPan_ = pathAPan_;
     snapshot.pathBMute_ = pathBMute_;
@@ -658,6 +682,9 @@ Snapshot Pedalboard::MakeSnapshotFromCurrentSettings(const Pedalboard &previousP
         SnapshotPathMix mix;
         mix.id(path.id());
         mix.inputVolumeDb(path.inputVolumeDb());
+        mix.inputGateEnabled(path.inputGateEnabled());
+        mix.inputGateThresholdDb(path.inputGateThresholdDb());
+        mix.inputGateDecayMs(path.inputGateDecayMs());
         mix.outputVolumeDb(path.outputVolumeDb());
         mix.mute(path.mute());
         mix.pan(path.pan());
@@ -720,6 +747,9 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,name)
     JSON_MAP_REFERENCE(Pedalboard,input_volume_db)
     JSON_MAP_REFERENCE(Pedalboard,output_volume_db)
+    JSON_MAP_REFERENCE(Pedalboard,inputGateEnabled)
+    JSON_MAP_REFERENCE(Pedalboard,inputGateThresholdDb)
+    JSON_MAP_REFERENCE(Pedalboard,inputGateDecayMs)
     JSON_MAP_REFERENCE(Pedalboard,pathAInputChannels)
     JSON_MAP_REFERENCE(Pedalboard,pathAOutputChannels)
     JSON_MAP_REFERENCE(Pedalboard,pathAMute)
@@ -729,6 +759,9 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,pathBName)
     JSON_MAP_REFERENCE(Pedalboard,pathBInputVolumeDb)
     JSON_MAP_REFERENCE(Pedalboard,pathBOutputVolumeDb)
+    JSON_MAP_REFERENCE(Pedalboard,pathBInputGateEnabled)
+    JSON_MAP_REFERENCE(Pedalboard,pathBInputGateThresholdDb)
+    JSON_MAP_REFERENCE(Pedalboard,pathBInputGateDecayMs)
     JSON_MAP_REFERENCE(Pedalboard,pathBMute)
     JSON_MAP_REFERENCE(Pedalboard,pathBPan)
     JSON_MAP_REFERENCE(Pedalboard,pathBInputChannels)
@@ -776,6 +809,9 @@ JSON_MAP_BEGIN(PedalboardPath)
     JSON_MAP_REFERENCE(PedalboardPath,name)
     JSON_MAP_REFERENCE(PedalboardPath,enabled)
     JSON_MAP_REFERENCE(PedalboardPath,inputVolumeDb)
+    JSON_MAP_REFERENCE(PedalboardPath,inputGateEnabled)
+    JSON_MAP_REFERENCE(PedalboardPath,inputGateThresholdDb)
+    JSON_MAP_REFERENCE(PedalboardPath,inputGateDecayMs)
     JSON_MAP_REFERENCE(PedalboardPath,outputVolumeDb)
     JSON_MAP_REFERENCE(PedalboardPath,mute)
     JSON_MAP_REFERENCE(PedalboardPath,pan)
@@ -788,6 +824,9 @@ JSON_MAP_END()
 JSON_MAP_BEGIN(SnapshotPathMix)
     JSON_MAP_REFERENCE(SnapshotPathMix,id)
     JSON_MAP_REFERENCE(SnapshotPathMix,inputVolumeDb)
+    JSON_MAP_REFERENCE(SnapshotPathMix,inputGateEnabled)
+    JSON_MAP_REFERENCE(SnapshotPathMix,inputGateThresholdDb)
+    JSON_MAP_REFERENCE(SnapshotPathMix,inputGateDecayMs)
     JSON_MAP_REFERENCE(SnapshotPathMix,outputVolumeDb)
     JSON_MAP_REFERENCE(SnapshotPathMix,mute)
     JSON_MAP_REFERENCE(SnapshotPathMix,pan)
@@ -811,6 +850,12 @@ JSON_MAP_BEGIN(Snapshot)
     JSON_MAP_REFERENCE(Snapshot,outputVolumeDb)
     JSON_MAP_REFERENCE(Snapshot,pathBInputVolumeDb)
     JSON_MAP_REFERENCE(Snapshot,pathBOutputVolumeDb)
+    JSON_MAP_REFERENCE(Snapshot,inputGateEnabled)
+    JSON_MAP_REFERENCE(Snapshot,inputGateThresholdDb)
+    JSON_MAP_REFERENCE(Snapshot,inputGateDecayMs)
+    JSON_MAP_REFERENCE(Snapshot,pathBInputGateEnabled)
+    JSON_MAP_REFERENCE(Snapshot,pathBInputGateThresholdDb)
+    JSON_MAP_REFERENCE(Snapshot,pathBInputGateDecayMs)
     JSON_MAP_REFERENCE(Snapshot,pathAMute)
     JSON_MAP_REFERENCE(Snapshot,pathAPan)
     JSON_MAP_REFERENCE(Snapshot,pathBMute)

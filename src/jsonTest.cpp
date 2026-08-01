@@ -63,6 +63,12 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     source.pathBOutputChannels({0});
     source.pathBInputVolumeDb(-3.0f);
     source.pathBOutputVolumeDb(2.5f);
+    source.inputGateEnabled(true);
+    source.inputGateThresholdDb(-52.0f);
+    source.inputGateDecayMs(180.0f);
+    source.pathBInputGateEnabled(true);
+    source.pathBInputGateThresholdDb(-48.0f);
+    source.pathBInputGateDecayMs(320.0f);
     source.pathAInputChannels({2});
     source.pathAOutputChannels({2, 3});
     source.pathAMute(true);
@@ -86,6 +92,9 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     pathC.outputChannels({6, 7});
     pathC.sourceSendsDb({{"A", -12.0f}, {"B", -18.0f}});
     pathC.inputVolumeDb(-2.0f);
+    pathC.inputGateEnabled(true);
+    pathC.inputGateThresholdDb(-44.0f);
+    pathC.inputGateDecayMs(410.0f);
     pathC.outputVolumeDb(1.5f);
     pathC.mute(false);
     pathC.pan(-0.5f);
@@ -129,6 +138,12 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.pathBOutputChannels() == std::vector<int64_t>{0});
     REQUIRE(result.pathBInputVolumeDb() == -3.0f);
     REQUIRE(result.pathBOutputVolumeDb() == 2.5f);
+    REQUIRE(result.inputGateEnabled());
+    REQUIRE(result.inputGateThresholdDb() == -52.0f);
+    REQUIRE(result.inputGateDecayMs() == 180.0f);
+    REQUIRE(result.pathBInputGateEnabled());
+    REQUIRE(result.pathBInputGateThresholdDb() == -48.0f);
+    REQUIRE(result.pathBInputGateDecayMs() == 320.0f);
     REQUIRE(result.pathAInputChannels() == std::vector<int64_t>{2});
     REQUIRE(result.pathAOutputChannels() == std::vector<int64_t>{2, 3});
     REQUIRE(result.pathAMute());
@@ -154,6 +169,9 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.additionalPaths()[0].sourceSendsDb().at("A") == -12.0f);
     REQUIRE(result.additionalPaths()[0].sourceSendsDb().at("B") == -18.0f);
     REQUIRE(result.additionalPaths()[0].inputVolumeDb() == -2.0f);
+    REQUIRE(result.additionalPaths()[0].inputGateEnabled());
+    REQUIRE(result.additionalPaths()[0].inputGateThresholdDb() == -44.0f);
+    REQUIRE(result.additionalPaths()[0].inputGateDecayMs() == 410.0f);
     REQUIRE(result.additionalPaths()[0].outputVolumeDb() == 1.5f);
     REQUIRE(result.additionalPaths()[0].pan() == -0.5f);
     REQUIRE(result.additionalPaths()[0].items().size() == 1);
@@ -173,6 +191,10 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.snapshots()[0]->pathAMute_);
     REQUIRE(result.snapshots()[0]->pathAPan_ == -1.0f);
     REQUIRE(result.snapshots()[0]->pathBPan_ == 1.0f);
+    REQUIRE(result.snapshots()[0]->inputGateEnabled_);
+    REQUIRE(result.snapshots()[0]->inputGateThresholdDb_ == -52.0f);
+    REQUIRE(result.snapshots()[0]->inputGateDecayMs_ == 180.0f);
+    REQUIRE(result.snapshots()[0]->pathBInputGateEnabled_);
     REQUIRE(result.snapshots()[0]->globalEqEnabled_);
     REQUIRE(result.snapshots()[0]->globalEqMidFrequencyHz_ == 1250);
     REQUIRE(result.snapshots()[0]->globalEqLowCutSlopeDb_ == 18);
@@ -181,6 +203,8 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.snapshots()[0]->additionalPathMixes_.size() == 2);
     REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].id() == "C");
     REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].pan() == -0.5f);
+    REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].inputGateEnabled());
+    REQUIRE(result.snapshots()[0]->additionalPathMixes_[0].inputGateThresholdDb() == -44.0f);
 }
 
 TEST_CASE("snapshot restoration preserves generic patch state", "[pedalboard][snapshot][patch-state]")
@@ -216,6 +240,25 @@ TEST_CASE("routing structure detects send graph changes", "[pedalboard][routing]
     Pedalboard right = left.DeepCopy();
     REQUIRE(left.IsStructureIdentical(right));
     right.additionalPaths()[0].sourceSendsDb({{"A", -6.0f}});
+    REQUIRE_FALSE(left.IsStructureIdentical(right));
+}
+
+TEST_CASE("input gate changes invalidate runtime structure", "[pedalboard][routing][input-gate]")
+{
+    Pedalboard left = Pedalboard::MakeDefault();
+    Pedalboard right = left.DeepCopy();
+    REQUIRE(left.IsStructureIdentical(right));
+
+    right.inputGateEnabled(true);
+    REQUIRE_FALSE(left.IsStructureIdentical(right));
+
+    right = left.DeepCopy();
+    PedalboardPath pathC;
+    pathC.id("C");
+    pathC.items().push_back(left.MakeEmptyItem());
+    left.additionalPaths().push_back(pathC);
+    right = left.DeepCopy();
+    right.additionalPaths()[0].inputGateThresholdDb(-48.0f);
     REQUIRE_FALSE(left.IsStructureIdentical(right));
 }
 

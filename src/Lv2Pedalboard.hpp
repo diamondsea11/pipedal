@@ -28,6 +28,8 @@
 #include <functional>
 #include "DbDezipper.hpp"
 #include <array>
+#include <algorithm>
+#include <cmath>
 
 namespace pipedal
 {
@@ -67,12 +69,72 @@ namespace pipedal
         };
 
     private:
+        class InputNoiseGate
+        {
+            bool enabled = false;
+            float threshold = 0.001f;
+            float envelope = 0;
+            float gain = 1;
+            float detectorAttack = 0;
+            float detectorRelease = 0;
+            float gainAttack = 0;
+            float gainRelease = 0;
+            uint32_t holdSamples = 0;
+            uint32_t holdRemaining = 0;
+        public:
+            void Configure(float sampleRate, bool enabledValue, float thresholdDb, float decayMs)
+            {
+                enabled = enabledValue;
+                threshold = std::pow(10.0f, std::clamp(thresholdDb, -96.0f, 0.0f) / 20.0f);
+                const float safeRate = std::max(sampleRate, 1.0f);
+                detectorAttack = std::exp(-1.0f / (0.001f * safeRate));
+                detectorRelease = std::exp(-1.0f / (0.03f * safeRate));
+                gainAttack = std::exp(-1.0f / (0.001f * safeRate));
+                const float decaySeconds = std::clamp(decayMs, 10.0f, 2000.0f) * 0.001f;
+                gainRelease = std::exp(std::log(0.001f) / (decaySeconds * safeRate));
+                holdSamples = (uint32_t)(safeRate * 0.02f);
+                if (!enabled)
+                {
+                    envelope = 0;
+                    gain = 1;
+                    holdRemaining = 0;
+                }
+            }
+            float Tick(float level)
+            {
+                if (!enabled) return 1;
+                const float detectorCoefficient = level > envelope
+                    ? detectorAttack
+                    : detectorRelease;
+                envelope = detectorCoefficient * envelope +
+                    (1 - detectorCoefficient) * level;
+                if (envelope >= threshold)
+                {
+                    holdRemaining = holdSamples;
+                    gain = 1 - (1 - gain) * gainAttack;
+                }
+                else if (holdRemaining != 0)
+                {
+                    --holdRemaining;
+                    gain = 1 - (1 - gain) * gainAttack;
+                }
+                else
+                {
+                    gain *= gainRelease;
+                    if (gain < 0.00001f) gain = 0;
+                }
+                return gain;
+            }
+        };
+
         IHost *pHost = nullptr;
         size_t currentFrameOffset = 0;
         DbDezipper inputVolume;
         DbDezipper outputVolume;
         DbDezipper pathBInputVolume;
         DbDezipper pathBOutputVolume;
+        InputNoiseGate inputGate;
+        InputNoiseGate pathBInputGate;
 
         BufferPool bufferPool;
         std::vector<float *> pedalboardInputBuffers;
@@ -134,6 +196,7 @@ namespace pipedal
             std::vector<float *> outputBuffers;
             DbDezipper inputVolume;
             DbDezipper outputVolume;
+            InputNoiseGate inputGate;
             bool mute = false;
             float pan = 0;
             std::vector<IEffect *> latencyEffects;

@@ -16,5 +16,7 @@ Install: copy these into the plugin bundle and append to the bundle's manifest.t
 `<https://dusk-audio.github.io/plugins/multi-comp> rdfs:seeAlso <modgui.ttl> .`
 then restart pipedald. In the UI, select the plugin and toggle **MOD UI**.
 
-Scope: first working core (Classic VCA engine + Mix + gain-reduction meter). Other
-engines (Opto/FET/Bus/Studio/Digital) and multiband are future iterations.
+The current skin covers Classic VCA, Opto, FET, Bus, Studio, Digital and
+multiband controls. Its gain-reduction meter reads the plugin's published
+real-time reduction property; plugins that do not publish reduction telemetry
+cannot provide a host-derived GR value.

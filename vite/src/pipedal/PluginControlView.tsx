@@ -34,7 +34,7 @@ import { midiChannelBindingControlFeatureEnabled } from './MidiChannelBinding';
 
 import { withStyles } from "tss-react/mui";
 import { PiPedalModel, PiPedalModelFactory } from './PiPedalModel';
-import { UiPlugin, UiControl, UiFileProperty, UiFrequencyPlot, ScalePoint } from './Lv2Plugin';
+import { UiPlugin, UiControl, UiFileProperty, UiFrequencyPlot, ScalePoint, ControlType } from './Lv2Plugin';
 import {
     Pedalboard, PedalboardItem, ControlValue
 } from './Pedalboard';
@@ -83,7 +83,7 @@ interface SideChainSelectItem {
     title: string;
 }
 
-function makeIoPluginInfo(name: string, uri: string): UiPlugin {
+function makeIoPluginInfo(name: string, uri: string, input: boolean): UiPlugin {
     let result = new UiPlugin();
     result.name = name;
     result.uri = uri;
@@ -100,18 +100,52 @@ function makeIoPluginInfo(name: string, uri: string): UiPlugin {
     volumeControl.scale_points = [
         new ScalePoint().deserialize({ label: "-INF", value: -60 })
     ];
-    result.controls = [
-        volumeControl
-    ];
+    if (input) {
+        const gateControl = new UiControl();
+        gateControl.name = "Gate";
+        gateControl.symbol = "input_gate";
+        gateControl.index = 1;
+        gateControl.is_input = true;
+        gateControl.min_value = 0;
+        gateControl.max_value = 1;
+        gateControl.default_value = 0;
+        gateControl.toggled_property = true;
+        gateControl.controlType = ControlType.OnOffSwitch;
+
+        const thresholdControl = new UiControl();
+        thresholdControl.name = "Threshold";
+        thresholdControl.symbol = "input_gate_threshold_db";
+        thresholdControl.index = 2;
+        thresholdControl.is_input = true;
+        thresholdControl.min_value = -96;
+        thresholdControl.max_value = 0;
+        thresholdControl.default_value = -60;
+        thresholdControl.units = Units.db;
+
+        const decayControl = new UiControl();
+        decayControl.name = "Decay";
+        decayControl.symbol = "input_gate_decay_ms";
+        decayControl.index = 3;
+        decayControl.is_input = true;
+        decayControl.min_value = 10;
+        decayControl.max_value = 2000;
+        decayControl.default_value = 250;
+        decayControl.units = Units.ms;
+        decayControl.is_logarithmic = true;
+
+        result.controls = [gateControl, thresholdControl, decayControl, volumeControl];
+    } else {
+        result.controls = [volumeControl];
+    }
     return result;
 }
 
 export const startPluginInfo: UiPlugin =
-    makeIoPluginInfo("Input", Pedalboard.START_PEDALBOARD_ITEM_URI);
+    makeIoPluginInfo("Input", Pedalboard.START_PEDALBOARD_ITEM_URI, true);
 
 
 export const endPluginInfo: UiPlugin =
-    makeIoPluginInfo("Output", Pedalboard.END_PEDALBOARD_ITEM_URI);
+    makeIoPluginInfo("Output", Pedalboard.END_PEDALBOARD_ITEM_URI, false);
 
 
 
@@ -913,10 +947,10 @@ const PluginControlView =
             }
 
             static startPluginInfo: UiPlugin =
-                makeIoPluginInfo("Input", Pedalboard.START_PEDALBOARD_ITEM_URI);
+                makeIoPluginInfo("Input", Pedalboard.START_PEDALBOARD_ITEM_URI, true);
 
             static endPluginInfo: UiPlugin =
-                makeIoPluginInfo("Output", Pedalboard.END_PEDALBOARD_ITEM_URI);
+                makeIoPluginInfo("Output", Pedalboard.END_PEDALBOARD_ITEM_URI, false);
 
             midiBindingControl(pedalboardItem: PedalboardItem): ReactNode {
                 if ((!pedalboardItem.midiChannelBinding) || (midiChannelBindingControlFeatureEnabled === false)) {

@@ -293,6 +293,12 @@ export class Snapshot {
         this.outputVolumeDb = input.outputVolumeDb ?? 0;
         this.pathBInputVolumeDb = input.pathBInputVolumeDb ?? 0;
         this.pathBOutputVolumeDb = input.pathBOutputVolumeDb ?? 0;
+        this.inputGateEnabled = input.inputGateEnabled ?? false;
+        this.inputGateThresholdDb = input.inputGateThresholdDb ?? -60;
+        this.inputGateDecayMs = input.inputGateDecayMs ?? 250;
+        this.pathBInputGateEnabled = input.pathBInputGateEnabled ?? false;
+        this.pathBInputGateThresholdDb = input.pathBInputGateThresholdDb ?? -60;
+        this.pathBInputGateDecayMs = input.pathBInputGateDecayMs ?? 250;
         this.pathAMute = input.pathAMute ?? false;
         this.pathAPan = input.pathAPan ?? 0;
         this.pathBMute = input.pathBMute ?? false;
@@ -352,6 +358,12 @@ export class Snapshot {
     outputVolumeDb: number = 0;
     pathBInputVolumeDb: number = 0;
     pathBOutputVolumeDb: number = 0;
+    inputGateEnabled: boolean = false;
+    inputGateThresholdDb: number = -60;
+    inputGateDecayMs: number = 250;
+    pathBInputGateEnabled: boolean = false;
+    pathBInputGateThresholdDb: number = -60;
+    pathBInputGateDecayMs: number = 250;
     pathAMute: boolean = false;
     pathAPan: number = 0;
     pathBMute: boolean = false;
@@ -377,6 +389,9 @@ export class SnapshotPathMix {
     deserialize(input: any): SnapshotPathMix {
         this.id = input.id ?? "";
         this.inputVolumeDb = input.inputVolumeDb ?? 0;
+        this.inputGateEnabled = input.inputGateEnabled ?? false;
+        this.inputGateThresholdDb = input.inputGateThresholdDb ?? -60;
+        this.inputGateDecayMs = input.inputGateDecayMs ?? 250;
         this.outputVolumeDb = input.outputVolumeDb ?? 0;
         this.mute = input.mute ?? false;
         this.pan = input.pan ?? 0;
@@ -384,6 +399,9 @@ export class SnapshotPathMix {
     }
     id: string = "";
     inputVolumeDb: number = 0;
+    inputGateEnabled: boolean = false;
+    inputGateThresholdDb: number = -60;
+    inputGateDecayMs: number = 250;
     outputVolumeDb: number = 0;
     mute: boolean = false;
     pan: number = 0;
@@ -395,6 +413,9 @@ export class PedalboardPath {
         this.name = input.name ?? this.id;
         this.enabled = input.enabled ?? true;
         this.inputVolumeDb = input.inputVolumeDb ?? 0;
+        this.inputGateEnabled = input.inputGateEnabled ?? false;
+        this.inputGateThresholdDb = input.inputGateThresholdDb ?? -60;
+        this.inputGateDecayMs = input.inputGateDecayMs ?? 250;
         this.outputVolumeDb = input.outputVolumeDb ?? 0;
         this.mute = input.mute ?? false;
         this.pan = input.pan ?? 0;
@@ -408,6 +429,9 @@ export class PedalboardPath {
     name: string = "";
     enabled: boolean = true;
     inputVolumeDb: number = 0;
+    inputGateEnabled: boolean = false;
+    inputGateThresholdDb: number = -60;
+    inputGateDecayMs: number = 250;
     outputVolumeDb: number = 0;
     mute: boolean = false;
     pan: number = 0;
@@ -572,6 +596,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         this.name = input.name;
         this.input_volume_db  = input.input_volume_db;
         this.output_volume_db = input.output_volume_db;
+        this.inputGateEnabled = input.inputGateEnabled ?? false;
+        this.inputGateThresholdDb = input.inputGateThresholdDb ?? -60;
+        this.inputGateDecayMs = input.inputGateDecayMs ?? 250;
         this.pathAInputChannels = input.pathAInputChannels
             ? input.pathAInputChannels.slice()
             : [];
@@ -586,6 +613,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         this.pathBName = input.pathBName ?? "Vocal";
         this.pathBInputVolumeDb = input.pathBInputVolumeDb ?? 0;
         this.pathBOutputVolumeDb = input.pathBOutputVolumeDb ?? 0;
+        this.pathBInputGateEnabled = input.pathBInputGateEnabled ?? false;
+        this.pathBInputGateThresholdDb = input.pathBInputGateThresholdDb ?? -60;
+        this.pathBInputGateDecayMs = input.pathBInputGateDecayMs ?? 250;
         this.pathBMute = input.pathBMute ?? false;
         this.pathBPan = input.pathBPan ?? 0;
         this.pathBInputChannels = input.pathBInputChannels
@@ -627,6 +657,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     name: string = "";
     input_volume_db: number = 0;
     output_volume_db: number = 0;
+    inputGateEnabled: boolean = false;
+    inputGateThresholdDb: number = -60;
+    inputGateDecayMs: number = 250;
     pathAInputChannels: number[] = [];
     pathAOutputChannels: number[] = [];
     pathAMute: boolean = false;
@@ -636,6 +669,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     pathBName: string = "Vocal";
     pathBInputVolumeDb: number = 0;
     pathBOutputVolumeDb: number = 0;
+    pathBInputGateEnabled: boolean = false;
+    pathBInputGateThresholdDb: number = -60;
+    pathBInputGateDecayMs: number = 250;
     pathBMute: boolean = false;
     pathBPan: number = 0;
     pathBInputChannels: number[] = [0];
@@ -822,13 +858,30 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         }
         return null;
     }
+    makeInputTerminalControlValues(
+        volumeDb: number,
+        gateEnabled: boolean,
+        gateThresholdDb: number,
+        gateDecayMs: number
+    ): ControlValue[] {
+        return [
+            new ControlValue("volume_db", volumeDb),
+            new ControlValue("input_gate", gateEnabled ? 1 : 0),
+            new ControlValue("input_gate_threshold_db", gateThresholdDb),
+            new ControlValue("input_gate_decay_ms", gateDecayMs),
+        ];
+    }
     makeStartItem(): PedalboardItem {
         let result = new PedalboardItem();
         result.pluginName = "Input";
         result.instanceId = Pedalboard.START_CONTROL_ID;
         result.uri = Pedalboard.START_PEDALBOARD_ITEM_URI;
         result.isEnabled = true;
-        result.controlValues = [new ControlValue("volume_db",this.input_volume_db)];
+        result.controlValues = this.makeInputTerminalControlValues(
+            this.input_volume_db,
+            this.inputGateEnabled,
+            this.inputGateThresholdDb,
+            this.inputGateDecayMs);
         return result;
 
     }
@@ -848,7 +901,11 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         result.instanceId = Pedalboard.AUX_START_CONTROL_ID;
         result.uri = Pedalboard.START_PEDALBOARD_ITEM_URI;
         result.isEnabled = true;
-        result.controlValues = [new ControlValue("volume_db", this.pathBInputVolumeDb)];
+        result.controlValues = this.makeInputTerminalControlValues(
+            this.pathBInputVolumeDb,
+            this.pathBInputGateEnabled,
+            this.pathBInputGateThresholdDb,
+            this.pathBInputGateDecayMs);
         return result;
     }
     makePathBEndItem(): PedalboardItem {
@@ -871,11 +928,13 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             ? Pedalboard.START_PEDALBOARD_ITEM_URI
             : Pedalboard.END_PEDALBOARD_ITEM_URI;
         result.isEnabled = true;
-        result.controlValues = [
-            new ControlValue("volume_db", input
-                ? path?.inputVolumeDb ?? 0
-                : path?.outputVolumeDb ?? 0)
-        ];
+        result.controlValues = input
+            ? this.makeInputTerminalControlValues(
+                path?.inputVolumeDb ?? 0,
+                path?.inputGateEnabled ?? false,
+                path?.inputGateThresholdDb ?? -60,
+                path?.inputGateDecayMs ?? 250)
+            : [new ControlValue("volume_db", path?.outputVolumeDb ?? 0)];
         return result;
     }
 

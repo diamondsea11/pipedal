@@ -211,6 +211,9 @@ namespace pipedal
         std::string name_;
         bool enabled_ = true;
         float inputVolumeDb_ = 0;
+        bool inputGateEnabled_ = false;
+        float inputGateThresholdDb_ = -60;
+        float inputGateDecayMs_ = 250;
         float outputVolumeDb_ = 0;
         bool mute_ = false;
         float pan_ = 0;
@@ -223,6 +226,9 @@ namespace pipedal
         GETTER_SETTER_REF(name)
         GETTER_SETTER(enabled)
         GETTER_SETTER(inputVolumeDb)
+        GETTER_SETTER(inputGateEnabled)
+        GETTER_SETTER(inputGateThresholdDb)
+        GETTER_SETTER(inputGateDecayMs)
         GETTER_SETTER(outputVolumeDb)
         GETTER_SETTER(mute)
         GETTER_SETTER(pan)
@@ -238,12 +244,18 @@ namespace pipedal
     {
         std::string id_;
         float inputVolumeDb_ = 0;
+        bool inputGateEnabled_ = false;
+        float inputGateThresholdDb_ = -60;
+        float inputGateDecayMs_ = 250;
         float outputVolumeDb_ = 0;
         bool mute_ = false;
         float pan_ = 0;
     public:
         GETTER_SETTER_REF(id)
         GETTER_SETTER(inputVolumeDb)
+        GETTER_SETTER(inputGateEnabled)
+        GETTER_SETTER(inputGateThresholdDb)
+        GETTER_SETTER(inputGateDecayMs)
         GETTER_SETTER(outputVolumeDb)
         GETTER_SETTER(mute)
         GETTER_SETTER(pan)
@@ -333,6 +345,12 @@ namespace pipedal
         float outputVolumeDb_ = 0;
         float pathBInputVolumeDb_ = 0;
         float pathBOutputVolumeDb_ = 0;
+        bool inputGateEnabled_ = false;
+        float inputGateThresholdDb_ = -60;
+        float inputGateDecayMs_ = 250;
+        bool pathBInputGateEnabled_ = false;
+        float pathBInputGateThresholdDb_ = -60;
+        float pathBInputGateDecayMs_ = 250;
         bool pathAMute_ = false;
         float pathAPan_ = 0;
         bool pathBMute_ = false;
@@ -364,6 +382,9 @@ namespace pipedal
         std::string name_;
         float input_volume_db_ = 0;
         float output_volume_db_ = 0;
+        bool inputGateEnabled_ = false;
+        float inputGateThresholdDb_ = -60;
+        float inputGateDecayMs_ = 250;
         std::vector<int64_t> pathAInputChannels_;
         std::vector<int64_t> pathAOutputChannels_;
         bool pathAMute_ = false;
@@ -374,6 +395,9 @@ namespace pipedal
         std::string pathBName_ = "Vocal";
         float pathBInputVolumeDb_ = 0;
         float pathBOutputVolumeDb_ = 0;
+        bool pathBInputGateEnabled_ = false;
+        float pathBInputGateThresholdDb_ = -60;
+        float pathBInputGateDecayMs_ = 250;
         bool pathBMute_ = false;
         float pathBPan_ = 0;
         std::vector<int64_t> pathBInputChannels_ = {0};
@@ -439,6 +463,9 @@ namespace pipedal
         GETTER_SETTER_VEC(items)
         GETTER_SETTER(input_volume_db)
         GETTER_SETTER(output_volume_db)
+        GETTER_SETTER(inputGateEnabled)
+        GETTER_SETTER(inputGateThresholdDb)
+        GETTER_SETTER(inputGateDecayMs)
         GETTER_SETTER_VEC(pathAInputChannels)
         GETTER_SETTER_VEC(pathAOutputChannels)
         GETTER_SETTER(pathAMute)
@@ -447,6 +474,9 @@ namespace pipedal
         GETTER_SETTER_REF(pathBName)
         GETTER_SETTER(pathBInputVolumeDb)
         GETTER_SETTER(pathBOutputVolumeDb)
+        GETTER_SETTER(pathBInputGateEnabled)
+        GETTER_SETTER(pathBInputGateThresholdDb)
+        GETTER_SETTER(pathBInputGateDecayMs)
         GETTER_SETTER(pathBMute)
         GETTER_SETTER(pathBPan)
         GETTER_SETTER_VEC(pathBInputChannels)

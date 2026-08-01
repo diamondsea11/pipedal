@@ -80,13 +80,15 @@ MIDI controllers.
   processor-specific groups; Multi-Comp also exposes its live GR telemetry.
 - [x] Add automated integration tests for path routing, snapshot restoration,
   plugin duplication and generic LV2 patch-property persistence.
+- [x] Add a per-path, linked-channel input noise gate with threshold and decay
+  controls in each input terminal and snapshot/preset persistence.
 
 ## Build Line
 
 - Base release: `2.0.110`
 - Current development branch: `feature/multipath-v1`
-- Current tagged build: `pipedal-2.0.110-codex19`
-- Current package build: `2.0.110+codex19`
+- Current tagged build: `pipedal-2.0.110-codex20`
+- Current package build: `2.0.110+codex20`
 
 ## Performance Record
 
