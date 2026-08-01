@@ -35,6 +35,46 @@ export const orderedPluginCategories = Object.values(pluginCategories)
 
 export const CATEGORY_FILTER_PREFIX = 'category:';
 
+// ---- User category overrides (persisted) -------------------------------
+// Lets the user re-assign a mis-categorised plugin. Keyed by plugin URI ->
+// category id. Persisted in localStorage so it survives reloads.
+const CATEGORY_OVERRIDE_KEY = 'pipedal.pluginCategoryOverrides';
+
+let categoryOverrides: Record<string, string> | null = null;
+
+function loadCategoryOverrides(): Record<string, string> {
+    if (categoryOverrides) return categoryOverrides;
+    categoryOverrides = {};
+    try {
+        const raw = window.localStorage.getItem(CATEGORY_OVERRIDE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+                categoryOverrides = parsed as Record<string, string>;
+            }
+        }
+    } catch (_e) { /* ignore corrupt/unavailable storage */ }
+    return categoryOverrides;
+}
+
+export function getPluginCategoryOverride(uri: string): PluginCategory | undefined {
+    const id = loadCategoryOverrides()[uri];
+    if (!id) return undefined;
+    return orderedPluginCategories.find(c => c.id === id);
+}
+
+export function setPluginCategoryOverride(uri: string, categoryId: string | null): void {
+    const overrides = loadCategoryOverrides();
+    if (categoryId) {
+        overrides[uri] = categoryId;
+    } else {
+        delete overrides[uri];
+    }
+    try {
+        window.localStorage.setItem(CATEGORY_OVERRIDE_KEY, JSON.stringify(overrides));
+    } catch (_e) { /* ignore */ }
+}
+
 export function getPluginCategory(pluginType: PluginType): PluginCategory {
     switch (pluginType) {
         case PluginType.NamPlugin:
@@ -104,6 +144,11 @@ export function getPluginCategory(pluginType: PluginType): PluginCategory {
 }
 
 export function getUiPluginCategory(plugin: UiPlugin): PluginCategory {
+    const override = getPluginCategoryOverride(plugin.uri);
+    if (override) {
+        return override;
+    }
+
     if (plugin.uri === 'http://two-play.com/plugins/toob-nam') {
         return pluginCategories.amp;
     }

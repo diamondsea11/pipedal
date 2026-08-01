@@ -32,7 +32,7 @@ import {
     Pedalboard, PedalboardItem, PedalboardSplitItem, SplitType
 } from './Pedalboard';
 import InputIcon from '@mui/icons-material/Input';
-import LoadPluginDialog from './LoadPluginDialog';
+import LoadPluginBrowserDialog from './LoadPluginBrowserDialog';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 
@@ -809,7 +809,7 @@ export const MainPage =
                             />
                             {
                                 (this.state.loadDialogOpen) && (
-                                    <LoadPluginDialog open={this.state.loadDialogOpen} uri={this.getSelectedUri()}
+                                    <LoadPluginBrowserDialog open={this.state.loadDialogOpen}
                                         onOk={this.onLoadOk} onCancel={this.onLoadCancel}
                                     />
 

@@ -1,22 +1,28 @@
 // Copyright (c) 2026 Thomas Rapolani
 // SPDX-License-Identifier: MIT
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SearchIcon from '@mui/icons-material/Search';
 import StarIcon from '@mui/icons-material/Star';
 import ButtonBase from '@mui/material/ButtonBase';
 import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { PluginType, UiPlugin } from './Lv2Plugin';
 import {
+    getPluginCategoryOverride,
     getPluginCategoryTags,
     getUiPluginCategory,
     orderedPluginCategories,
     PluginCategory,
+    setPluginCategoryOverride,
 } from './PluginCategories';
 import PluginIcon from './PluginIcon';
 import { FavoritesList, PiPedalModelFactory } from './PiPedalModel';
@@ -51,8 +57,22 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
     const [categoryId, setCategoryId] = useState<string | null>(null);
     const [manufacturer, setManufacturer] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    // Re-categorise context menu (right-click on desktop, long-press on touch).
+    const [recatMenu, setRecatMenu] = useState<{ uri: string; top: number; left: number } | null>(null);
+    const [overrideBump, setOverrideBump] = useState(0);
+    const longPressTimer = useRef<number | null>(null);
+    const longPressFired = useRef(false);
 
     const selectCategory = (id: string | null) => { setCategoryId(id); setManufacturer(null); };
+
+    const openRecatMenu = (event: { clientX: number; clientY: number }, uri: string) => {
+        setRecatMenu({ uri, top: event.clientY, left: event.clientX });
+    };
+    const applyOverride = (uri: string, categoryId: string | null) => {
+        setPluginCategoryOverride(uri, categoryId);
+        setRecatMenu(null);
+        setOverrideBump((n) => n + 1);
+    };
 
     useEffect(() => {
         const onPluginsChanged = (value: UiPlugin[]) => setPlugins(value);
@@ -74,7 +94,7 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
         return orderedPluginCategories
             .filter((category) => (counts.get(category.id) ?? 0) !== 0)
             .map((category) => ({ category, count: counts.get(category.id) ?? 0 }));
-    }, [plugins]);
+    }, [plugins, overrideBump]);
 
     const visiblePlugins = useMemo(() => {
         const searchText = search.trim();
@@ -116,7 +136,7 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
             return left.plugin.name.localeCompare(right.plugin.name);
         });
         return scored.map((entry) => entry.plugin);
-    }, [categoryId, manufacturer, favorites, plugins, search]);
+    }, [categoryId, manufacturer, favorites, plugins, search, overrideBump]);
 
     // Manufacturers (by author) within the selected category, as a sub-level.
     const manufacturers = useMemo(() => {
@@ -130,7 +150,7 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
         return Array.from(counts.entries())
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [categoryId, plugins]);
+    }, [categoryId, plugins, overrideBump]);
 
     const selectedCategory: PluginCategory | undefined =
         categoryId === null
@@ -298,7 +318,26 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
                             return (
                                 <ButtonBase
                                     key={plugin.uri}
-                                    onClick={() => props.onSelect(plugin.uri)}
+                                    onClick={() => {
+                                        if (longPressFired.current) { longPressFired.current = false; return; }
+                                        props.onSelect(plugin.uri);
+                                    }}
+                                    onContextMenu={(e) => { e.preventDefault(); openRecatMenu(e, plugin.uri); }}
+                                    onPointerDown={(e) => {
+                                        if (e.pointerType === 'mouse') { return; }
+                                        longPressFired.current = false;
+                                        const x = e.clientX, y = e.clientY, uri = plugin.uri;
+                                        longPressTimer.current = window.setTimeout(() => {
+                                            longPressFired.current = true;
+                                            openRecatMenu({ clientX: x, clientY: y }, uri);
+                                        }, 550);
+                                    }}
+                                    onPointerUp={() => {
+                                        if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+                                    }}
+                                    onPointerLeave={() => {
+                                        if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+                                    }}
                                     sx={{
                                         minHeight: 70,
                                         border: '1px solid',
@@ -357,6 +396,36 @@ export default function InlinePluginBrowser(props: InlinePluginBrowserProps) {
                     </div>
                 </div>
             )}
+
+            <Menu
+                open={recatMenu !== null}
+                onClose={() => setRecatMenu(null)}
+                anchorReference="anchorPosition"
+                anchorPosition={recatMenu ? { top: recatMenu.top, left: recatMenu.left } : undefined}
+            >
+                <Typography sx={{ px: 2, py: 0.5, fontSize: '0.72rem', fontWeight: 700, color: 'text.secondary' }}>
+                    MOVE TO CATEGORY
+                </Typography>
+                {orderedPluginCategories.map((category) => (
+                    <MenuItem
+                        key={category.id}
+                        dense
+                        onClick={() => recatMenu && applyOverride(recatMenu.uri, category.id)}
+                    >
+                        <span style={{
+                            width: 10, height: 10, borderRadius: 2,
+                            background: category.color, marginRight: 10, flex: '0 0 auto',
+                        }} />
+                        <ListItemText primary={category.label} />
+                    </MenuItem>
+                ))}
+                {recatMenu && getPluginCategoryOverride(recatMenu.uri) && [
+                    <Divider key="div" />,
+                    <MenuItem key="reset" dense onClick={() => recatMenu && applyOverride(recatMenu.uri, null)}>
+                        <ListItemText primary="Reset to default" />
+                    </MenuItem>,
+                ]}
+            </Menu>
         </div>
     );
 }
