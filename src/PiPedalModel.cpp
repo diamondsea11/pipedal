@@ -18,7 +18,10 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "pch.h"
+#include <array>
 #include <future>
+#include <string_view>
+#include <unordered_map>
 #include "ServiceConfiguration.hpp"
 #include "AudioConfig.hpp"
 #include "ConfigUtil.hpp"
@@ -2362,21 +2365,25 @@ static bool NamModelHasInputLevelCalibration(
         {
             continue;
         }
-        // value is a JSON Path atom: {"otype_":"Path","value":"<path>"}.
-        auto valueKey = value.find("\"value\"");
-        if (valueKey == std::string::npos)
+        std::string modelPath;
+        try
+        {
+            std::istringstream stream(value);
+            json_reader reader(stream);
+            json_variant atom;
+            reader.read(&atom);
+            if (!atom.is_object())
+                return false;
+            auto object = atom.as_object();
+            auto path = object->find("value");
+            if (path == object->end() || !path->second.is_string())
+                return false;
+            modelPath = path->second.as_string();
+        }
+        catch (const std::exception &)
+        {
             return false;
-        auto colon = value.find(':', valueKey);
-        if (colon == std::string::npos)
-            return false;
-        auto firstQuote = value.find('"', colon);
-        if (firstQuote == std::string::npos)
-            return false;
-        auto secondQuote = value.find('"', firstQuote + 1);
-        if (secondQuote == std::string::npos)
-            return false;
-        std::string modelPath =
-            value.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+        }
         if (modelPath.empty())
             return false;
 
@@ -2388,19 +2395,58 @@ static bool NamModelHasInputLevelCalibration(
         auto fileSize = std::filesystem::file_size(fullPath, ec);
         if (ec)
             return false;
+        auto modified = std::filesystem::last_write_time(fullPath, ec);
+        if (ec)
+            return false;
 
-        // .nam files are JSON. Read the file (only on preset load, never on the
-        // audio thread) and scan for the calibration field. Cap the read so a
-        // pathological file can't stall startup or balloon memory.
+        struct CacheEntry
+        {
+            std::uintmax_t size;
+            std::filesystem::file_time_type modified;
+            bool hasCalibration;
+        };
+        static std::unordered_map<std::string, CacheEntry> cache;
+        const std::string cacheKey = fullPath.lexically_normal().string();
+        auto cached = cache.find(cacheKey);
+        if (cached != cache.end() && cached->second.size == fileSize &&
+            cached->second.modified == modified)
+        {
+            return cached->second.hasCalibration;
+        }
+
+        // Stream the JSON until the metadata key is found. This avoids allocating
+        // tens of megabytes for large NAM weights and the result is cached across
+        // the active block and all snapshots that reference the same model.
         constexpr std::uintmax_t MAX_SCAN_BYTES = 64 * 1024 * 1024;
         std::ifstream f(fullPath, std::ios::binary);
         if (!f)
             return false;
-        std::string contents;
-        contents.resize((size_t)std::min(fileSize, MAX_SCAN_BYTES));
-        f.read(contents.data(), (std::streamsize)contents.size());
-        contents.resize((size_t)f.gcount());
-        return contents.find("input_level_dbu") != std::string::npos;
+        constexpr std::string_view field = "input_level_dbu";
+        std::array<char, 64 * 1024> buffer;
+        std::string carry;
+        std::uintmax_t scanned = 0;
+        bool found = false;
+        while (scanned < std::min(fileSize, MAX_SCAN_BYTES) && f)
+        {
+            const auto requested = (std::streamsize)std::min<std::uintmax_t>(
+                buffer.size(), std::min(fileSize, MAX_SCAN_BYTES) - scanned);
+            f.read(buffer.data(), requested);
+            const auto count = f.gcount();
+            if (count <= 0)
+                break;
+            std::string chunk = carry;
+            chunk.append(buffer.data(), (size_t)count);
+            if (chunk.find(field) != std::string::npos)
+            {
+                found = true;
+                break;
+            }
+            const size_t overlap = std::min(field.size() - 1, chunk.size());
+            carry.assign(chunk.end() - overlap, chunk.end());
+            scanned += (std::uintmax_t)count;
+        }
+        cache[cacheKey] = CacheEntry{fileSize, modified, found};
+        return found;
     }
     return false;
 }

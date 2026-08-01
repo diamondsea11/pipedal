@@ -210,6 +210,35 @@ TEST_CASE("routing structure detects send graph changes", "[pedalboard][routing]
     REQUIRE_FALSE(left.IsStructureIdentical(right));
 }
 
+TEST_CASE("snapshot MIDI actions inherit Base and invalidate runtime structure",
+          "[pedalboard][snapshot][midi-actions]")
+{
+    Pedalboard base = Pedalboard::MakeDefault();
+    MidiAction baseAction;
+    baseAction.actionType((int)MidiActionType::NextPreset);
+    baseAction.number(10);
+    base.midiActions().push_back(baseAction);
+
+    auto inherited = std::make_shared<Snapshot>();
+    auto overridden = std::make_shared<Snapshot>();
+    overridden->hasMidiActions_ = true;
+    MidiAction snapshotAction = baseAction;
+    snapshotAction.actionType((int)MidiActionType::NextSnapshot);
+    snapshotAction.number(20);
+    overridden->midiActions_.push_back(snapshotAction);
+    base.snapshots({inherited, overridden});
+
+    base.selectedSnapshot(0);
+    REQUIRE(base.GetActiveMidiActions() == base.midiActions());
+
+    Pedalboard activeOverride = base.DeepCopy();
+    activeOverride.selectedSnapshot(1);
+    REQUIRE(activeOverride.GetActiveMidiActions().size() == 1);
+    REQUIRE(activeOverride.GetActiveMidiActions()[0].number() == 20);
+    REQUIRE(activeOverride.midiActions()[0].number() == 10);
+    REQUIRE_FALSE(base.IsStructureIdentical(activeOverride));
+}
+
 TEST_CASE("pedalboard copies isolate plugin state", "[pedalboard][duplication][patch-state]")
 {
     Pedalboard original = Pedalboard::MakeDefault();

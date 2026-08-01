@@ -306,15 +306,6 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
         }
     }
 
-    // Per-snapshot MIDI actions: replace the active actions with this
-    // snapshot's set. Old snapshots leave hasMidiActions_ false and keep the
-    // pedalboard-global actions. FirePedalboardChanged() reloads the engine
-    // afterward, so the new bindings take effect without touching the RT path.
-    if (snapshot->hasMidiActions_)
-    {
-        this->midiActions_ = snapshot->midiActions_;
-    }
-
     for (auto &value: snapshot->values_)
     {
         indexedValues[value.instanceId_] = &value;
@@ -335,6 +326,20 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
         }
     }
     return true;
+}
+
+const std::vector<MidiAction> &Pedalboard::GetActiveMidiActions() const
+{
+    if (selectedSnapshot_ >= 0 &&
+        (size_t)selectedSnapshot_ < snapshots_.size())
+    {
+        const auto &snapshot = snapshots_[selectedSnapshot_];
+        if (snapshot && snapshot->hasMidiActions_)
+        {
+            return snapshot->midiActions_;
+        }
+    }
+    return midiActions_;
 }
 
 void PedalboardItem::ApplyDefaultValues(PluginHost&pluginHost)
@@ -403,6 +408,13 @@ void PedalboardItem::ApplySnapshotValue(SnapshotValue*snapshotValue)
 // can we just send a snapshot-style uddate instead of reloading plugins? All settings are ignored.
 bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
 {
+    // MIDI actions are compiled into Lv2Pedalboard's runtime tables. A change in
+    // the effective Base/snapshot action set therefore requires a fresh runtime
+    // pedalboard instead of a parameter-only snapshot update.
+    if (GetActiveMidiActions() != other.GetActiveMidiActions())
+    {
+        return false;
+    }
     if (this->nextInstanceId_ != other.nextInstanceId_) // quick check that catches 95% of structural changes.
     {
         return false;

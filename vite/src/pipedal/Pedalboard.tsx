@@ -753,10 +753,10 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             mix.pan = path.pan;
             return mix;
         });
-        // Capture the current MIDI actions with the snapshot so each snapshot
-        // keeps its own Command-Center-style mappings.
-        result.hasMidiActions = true;
-        result.midiActions = this.midiActions.map((a) => a.clone());
+        // New snapshots inherit the preset's Base MIDI actions until the user
+        // explicitly enables a snapshot override in Control Hub.
+        result.hasMidiActions = false;
+        result.midiActions = [];
         let it = this.itemsGenerator();
         while (true)
         {

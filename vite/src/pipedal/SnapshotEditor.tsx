@@ -243,6 +243,8 @@ const SnapshotEditor = withStyles(
             let newSnapshot = this.model_.pedalboard.get().makeSnapshot();
             newSnapshot.name = this.state.name;
             newSnapshot.color = this.state.color;
+            newSnapshot.hasMidiActions = currentSnapshot.hasMidiActions;
+            newSnapshot.midiActions = currentSnapshot.midiActions.map((action) => action.clone());
             newSnapshots[selectedSnapshot] = newSnapshot;
             this.model_.setSnapshots(newSnapshots, selectedSnapshot);
 

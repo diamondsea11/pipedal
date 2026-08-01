@@ -368,7 +368,10 @@ export default withStyles(
 
         handleMultisSelectClose() {
             this.setState({
-                multiSelect: false, selectedFiles: [], menuMultiselectAnchorEl: null
+                multiSelect: false, selectedFiles: [], menuMultiselectAnchorEl: null,
+                selectedFile: "", selectedFileIsDirectory: false,
+                selectedFileProtected: true, hasSelection: false,
+                hasFileSelection: false,
             });
         }
 
@@ -435,7 +438,11 @@ export default withStyles(
                 if (!files[i].isProtected) selectedFiles.push(files[i].pathname);
             }
             if (selectedFiles.length === 0) {
-                this.setState({ multiSelect: false, selectedFiles: [] });
+                this.setState({
+                    multiSelect: false, selectedFiles: [], selectedFile: "",
+                    selectedFileIsDirectory: false, selectedFileProtected: true,
+                    hasSelection: false, hasFileSelection: false,
+                });
             } else if (selectedFiles.length === 1) {
                 let f = this.getFileEntry(files, selectedFiles[0]);
                 this.setState({
@@ -444,9 +451,18 @@ export default withStyles(
                     selectedFileIsDirectory: f ? f.isDirectory : false,
                     selectedFileProtected: f ? f.isProtected : false,
                     hasSelection: true,
+                    hasFileSelection: !!f && !f.isDirectory && !f.isProtected,
                 });
             } else {
-                this.setState({ multiSelect: true, selectedFiles: selectedFiles });
+                let f = this.getFileEntry(files, selectedFiles[0]);
+                this.setState({
+                    multiSelect: true, selectedFiles: selectedFiles,
+                    selectedFile: selectedFiles[0],
+                    selectedFileIsDirectory: f ? f.isDirectory : false,
+                    selectedFileProtected: false,
+                    hasSelection: true,
+                    hasFileSelection: false,
+                });
             }
         }
 
@@ -641,6 +657,9 @@ export default withStyles(
             });
         }
         componentWillUnmount() {
+            this.marqueeStartPoint = null;
+            window.removeEventListener("mousemove", this.marqueeMove);
+            window.removeEventListener("mouseup", this.marqueeUp);
             this.model.setT3kModelSelectionDialogListener(undefined);
             this.stopAutoScroll();
             this.cancelProgressTimeout();
@@ -726,12 +745,23 @@ export default withStyles(
                     if (selectedFiles.length === 0) {
                         this.setState({
                             multiSelect: false,
-                            selectedFiles: []
+                            selectedFiles: [],
+                            selectedFile: "",
+                            selectedFileIsDirectory: false,
+                            selectedFileProtected: true,
+                            hasSelection: false,
+                            hasFileSelection: false,
                         });
                     } else {
+                        let first = this.getFileEntry(this.state.fileResult.files, selectedFiles[0]);
                         this.setState({
                             multiSelect: true,
-                            selectedFiles: selectedFiles
+                            selectedFiles: selectedFiles,
+                            selectedFile: selectedFiles[0],
+                            selectedFileIsDirectory: first ? first.isDirectory : false,
+                            selectedFileProtected: false,
+                            hasSelection: true,
+                            hasFileSelection: false,
                         });
                     }
                 } else {
@@ -743,7 +773,12 @@ export default withStyles(
                     }
                     this.setState({
                         multiSelect: true,
-                        selectedFiles: selectedFiles
+                        selectedFiles: selectedFiles,
+                        selectedFile: selectedFiles[0],
+                        selectedFileIsDirectory: fileEntry.isDirectory,
+                        selectedFileProtected: false,
+                        hasSelection: true,
+                        hasFileSelection: false,
                     });
                 }
                 event.stopPropagation();
@@ -852,16 +887,29 @@ export default withStyles(
                 });
             }
             if (selected.length > 1) {
-                this.setState({ multiSelect: true, selectedFiles: selected });
+                let f = this.getFileEntry(files, selected[0]);
+                this.setState({
+                    multiSelect: true, selectedFiles: selected,
+                    selectedFile: selected[0],
+                    selectedFileIsDirectory: f ? f.isDirectory : false,
+                    selectedFileProtected: false,
+                    hasSelection: true,
+                    hasFileSelection: false,
+                });
             } else if (selected.length === 1) {
                 let f = this.getFileEntry(files, selected[0]);
                 this.setState({
                     multiSelect: false, selectedFiles: [], selectedFile: selected[0],
                     selectedFileIsDirectory: f ? f.isDirectory : false,
                     selectedFileProtected: f ? f.isProtected : false, hasSelection: true,
+                    hasFileSelection: !!f && !f.isDirectory && !f.isProtected,
                 });
             } else {
-                this.setState({ multiSelect: false, selectedFiles: [] });
+                this.setState({
+                    multiSelect: false, selectedFiles: [], selectedFile: "",
+                    selectedFileIsDirectory: false, selectedFileProtected: true,
+                    hasSelection: false, hasFileSelection: false,
+                });
             }
         };
         marqueeUp = () => {

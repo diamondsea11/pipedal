@@ -299,6 +299,8 @@ namespace pipedal
         int resetGroup_ = 0;
         uint32_t delayMs_ = 0;
     public:
+        bool operator==(const MidiAction &other) const = default;
+
         GETTER_SETTER(enabled)
         GETTER_SETTER(bindingType)
         GETTER_SETTER(channel)
@@ -417,6 +419,7 @@ namespace pipedal
         void SetCurrentSnapshotModified(bool modified);
 
         bool IsStructureIdentical(const Pedalboard &other) const; // caan we just send a snapshot-style uddate instead of reloading plugins? All settings are ignored.
+        const std::vector<MidiAction> &GetActiveMidiActions() const;
         Snapshot MakeSnapshotFromCurrentSettings(const Pedalboard &previousPedalboard);
 
         PedalboardItem *GetItem(int64_t pedalItemId);

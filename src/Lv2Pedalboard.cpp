@@ -618,7 +618,7 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
     {
         path->delay.Prepare(delayCapacity);
     }
-    for (const auto &action : pedalboard.midiActions())
+    for (const auto &action : pedalboard.GetActiveMidiActions())
     {
         if (action.enabled())
         {

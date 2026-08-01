@@ -2430,6 +2430,17 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
     }
 
+    setMidiActionConfiguration(
+        baseActions: MidiAction[],
+        snapshots: (Snapshot | null)[]): void {
+        const newPedalboard = this.pedalboard.get().clone();
+        newPedalboard.midiActions = baseActions.map((action) => action.clone());
+        newPedalboard.snapshots = snapshots;
+        this.pruneSnapshotValues(newPedalboard);
+        this.setModelPedalboard(newPedalboard);
+        this.updateServerPedalboard();
+    }
+
     configureGlobalEq(settings: {
         enabled: boolean;
         lowCutHz: number;
