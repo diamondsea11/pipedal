@@ -87,8 +87,8 @@ MIDI controllers.
 
 - Base release: `2.0.110`
 - Current development branch: `feature/multipath-v1`
-- Current tagged build: `pipedal-2.0.110-codex20`
-- Current package build: `2.0.110+codex20`
+- Current tagged build: `pipedal-2.0.110-codex21`
+- Current package build: `2.0.110+codex21`
 
 ## Performance Record
 

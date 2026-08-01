@@ -5,7 +5,7 @@ project(pipedal
     HOMEPAGE_URL "https://rerdavies.github.io/pipedal"
 )
 
-set (DISPLAY_VERSION "PiPedal v2.0.110-codex19")
+set (DISPLAY_VERSION "PiPedal v2.0.110-codex21 Experimental")
 
 option(PIPEDAL_DISABLE_COPYRIGHT_BUILD "Skip generation of copyright notices (use on non-Debian distros)" OFF)
 option(PIPEDAL_EXCLUDE_TESTS "Exclude test targets from default build" OFF)
@@ -118,10 +118,10 @@ endif()
 
 
 set(CPACK_GENERATOR "DEB")
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Robin E. R. Davies<rerdavies@gmail.com>") # required
-set(CPACK_PACKAGE_VENDOR "Robin E. R. Davies")
-set(CPACK_PACKAGE_DESCRIPTION "IoT guitar effect pedal for Raspberry Pi, with phone-friendly web interface.")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "IoT guitar effect pedal for Raspberry Pi")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Thomas Rapolani <diamondsea11@users.noreply.github.com>")
+set(CPACK_PACKAGE_VENDOR "PiPedal Performance Fork")
+set(CPACK_PACKAGE_DESCRIPTION "Experimental PiPedal performance fork for Raspberry Pi, with a touch-friendly web interface.")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Experimental PiPedal performance fork for Raspberry Pi")
 set(CPACK_DEBIAN_PACKAGE_SECTION sound)
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_PACKAGE_CONTROL_STRICT_PERMISSION TRUE)
@@ -132,9 +132,9 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "libicu-dev ,lv2-dev,iw, ffmpeg, authbind, curl
 set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE ${DEBIAN_ARCHITECTURE})
 set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION "2.0.110+codex19")
-set(CPACK_PACKAGE_VERSION "2.0.110+codex19")
-set(CPACK_DEBIAN_PACKAGE_VERSION "2.0.110+codex19")
+set(CPACK_PROJECT_VERSION "2.0.110+codex21")
+set(CPACK_PACKAGE_VERSION "2.0.110+codex21")
+set(CPACK_DEBIAN_PACKAGE_VERSION "2.0.110+codex21")
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 if (CMAKE_BUILD_TYPE MATCHES Debug)
     set (CPACK_STRIP_FILES false)

@@ -4,7 +4,8 @@
 > **Development fork:** `feature/multipath-v1` contains experimental
 > performance, multipath, MIDI, calibration and touch-UI work beyond upstream
 > PiPedal. See [the change inventory](docs/ForkChanges.md), [validation roadmap](ROADMAP.md)
-> and [upstream contribution plan](UPSTREAMING.md). The official project remains
+> [upstream contribution plan](UPSTREAMING.md) and
+> [experimental ARM64 build](docs/ExperimentalBuild.md). The official project remains
 > [rerdavies/pipedal](https://github.com/rerdavies/pipedal).
 
 <a href="https://rerdavies.github.io/pipedal/ReleaseNotes"><img src="https://img.shields.io/github/v/release/rerdavies/pipedal?color=%23808080"/></a>
@@ -129,7 +130,6 @@ If your USB audio adapter has MIDI connectors, you can use MIDI devices (keyboar
     </a>
     . License: CC BY 4.0. <a href="#fnref1" aria-label="Back to figure note reference">↩</a>
 </p>
-
 
 
 
