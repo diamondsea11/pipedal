@@ -68,6 +68,7 @@ import {
 } from './PedalboardClipboard';
 import RoutingGraphDialog from './RoutingGraphDialog';
 import VuMeter from './VuMeter';
+import { getUiPluginCategory } from './PluginCategories';
 
 // import MidiIcon from './svg/ic_midi.svg?react';
 // import { midiChannelBindingControlFeatureEnabled } from './MidiChannelBinding';
@@ -362,6 +363,7 @@ class PedalLayout {
     pluginType: PluginType = PluginType.Plugin;
     iconUrl: string = "";
     iconColor: string = "";
+    categoryColor: string = "";
 
     bounds: Rect = new Rect();
 
@@ -458,6 +460,7 @@ class PedalLayout {
                 }
                 this.iconUrl = SelectIconUri(pluginType);
                 this.iconColor = pedalItem.iconColor;
+                this.categoryColor = getUiPluginCategory(uiPlugin).color;
                 this.name = uiPlugin.label;
                 if (pedalItem.title !== "") {
                     this.name = pedalItem.title;
@@ -1240,6 +1243,11 @@ const PedalboardView =
                         }
                     }
 
+                    const resolvedIconColor = (getIconColor(iconColor) ?? iconColor) || undefined;
+                    const frameColor = hasBorder && instanceId !== this.props.selectedId
+                        ? resolvedIconColor
+                        : undefined;
+
                     return (
                         <div style={{ width: "100%", height: "100%" }}>
                             <ButtonBase className={classes.pedalButton} 
@@ -1247,7 +1255,7 @@ const PedalboardView =
                                 onDoubleClick={(e: SyntheticEvent) => { this.onItemDoubleClick(e, instanceId); }}
                                 onContextMenu={(e: React.MouseEvent) => { this.onItemLongClick(e, instanceId); }}
                             >
-                                <div className={frameStyle} style={{ position: "absolute" }} onContextMenu={(e) => { e.preventDefault(); }}
+                                <div className={frameStyle} style={{ position: "absolute", borderColor: frameColor }} onContextMenu={(e) => { e.preventDefault(); }}
                                 >
                                     <SelectHoverBackground selected={instanceId === this.props.selectedId} showHover={true}
                                         clipChildren={false}
@@ -1263,7 +1271,7 @@ const PedalboardView =
                                     <div id="childIcon" style={{ position: "relative", display: "flex", justifyContent: "center", alignItems: "center" }} >
                                         <PluginIcon pluginType={iconType}
                                             size={24}
-                                            color={getIconColor(iconColor)}
+                                            color={resolvedIconColor}
                                             pluginMissing={pluginNotFound}
                                         />
                                     </div>
@@ -1378,7 +1386,7 @@ const PedalboardView =
                                         {this.pedalButton(
                                             item.pedalItem?.instanceId ?? -1,
                                             pluginType,
-                                            item.pedalItem?.iconColor ?? "",
+                                            item.pedalItem?.iconColor || item.categoryColor,
                                             !item.isEmpty(),
                                             item.pedalItem?.isEnabled ?? false,
                                             true,
