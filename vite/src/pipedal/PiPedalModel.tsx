@@ -2444,20 +2444,28 @@ export class PiPedalModel //implements PiPedalModel
     configureGlobalEq(settings: {
         enabled: boolean;
         lowCutHz: number;
+        lowCutSlopeDb: number;
         lowGainDb: number;
         midGainDb: number;
         midFrequencyHz: number;
+        midQ: number;
         highGainDb: number;
         highCutHz: number;
+        highCutSlopeDb: number;
     }): void {
         let newPedalboard = this.pedalboard.get().clone();
         newPedalboard.globalEqEnabled = settings.enabled;
         newPedalboard.globalEqLowCutHz = Math.max(10, Math.min(500, settings.lowCutHz));
+        newPedalboard.globalEqLowCutSlopeDb = [6, 12, 18, 24].includes(settings.lowCutSlopeDb)
+            ? settings.lowCutSlopeDb : 12;
         newPedalboard.globalEqLowGainDb = Math.max(-12, Math.min(12, settings.lowGainDb));
         newPedalboard.globalEqMidGainDb = Math.max(-12, Math.min(12, settings.midGainDb));
         newPedalboard.globalEqMidFrequencyHz = Math.max(100, Math.min(8000, settings.midFrequencyHz));
+        newPedalboard.globalEqMidQ = Math.max(0.2, Math.min(10, settings.midQ));
         newPedalboard.globalEqHighGainDb = Math.max(-12, Math.min(12, settings.highGainDb));
         newPedalboard.globalEqHighCutHz = Math.max(1000, Math.min(24000, settings.highCutHz));
+        newPedalboard.globalEqHighCutSlopeDb = [6, 12, 18, 24].includes(settings.highCutSlopeDb)
+            ? settings.highCutSlopeDb : 12;
         this.setModelPedalboard(newPedalboard);
         this.updateServerPedalboard();
     }

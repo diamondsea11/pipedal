@@ -285,11 +285,14 @@ bool Pedalboard::ApplySnapshot(int64_t snapshotIndex, PluginHost&pluginHost)
         pathBPan_ = snapshot->pathBPan_;
         globalEqEnabled_ = snapshot->globalEqEnabled_;
         globalEqLowCutHz_ = snapshot->globalEqLowCutHz_;
+        globalEqLowCutSlopeDb_ = snapshot->globalEqLowCutSlopeDb_;
         globalEqLowGainDb_ = snapshot->globalEqLowGainDb_;
         globalEqMidGainDb_ = snapshot->globalEqMidGainDb_;
         globalEqMidFrequencyHz_ = snapshot->globalEqMidFrequencyHz_;
+        globalEqMidQ_ = snapshot->globalEqMidQ_;
         globalEqHighGainDb_ = snapshot->globalEqHighGainDb_;
         globalEqHighCutHz_ = snapshot->globalEqHighCutHz_;
+        globalEqHighCutSlopeDb_ = snapshot->globalEqHighCutSlopeDb_;
         for (const auto &mix : snapshot->additionalPathMixes_)
         {
             for (auto &path : additionalPaths_)
@@ -441,11 +444,14 @@ bool Pedalboard::IsStructureIdentical(const Pedalboard &other) const
         this->pathBPan_ != other.pathBPan_ ||
         this->globalEqEnabled_ != other.globalEqEnabled_ ||
         this->globalEqLowCutHz_ != other.globalEqLowCutHz_ ||
+        this->globalEqLowCutSlopeDb_ != other.globalEqLowCutSlopeDb_ ||
         this->globalEqLowGainDb_ != other.globalEqLowGainDb_ ||
         this->globalEqMidGainDb_ != other.globalEqMidGainDb_ ||
         this->globalEqMidFrequencyHz_ != other.globalEqMidFrequencyHz_ ||
+        this->globalEqMidQ_ != other.globalEqMidQ_ ||
         this->globalEqHighGainDb_ != other.globalEqHighGainDb_ ||
         this->globalEqHighCutHz_ != other.globalEqHighCutHz_ ||
+        this->globalEqHighCutSlopeDb_ != other.globalEqHighCutSlopeDb_ ||
         this->pathBItems_.size() != other.pathBItems_.size() ||
         this->additionalPaths_.size() != other.additionalPaths_.size())
     {
@@ -639,11 +645,14 @@ Snapshot Pedalboard::MakeSnapshotFromCurrentSettings(const Pedalboard &previousP
     snapshot.pathBPan_ = pathBPan_;
     snapshot.globalEqEnabled_ = globalEqEnabled_;
     snapshot.globalEqLowCutHz_ = globalEqLowCutHz_;
+    snapshot.globalEqLowCutSlopeDb_ = globalEqLowCutSlopeDb_;
     snapshot.globalEqLowGainDb_ = globalEqLowGainDb_;
     snapshot.globalEqMidGainDb_ = globalEqMidGainDb_;
     snapshot.globalEqMidFrequencyHz_ = globalEqMidFrequencyHz_;
+    snapshot.globalEqMidQ_ = globalEqMidQ_;
     snapshot.globalEqHighGainDb_ = globalEqHighGainDb_;
     snapshot.globalEqHighCutHz_ = globalEqHighCutHz_;
+    snapshot.globalEqHighCutSlopeDb_ = globalEqHighCutSlopeDb_;
     for (const auto &path : additionalPaths_)
     {
         SnapshotPathMix mix;
@@ -729,11 +738,14 @@ JSON_MAP_BEGIN(Pedalboard)
     JSON_MAP_REFERENCE(Pedalboard,midiActions)
     JSON_MAP_REFERENCE(Pedalboard,globalEqEnabled)
     JSON_MAP_REFERENCE(Pedalboard,globalEqLowCutHz)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqLowCutSlopeDb)
     JSON_MAP_REFERENCE(Pedalboard,globalEqLowGainDb)
     JSON_MAP_REFERENCE(Pedalboard,globalEqMidGainDb)
     JSON_MAP_REFERENCE(Pedalboard,globalEqMidFrequencyHz)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqMidQ)
     JSON_MAP_REFERENCE(Pedalboard,globalEqHighGainDb)
     JSON_MAP_REFERENCE(Pedalboard,globalEqHighCutHz)
+    JSON_MAP_REFERENCE(Pedalboard,globalEqHighCutSlopeDb)
     JSON_MAP_REFERENCE(Pedalboard,nextInstanceId)
     JSON_MAP_REFERENCE(Pedalboard,snapshots)
     JSON_MAP_REFERENCE(Pedalboard,selectedSnapshot)
@@ -805,11 +817,14 @@ JSON_MAP_BEGIN(Snapshot)
     JSON_MAP_REFERENCE(Snapshot,pathBPan)
     JSON_MAP_REFERENCE(Snapshot,globalEqEnabled)
     JSON_MAP_REFERENCE(Snapshot,globalEqLowCutHz)
+    JSON_MAP_REFERENCE(Snapshot,globalEqLowCutSlopeDb)
     JSON_MAP_REFERENCE(Snapshot,globalEqLowGainDb)
     JSON_MAP_REFERENCE(Snapshot,globalEqMidGainDb)
     JSON_MAP_REFERENCE(Snapshot,globalEqMidFrequencyHz)
+    JSON_MAP_REFERENCE(Snapshot,globalEqMidQ)
     JSON_MAP_REFERENCE(Snapshot,globalEqHighGainDb)
     JSON_MAP_REFERENCE(Snapshot,globalEqHighCutHz)
+    JSON_MAP_REFERENCE(Snapshot,globalEqHighCutSlopeDb)
     JSON_MAP_REFERENCE(Snapshot,additionalPathMixes)
     JSON_MAP_REFERENCE(Snapshot,hasMidiActions)
     JSON_MAP_REFERENCE(Snapshot,midiActions)

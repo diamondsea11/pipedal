@@ -299,11 +299,14 @@ export class Snapshot {
         this.pathBPan = input.pathBPan ?? 0;
         this.globalEqEnabled = input.globalEqEnabled ?? false;
         this.globalEqLowCutHz = input.globalEqLowCutHz ?? 20;
+        this.globalEqLowCutSlopeDb = input.globalEqLowCutSlopeDb ?? 12;
         this.globalEqLowGainDb = input.globalEqLowGainDb ?? 0;
         this.globalEqMidGainDb = input.globalEqMidGainDb ?? 0;
         this.globalEqMidFrequencyHz = input.globalEqMidFrequencyHz ?? 800;
+        this.globalEqMidQ = input.globalEqMidQ ?? 1;
         this.globalEqHighGainDb = input.globalEqHighGainDb ?? 0;
         this.globalEqHighCutHz = input.globalEqHighCutHz ?? 20000;
+        this.globalEqHighCutSlopeDb = input.globalEqHighCutSlopeDb ?? 12;
         this.additionalPathMixes = (input.additionalPathMixes ?? [])
             .map((value: any) => new SnapshotPathMix().deserialize(value));
         this.hasMidiActions = input.hasMidiActions ?? false;
@@ -355,11 +358,14 @@ export class Snapshot {
     pathBPan: number = 0;
     globalEqEnabled: boolean = false;
     globalEqLowCutHz: number = 20;
+    globalEqLowCutSlopeDb: number = 12;
     globalEqLowGainDb: number = 0;
     globalEqMidGainDb: number = 0;
     globalEqMidFrequencyHz: number = 800;
+    globalEqMidQ: number = 1;
     globalEqHighGainDb: number = 0;
     globalEqHighCutHz: number = 20000;
+    globalEqHighCutSlopeDb: number = 12;
     additionalPathMixes: SnapshotPathMix[] = [];
     // Per-snapshot MIDI actions (Helix Command Center style). When
     // hasMidiActions is set, this snapshot carries its own MIDI action set.
@@ -597,11 +603,14 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             .map((action: any) => new MidiAction().deserialize(action));
         this.globalEqEnabled = input.globalEqEnabled ?? false;
         this.globalEqLowCutHz = input.globalEqLowCutHz ?? 20;
+        this.globalEqLowCutSlopeDb = input.globalEqLowCutSlopeDb ?? 12;
         this.globalEqLowGainDb = input.globalEqLowGainDb ?? 0;
         this.globalEqMidGainDb = input.globalEqMidGainDb ?? 0;
         this.globalEqMidFrequencyHz = input.globalEqMidFrequencyHz ?? 800;
+        this.globalEqMidQ = input.globalEqMidQ ?? 1;
         this.globalEqHighGainDb = input.globalEqHighGainDb ?? 0;
         this.globalEqHighCutHz = input.globalEqHighCutHz ?? 20000;
+        this.globalEqHighCutSlopeDb = input.globalEqHighCutSlopeDb ?? 12;
         if (this.pathBEnabled && this.pathBItems.length === 0) {
             this.pathBItems = [this.createEmptyItem()];
         }
@@ -636,11 +645,14 @@ export class Pedalboard implements Deserializable<Pedalboard> {
     midiActions: MidiAction[] = [];
     globalEqEnabled: boolean = false;
     globalEqLowCutHz: number = 20;
+    globalEqLowCutSlopeDb: number = 12;
     globalEqLowGainDb: number = 0;
     globalEqMidGainDb: number = 0;
     globalEqMidFrequencyHz: number = 800;
+    globalEqMidQ: number = 1;
     globalEqHighGainDb: number = 0;
     globalEqHighCutHz: number = 20000;
+    globalEqHighCutSlopeDb: number = 12;
     nextInstanceId: number = -1;
 
     snapshots: (Snapshot | null)[] = [];
@@ -739,11 +751,14 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         result.pathBPan = this.pathBPan;
         result.globalEqEnabled = this.globalEqEnabled;
         result.globalEqLowCutHz = this.globalEqLowCutHz;
+        result.globalEqLowCutSlopeDb = this.globalEqLowCutSlopeDb;
         result.globalEqLowGainDb = this.globalEqLowGainDb;
         result.globalEqMidGainDb = this.globalEqMidGainDb;
         result.globalEqMidFrequencyHz = this.globalEqMidFrequencyHz;
+        result.globalEqMidQ = this.globalEqMidQ;
         result.globalEqHighGainDb = this.globalEqHighGainDb;
         result.globalEqHighCutHz = this.globalEqHighCutHz;
+        result.globalEqHighCutSlopeDb = this.globalEqHighCutSlopeDb;
         result.additionalPathMixes = this.additionalPaths.map((path) => {
             const mix = new SnapshotPathMix();
             mix.id = path.id;

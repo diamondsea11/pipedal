@@ -141,7 +141,7 @@ namespace pipedal
         };
         std::vector<std::unique_ptr<AdditionalPathRuntime>> additionalPaths;
         bool globalEqEnabled = false;
-        std::array<std::array<Biquad, 5>, 2> globalEq;
+        std::array<std::array<Biquad, 7>, 2> globalEq;
         float *pedalboardSidechainBuffer = nullptr;
 
         std::vector<std::shared_ptr<IEffect>> effects;

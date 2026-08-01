@@ -339,11 +339,14 @@ namespace pipedal
         float pathBPan_ = 0;
         bool globalEqEnabled_ = false;
         float globalEqLowCutHz_ = 20;
+        int globalEqLowCutSlopeDb_ = 12;
         float globalEqLowGainDb_ = 0;
         float globalEqMidGainDb_ = 0;
         float globalEqMidFrequencyHz_ = 800;
+        float globalEqMidQ_ = 1.0f;
         float globalEqHighGainDb_ = 0;
         float globalEqHighCutHz_ = 20000;
+        int globalEqHighCutSlopeDb_ = 12;
         std::vector<SnapshotPathMix> additionalPathMixes_;
         // Per-snapshot MIDI actions (Helix Command Center style): when
         // hasMidiActions_ is set, selecting this snapshot replaces the
@@ -380,11 +383,14 @@ namespace pipedal
         std::vector<MidiAction> midiActions_;
         bool globalEqEnabled_ = false;
         float globalEqLowCutHz_ = 20;
+        int globalEqLowCutSlopeDb_ = 12;
         float globalEqLowGainDb_ = 0;
         float globalEqMidGainDb_ = 0;
         float globalEqMidFrequencyHz_ = 800;
+        float globalEqMidQ_ = 1.0f;
         float globalEqHighGainDb_ = 0;
         float globalEqHighCutHz_ = 20000;
+        int globalEqHighCutSlopeDb_ = 12;
         uint64_t nextInstanceId_ = 0;
         uint64_t NextInstanceId() { return ++nextInstanceId_; }
 
@@ -450,11 +456,14 @@ namespace pipedal
         GETTER_SETTER_VEC(midiActions)
         GETTER_SETTER(globalEqEnabled)
         GETTER_SETTER(globalEqLowCutHz)
+        GETTER_SETTER(globalEqLowCutSlopeDb)
         GETTER_SETTER(globalEqLowGainDb)
         GETTER_SETTER(globalEqMidGainDb)
         GETTER_SETTER(globalEqMidFrequencyHz)
+        GETTER_SETTER(globalEqMidQ)
         GETTER_SETTER(globalEqHighGainDb)
         GETTER_SETTER(globalEqHighCutHz)
+        GETTER_SETTER(globalEqHighCutSlopeDb)
         GETTER_SETTER_VEC(snapshots)
         GETTER_SETTER(selectedSnapshot)
         GETTER_SETTER(selectedPlugin)

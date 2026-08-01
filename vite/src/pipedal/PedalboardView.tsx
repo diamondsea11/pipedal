@@ -25,7 +25,7 @@ import WithStyles, { withTheme } from './WithStyles';
 import { withStyles } from "tss-react/mui";
 
 
-import { Theme } from '@mui/material/styles';
+import { alpha, Theme } from '@mui/material/styles';
 import { PiPedalModel, PiPedalModelFactory } from './PiPedalModel';
 import { PluginType } from './Lv2Plugin';
 import ButtonBase from '@mui/material/ButtonBase';
@@ -38,19 +38,13 @@ import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Select from '@mui/material/Select';
 import Typography from '@mui/material/Typography';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
-import Switch from '@mui/material/Switch';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import HubIcon from '@mui/icons-material/Hub';
 import ControlHubDialog from './ControlHubDialog';
+import GlobalEqDialog from './GlobalEqDialog';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import CallMergeIcon from '@mui/icons-material/CallMerge';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -94,7 +88,7 @@ const DISABLED_CONNECTOR_COLOR = isDarkMode() ? "#666" : "#CCC";
 const CELL_WIDTH: number = 96;
 const CELL_HEIGHT: number = 64;
 const FRAME_SIZE: number = 36;
-const PATH_HEADER_HEIGHT: number = 36;
+const PATH_HEADER_HEIGHT: number = 48;
 const PATH_GAP: number = 8;
 
 const STROKE_WIDTH = 3;
@@ -141,9 +135,49 @@ const pedalboardStyles = (theme: Theme) => createStyles({
         height: PATH_HEADER_HEIGHT,
         display: "flex",
         alignItems: "center",
-        gap: 8,
+        gap: 6,
+        padding: "5px 0",
         borderBottom: `1px solid ${theme.palette.divider}`,
         zIndex: 2,
+    }),
+    pathTitle: css({
+        minWidth: 58,
+        height: 36,
+        display: "flex",
+        alignItems: "center",
+        padding: "0 8px",
+        borderLeft: `3px solid ${theme.palette.primary.main}`,
+        background: alpha(theme.palette.primary.main, 0.08),
+        whiteSpace: "nowrap",
+    }),
+    pathSelect: css({
+        height: "36px !important",
+        background: alpha(theme.palette.background.paper, 0.65),
+    }),
+    pathIconButton: css({
+        width: "36px !important",
+        height: "36px !important",
+        border: `1px solid ${theme.palette.divider} !important`,
+        borderRadius: "4px !important",
+    }),
+    pathToolButton: css({
+        height: "36px !important",
+        minWidth: "82px !important",
+        padding: "0 10px !important",
+        border: `1px solid ${theme.palette.divider} !important`,
+        borderRadius: "4px !important",
+        background: `${alpha(theme.palette.background.paper, 0.72)} !important`,
+        whiteSpace: "nowrap",
+        letterSpacing: "0 !important",
+        '& .MuiButton-startIcon': { marginRight: 6 },
+    }),
+    pathPrimaryTool: css({
+        borderColor: `${alpha(theme.palette.primary.main, 0.65)} !important`,
+        background: `${alpha(theme.palette.primary.main, 0.11)} !important`,
+        color: `${theme.palette.primary.light} !important`,
+        '&:hover': {
+            background: `${alpha(theme.palette.primary.main, 0.2)} !important`,
+        },
     }),
     splitItem: css({
         position: "absolute",
@@ -1656,7 +1690,8 @@ const PedalboardView =
                                 onChange={(event) =>
                                     setPathOutput(pathId, String(event.target.value))}
                                 aria-label={`Path ${pathId} output`}
-                                style={{ height: 28, minWidth: 132 }}
+                                className={classes.pathSelect}
+                                style={{ minWidth: 132 }}
                             >
                                 <MenuItem value="main">Main bus</MenuItem>
                                 {Array.from(
@@ -1742,7 +1777,7 @@ const PedalboardView =
                                     width: frameWidth, height: frameHeight,
                                 }} >
                                 <div className={classes.pathHeader} style={{ top: 0 }}>
-                                    <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path A</Typography>
+                                    <Typography variant="subtitle2" className={classes.pathTitle}>Path A</Typography>
                                     {pathMeters(
                                         Pedalboard.START_CONTROL_ID,
                                         Pedalboard.END_CONTROL_ID)}
@@ -1753,7 +1788,8 @@ const PedalboardView =
                                         onChange={(event) =>
                                             this.model.configurePathAInput(Number(event.target.value))}
                                         aria-label="Path A input"
-                                        style={{ height: 28, minWidth: 82 }}
+                                        className={classes.pathSelect}
+                                        style={{ minWidth: 82 }}
                                     >
                                         {inputPorts.map((_port, index) => (
                                             <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
@@ -1767,7 +1803,8 @@ const PedalboardView =
                                         startIcon={<AccountTreeIcon />}
                                         onClick={() => this.setState({ routingGraphOpen: true })}
                                         aria-label="Routing template"
-                                        style={{ height: 28 }}
+                                        variant="outlined"
+                                        className={classes.pathToolButton}
                                     >
                                         Routing
                                     </Button>
@@ -1776,6 +1813,7 @@ const PedalboardView =
                                         color={pedalboard?.pathAMute ? "primary" : "default"}
                                         title="Mute Path A"
                                         aria-label="Mute Path A"
+                                        className={classes.pathIconButton}
                                         onClick={() => this.model.configurePathMix(
                                             "A", !pedalboard?.pathAMute, pedalboard?.pathAPan ?? 0)}
                                     >
@@ -1787,7 +1825,8 @@ const PedalboardView =
                                         onChange={(event) => this.model.configurePathMix(
                                             "A", pedalboard?.pathAMute ?? false, Number(event.target.value))}
                                         aria-label="Path A pan"
-                                        style={{ height: 28, minWidth: 58 }}
+                                        className={classes.pathSelect}
+                                        style={{ minWidth: 58 }}
                                     >
                                         <MenuItem value={-1}>L</MenuItem>
                                         <MenuItem value={0}>C</MenuItem>
@@ -1797,6 +1836,9 @@ const PedalboardView =
                                         size="small"
                                         startIcon={<EqualizerIcon />}
                                         onClick={() => this.setState({ globalEqDialogOpen: true })}
+                                        variant="outlined"
+                                        className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
+                                        aria-label="Global EQ"
                                     >
                                         Global EQ
                                     </Button>
@@ -1804,6 +1846,9 @@ const PedalboardView =
                                         size="small"
                                         startIcon={<HubIcon />}
                                         onClick={() => this.setState({ controlHubOpen: true })}
+                                        variant="outlined"
+                                        className={`${classes.pathToolButton} ${classes.pathPrimaryTool}`}
+                                        aria-label="Control Hub"
                                     >
                                         Control Hub
                                     </Button>
@@ -1820,6 +1865,9 @@ const PedalboardView =
                                                 }
                                             }}
                                             style={{ marginLeft: "auto" }}
+                                            variant="outlined"
+                                            className={classes.pathToolButton}
+                                            aria-label="Add path"
                                         >
                                             Add path
                                         </Button>
@@ -1832,7 +1880,7 @@ const PedalboardView =
                                             className={classes.pathHeader}
                                             style={{ top: layoutSize.height + PATH_GAP }}
                                         >
-                                            <Typography variant="subtitle2" style={{ minWidth: 54 }}>Path B</Typography>
+                                            <Typography variant="subtitle2" className={classes.pathTitle}>Path B</Typography>
                                             {pathMeters(
                                                 Pedalboard.AUX_START_CONTROL_ID,
                                                 Pedalboard.AUX_END_CONTROL_ID)}
@@ -1846,7 +1894,8 @@ const PedalboardView =
                                                         Number(event.target.value),
                                                         pedalboard?.pathBName)}
                                                 aria-label="Path B input"
-                                                style={{ height: 28, minWidth: 82 }}
+                                                className={classes.pathSelect}
+                                                style={{ minWidth: 82 }}
                                             >
                                                 {inputPorts.map((_port, index) => (
                                                     <MenuItem key={index} value={index}>IN {index + 1}</MenuItem>
@@ -1863,6 +1912,7 @@ const PedalboardView =
                                                 color={pedalboard?.pathBMute ? "primary" : "default"}
                                                 title="Mute Path B"
                                                 aria-label="Mute Path B"
+                                                className={classes.pathIconButton}
                                                 onClick={() => this.model.configurePathMix(
                                                     "B", !pedalboard?.pathBMute, pedalboard?.pathBPan ?? 0)}
                                             >
@@ -1874,7 +1924,8 @@ const PedalboardView =
                                                 onChange={(event) => this.model.configurePathMix(
                                                     "B", pedalboard?.pathBMute ?? false, Number(event.target.value))}
                                                 aria-label="Path B pan"
-                                                style={{ height: 28, minWidth: 58 }}
+                                                className={classes.pathSelect}
+                                                style={{ minWidth: 58 }}
                                             >
                                                 <MenuItem value={-1}>L</MenuItem>
                                                 <MenuItem value={0}>C</MenuItem>
@@ -1884,6 +1935,7 @@ const PedalboardView =
                                                 size="small"
                                                 title="Remove Path B"
                                                 aria-label="Remove Path B"
+                                                className={classes.pathIconButton}
                                                 onClick={() => this.model.configurePathB(false)}
                                                 style={{ marginLeft: "auto" }}
                                             >
@@ -1902,7 +1954,7 @@ const PedalboardView =
                                             className={classes.pathHeader}
                                             style={{ top: path.top }}
                                         >
-                                            <Typography variant="subtitle2" style={{ minWidth: 54 }}>
+                                            <Typography variant="subtitle2" className={classes.pathTitle}>
                                                 Path {path.id}
                                             </Typography>
                                             {pathMeters(path.startId, path.endId)}
@@ -1916,7 +1968,8 @@ const PedalboardView =
                                                     onClick={() =>
                                                         this.setState({ routingGraphOpen: true })}
                                                     aria-label={`Path ${path.id} return sources`}
-                                                    style={{ height: 28 }}
+                                                    variant="outlined"
+                                                    className={classes.pathToolButton}
                                                 >
                                                     Return {Object.keys(
                                                         pedalboard?.additionalPaths.find(
@@ -1935,7 +1988,8 @@ const PedalboardView =
                                                             path.mute,
                                                             path.pan)}
                                                     aria-label={`Path ${path.id} input`}
-                                                    style={{ height: 28, minWidth: 82 }}
+                                                    className={classes.pathSelect}
+                                                    style={{ minWidth: 82 }}
                                                 >
                                                     {inputPorts.map((_port, index) => (
                                                         <MenuItem key={index} value={index}>
@@ -1956,6 +2010,7 @@ const PedalboardView =
                                                 color={path.mute ? "primary" : "default"}
                                                 title={`Mute Path ${path.id}`}
                                                 aria-label={`Mute Path ${path.id}`}
+                                                className={classes.pathIconButton}
                                                 onClick={() => this.model.configureAdditionalPath(
                                                     path.id,
                                                     true,
@@ -1975,7 +2030,8 @@ const PedalboardView =
                                                     path.mute,
                                                     Number(event.target.value))}
                                                 aria-label={`Path ${path.id} pan`}
-                                                style={{ height: 28, minWidth: 58 }}
+                                                className={classes.pathSelect}
+                                                style={{ minWidth: 58 }}
                                             >
                                                 <MenuItem value={-1}>L</MenuItem>
                                                 <MenuItem value={0}>C</MenuItem>
@@ -1985,6 +2041,7 @@ const PedalboardView =
                                                 size="small"
                                                 title={`Remove Path ${path.id}`}
                                                 aria-label={`Remove Path ${path.id}`}
+                                                className={classes.pathIconButton}
                                                 onClick={() => this.model.configureAdditionalPath(
                                                     path.id, false)}
                                                 style={{ marginLeft: "auto" }}
@@ -2012,79 +2069,12 @@ const PedalboardView =
                                     onClose={() => this.setState({ controlHubOpen: false })}
                                 />
                             )}
-                            <Dialog
+                            {pedalboard && <GlobalEqDialog
                                 open={this.state.globalEqDialogOpen}
+                                pedalboard={pedalboard}
+                                onChange={(settings) => this.model.configureGlobalEq(settings)}
                                 onClose={() => this.setState({ globalEqDialogOpen: false })}
-                                maxWidth="sm"
-                                fullWidth
-                            >
-                                <DialogTitle>Global EQ</DialogTitle>
-                                <DialogContent
-                                    style={{
-                                        display: "grid",
-                                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                                        gap: 16,
-                                        paddingTop: 8,
-                                    }}
-                                >
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={pedalboard?.globalEqEnabled ?? false}
-                                                onChange={(event) => {
-                                                    if (!pedalboard) return;
-                                                    this.model.configureGlobalEq({
-                                                        enabled: event.target.checked,
-                                                        lowCutHz: pedalboard.globalEqLowCutHz,
-                                                        lowGainDb: pedalboard.globalEqLowGainDb,
-                                                        midGainDb: pedalboard.globalEqMidGainDb,
-                                                        midFrequencyHz: pedalboard.globalEqMidFrequencyHz,
-                                                        highGainDb: pedalboard.globalEqHighGainDb,
-                                                        highCutHz: pedalboard.globalEqHighCutHz,
-                                                    });
-                                                }}
-                                            />
-                                        }
-                                        label="Enabled"
-                                        style={{ gridColumn: "1 / -1" }}
-                                    />
-                                    {[
-                                        ["Low cut", "globalEqLowCutHz", "Hz"],
-                                        ["Low shelf", "globalEqLowGainDb", "dB"],
-                                        ["Mid gain", "globalEqMidGainDb", "dB"],
-                                        ["Mid frequency", "globalEqMidFrequencyHz", "Hz"],
-                                        ["High shelf", "globalEqHighGainDb", "dB"],
-                                        ["High cut", "globalEqHighCutHz", "Hz"],
-                                    ].map(([label, key, unit]) => (
-                                        <TextField
-                                            key={key}
-                                            label={label}
-                                            type="number"
-                                            defaultValue={(pedalboard as any)?.[key] ?? 0}
-                                            slotProps={{ input: { endAdornment: unit } }}
-                                            onBlur={(event) => {
-                                                if (!pedalboard) return;
-                                                const value = Number(event.target.value);
-                                                if (!Number.isFinite(value)) return;
-                                                this.model.configureGlobalEq({
-                                                    enabled: pedalboard.globalEqEnabled,
-                                                    lowCutHz: key === "globalEqLowCutHz" ? value : pedalboard.globalEqLowCutHz,
-                                                    lowGainDb: key === "globalEqLowGainDb" ? value : pedalboard.globalEqLowGainDb,
-                                                    midGainDb: key === "globalEqMidGainDb" ? value : pedalboard.globalEqMidGainDb,
-                                                    midFrequencyHz: key === "globalEqMidFrequencyHz" ? value : pedalboard.globalEqMidFrequencyHz,
-                                                    highGainDb: key === "globalEqHighGainDb" ? value : pedalboard.globalEqHighGainDb,
-                                                    highCutHz: key === "globalEqHighCutHz" ? value : pedalboard.globalEqHighCutHz,
-                                                });
-                                            }}
-                                        />
-                                    ))}
-                                </DialogContent>
-                                <DialogActions>
-                                    <Button onClick={() => this.setState({ globalEqDialogOpen: false })}>
-                                        Close
-                                    </Button>
-                                </DialogActions>
-                            </Dialog>
+                            />}
                             <Menu
                                 open={this.state.contextMenu !== null}
                                 onClose={() => this.closeItemContextMenu()}

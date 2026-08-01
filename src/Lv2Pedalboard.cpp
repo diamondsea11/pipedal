@@ -114,6 +114,59 @@ namespace
         filter.a2 = a2 / a0;
         filter.z1 = filter.z2 = 0;
     }
+
+    void ConfigureBypass(Lv2Pedalboard::Biquad &filter)
+    {
+        filter.b0 = 1;
+        filter.b1 = filter.b2 = filter.a1 = filter.a2 = 0;
+        filter.z1 = filter.z2 = 0;
+    }
+
+    void ConfigureFirstOrderCut(
+        Lv2Pedalboard::Biquad &filter,
+        EqType type,
+        float sampleRate,
+        float frequency)
+    {
+        frequency = std::max(10.0f, std::min(frequency, sampleRate * 0.45f));
+        const float k = std::tan((float)M_PI * frequency / sampleRate);
+        const float norm = 1.0f / (1.0f + k);
+        filter.b0 = type == EqType::LowPass ? k * norm : norm;
+        filter.b1 = type == EqType::LowPass ? filter.b0 : -filter.b0;
+        filter.b2 = 0;
+        filter.a1 = (k - 1.0f) * norm;
+        filter.a2 = 0;
+        filter.z1 = filter.z2 = 0;
+    }
+
+    void ConfigureCutFilters(
+        Lv2Pedalboard::Biquad &first,
+        Lv2Pedalboard::Biquad &second,
+        EqType type,
+        float sampleRate,
+        float frequency,
+        int slopeDb)
+    {
+        switch (slopeDb)
+        {
+        case 6:
+            ConfigureFirstOrderCut(first, type, sampleRate, frequency);
+            ConfigureBypass(second);
+            break;
+        case 18:
+            ConfigureFirstOrderCut(first, type, sampleRate, frequency);
+            ConfigureBiquad(second, type, sampleRate, frequency, 0, 1.0f);
+            break;
+        case 24:
+            ConfigureBiquad(first, type, sampleRate, frequency, 0, 0.5411961f);
+            ConfigureBiquad(second, type, sampleRate, frequency, 0, 1.3065630f);
+            break;
+        default:
+            ConfigureBiquad(first, type, sampleRate, frequency);
+            ConfigureBypass(second);
+            break;
+        }
+    }
 }
 
 float *Lv2Pedalboard::CreateNewAudioBuffer()
@@ -428,12 +481,15 @@ void Lv2Pedalboard::Prepare(IHost *pHost, Pedalboard &pedalboard, Lv2PedalboardE
     {
         auto &filters = this->globalEq[channel];
         float sampleRate = (float)this->pHost->GetSampleRate();
-        ConfigureBiquad(filters[0], EqType::HighPass, sampleRate, pedalboard.globalEqLowCutHz());
-        ConfigureBiquad(filters[1], EqType::LowShelf, sampleRate, 120, pedalboard.globalEqLowGainDb());
-        ConfigureBiquad(filters[2], EqType::Peak, sampleRate,
-                        pedalboard.globalEqMidFrequencyHz(), pedalboard.globalEqMidGainDb(), 1.0f);
-        ConfigureBiquad(filters[3], EqType::HighShelf, sampleRate, 4000, pedalboard.globalEqHighGainDb());
-        ConfigureBiquad(filters[4], EqType::LowPass, sampleRate, pedalboard.globalEqHighCutHz());
+        ConfigureCutFilters(filters[0], filters[1], EqType::HighPass, sampleRate,
+                            pedalboard.globalEqLowCutHz(), pedalboard.globalEqLowCutSlopeDb());
+        ConfigureBiquad(filters[2], EqType::LowShelf, sampleRate, 120, pedalboard.globalEqLowGainDb());
+        ConfigureBiquad(filters[3], EqType::Peak, sampleRate,
+                        pedalboard.globalEqMidFrequencyHz(), pedalboard.globalEqMidGainDb(),
+                        pedalboard.globalEqMidQ());
+        ConfigureBiquad(filters[4], EqType::HighShelf, sampleRate, 4000, pedalboard.globalEqHighGainDb());
+        ConfigureCutFilters(filters[5], filters[6], EqType::LowPass, sampleRate,
+                            pedalboard.globalEqHighCutHz(), pedalboard.globalEqHighCutSlopeDb());
     }
 
     this->pathAInputChannels = pedalboard.pathAInputChannels();
