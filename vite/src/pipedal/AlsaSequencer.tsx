@@ -23,6 +23,9 @@ export class AlsaSequencerPortSelection {
         this.id = json.id;
         this.name = json.name;
         this.sortOrder = json.sortOrder;
+        this.input = json.input ?? true;
+        this.output = json.output ?? false;
+        this.bluetooth = json.bluetooth ?? false;
         return this;
     };
     static deserialize_array(input: any): AlsaSequencerPortSelection[] {
@@ -35,12 +38,16 @@ export class AlsaSequencerPortSelection {
     id: string = "";
     name: string = "";
     sortOrder: number = 0;
+    input: boolean = true;
+    output: boolean = false;
+    bluetooth: boolean = false;
 };
 
 export class AlsaSequencerConfiguration {
     deserialize(input: any) {
         this.midiChannel = input.midiChannel?? -1;
-        this.connections = AlsaSequencerPortSelection.deserialize_array(input.connections);
+        this.connections = AlsaSequencerPortSelection.deserialize_array(input.connections ?? []);
+        this.outputConnections = AlsaSequencerPortSelection.deserialize_array(input.outputConnections ?? []);
         return this;
     }
     deserialize_array(input: any): AlsaSequencerConfiguration[] {
@@ -53,4 +60,5 @@ export class AlsaSequencerConfiguration {
 
     midiChannel: number = -1;
     connections: AlsaSequencerPortSelection[] = [];
+    outputConnections: AlsaSequencerPortSelection[] = [];
 };

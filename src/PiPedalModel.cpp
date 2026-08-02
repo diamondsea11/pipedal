@@ -1743,6 +1743,17 @@ void PiPedalModel::OnAlsaSequencerDeviceAdded(int client, const std::string &cli
             break;
         }
     }
+    if (!interested)
+    {
+        for (const auto &port : alsaSequencerConfiguration.outputConnections())
+        {
+            if (port.id().starts_with(key))
+            {
+                interested = true;
+                break;
+            }
+        }
+    }
     if (interested)
     {
         Post(
@@ -1795,8 +1806,14 @@ std::vector<AlsaSequencerPortSelection> PiPedalModel::GetAlsaSequencerPorts()
     {
         result.push_back(AlsaSequencerPortSelection{
             port.id,
-            port.name,
-            port.displaySortOrder});
+            port.clientName == port.name ? port.name : port.clientName + " - " + port.name,
+            port.displaySortOrder,
+            port.canRead && port.canReadSubscribe,
+            port.canWrite && port.canWriteSubscribe,
+            port.clientName.find("BlueALSA") != std::string::npos ||
+                port.clientName.find("Bluetooth") != std::string::npos ||
+                port.name.find("BLE MIDI") != std::string::npos ||
+                port.name.find("Bluetooth") != std::string::npos});
     }
     return result;
 }

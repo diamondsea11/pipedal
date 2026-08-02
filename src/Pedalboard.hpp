@@ -280,7 +280,8 @@ namespace pipedal
         TogglePathMute = 12,
         ToggleGlobalEq = 13,
         SendMidiControl = 14,
-        SendMidiProgram = 15
+        SendMidiProgram = 15,
+        SendMidiNote = 16
     };
 
     enum class MidiActionGesture : int

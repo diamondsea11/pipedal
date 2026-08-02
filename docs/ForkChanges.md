@@ -63,6 +63,10 @@ installed only on the Raspberry Pi target.
   profiles can be imported and exported.
 - The MIDI monitor shows incoming events and matched actions for troubleshooting
   without SSH. Synthetic ALSA tests cover Note, CC and Program Change handling.
+- MIDI connections distinguish inputs from outputs and identify BlueZ BLE-MIDI
+  ports in the UI. Control Hub actions can send CC, Program Change and Note
+  messages to selected USB or Bluetooth destinations. Offline destinations are
+  restored automatically when a controller reconnects.
 
 ## Host Compatibility and Performance
 

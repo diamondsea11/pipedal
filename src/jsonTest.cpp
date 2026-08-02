@@ -29,6 +29,7 @@
 #include "Pedalboard.hpp"
 #include "JackServerSettings.hpp"
 #include "ChannelRouterSettings.hpp"
+#include "AlsaSequencer.hpp"
 #endif
 #include <concepts>
 #include <type_traits>
@@ -52,6 +53,49 @@ TEST_CASE("legacy pedalboards default to one path", "[json_read_test][multipath]
     REQUIRE(pedalboard.pathBOutputChannels().empty());
     REQUIRE(pedalboard.pathBItems().empty());
     REQUIRE(pedalboard.additionalPaths().empty());
+}
+
+TEST_CASE("legacy MIDI configuration defaults to input-only", "[json_read_test][midi-routing]")
+{
+    std::stringstream input{
+        R"({"midiChannel":-1,"connections":[{"id":"seq:Controller/Port","name":"Controller","sortOrder":12}]})"};
+    json_reader reader{input};
+    AlsaSequencerConfiguration configuration;
+    reader.read(&configuration);
+
+    REQUIRE(reader.is_complete());
+    REQUIRE(configuration.connections().size() == 1);
+    REQUIRE(configuration.outputConnections().empty());
+    REQUIRE(configuration.connections()[0].input());
+    REQUIRE_FALSE(configuration.connections()[0].output());
+}
+
+TEST_CASE("Bluetooth MIDI routes survive json roundtrip", "[json_read_test][midi-routing]")
+{
+    AlsaSequencerConfiguration source;
+    AlsaSequencerPortSelection port{
+        "seq:Chocolate Plus/Chocolate Plus Bluetooth",
+        "Chocolate Plus - Chocolate Plus Bluetooth",
+        128,
+        true,
+        true,
+        true};
+    source.connections().push_back(port);
+    source.outputConnections().push_back(port);
+
+    std::stringstream serialized;
+    json_writer writer{serialized};
+    writer.write(source);
+    json_reader reader{serialized};
+    AlsaSequencerConfiguration result;
+    reader.read(&result);
+
+    REQUIRE(reader.is_complete());
+    REQUIRE(result.connections().size() == 1);
+    REQUIRE(result.outputConnections().size() == 1);
+    REQUIRE(result.outputConnections()[0].output());
+    REQUIRE(result.outputConnections()[0].bluetooth());
+    REQUIRE(result.outputConnections()[0].id() == port.id());
 }
 
 TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][multipath]")

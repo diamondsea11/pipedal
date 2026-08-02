@@ -159,6 +159,9 @@ namespace pipedal
         while (snd_seq_query_next_client(seq, client_info) >= 0)
         {
             int client = snd_seq_client_info_get_client(client_info);
+            const std::string clientName = snd_seq_client_info_get_name(client_info);
+            if (clientName == "PiPedal" || clientName == "Device Monitor")
+                continue;
 
             snd_seq_port_info_set_client(port_info, client);
             snd_seq_port_info_set_port(port_info, -1);
@@ -173,17 +176,21 @@ namespace pipedal
                 {
                     continue;
                 }
-                if ((capability & (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) != (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ))
-                {
-                    continue; // Skip ports that are not readable AND subscribable
-                }
+                const bool canProvideInput =
+                    (capability & (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ)) ==
+                    (SND_SEQ_PORT_CAP_READ | SND_SEQ_PORT_CAP_SUBS_READ);
+                const bool canAcceptOutput =
+                    (capability & (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE)) ==
+                    (SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE);
+                if (!canProvideInput && !canAcceptOutput)
+                    continue;
 
                 AlsaSequencerPort port;
                 port.client = client;
                 port.isKernelDevice = snd_seq_client_info_get_type(client_info) == SND_SEQ_KERNEL_CLIENT;
                 port.port = snd_seq_port_info_get_port(port_info);
                 port.name = snd_seq_port_info_get_name(port_info);
-                port.clientName = snd_seq_client_info_get_name(client_info);
+                port.clientName = clientName;
                 port.canRead = capability & SND_SEQ_PORT_CAP_READ;
                 port.canWrite = capability & SND_SEQ_PORT_CAP_WRITE;
                 port.canReadSubscribe = capability & SND_SEQ_PORT_CAP_SUBS_READ;
@@ -395,11 +402,17 @@ namespace pipedal
                         ModifyConnection(
                             port.client, port.port, false, ConnectAction::Subscribe);
                     }
-                    if (port.canWriteSubscribe)
-                    {
-                        ModifyConnection(
-                            port.client, port.port, true, ConnectAction::Subscribe);
-                    }
+                    break;
+                }
+            }
+        }
+        for (const auto &connection : alsaSequencerConfiguration.outputConnections())
+        {
+            for (const auto &port : ports)
+            {
+                if (port.id == connection.id() && port.canWriteSubscribe)
+                {
+                    ModifyConnection(port.client, port.port, true, ConnectAction::Subscribe);
                     break;
                 }
             }
@@ -1180,11 +1193,15 @@ namespace pipedal
     JSON_MAP_REFERENCE(AlsaSequencerPortSelection, id)
     JSON_MAP_REFERENCE(AlsaSequencerPortSelection, name)
     JSON_MAP_REFERENCE(AlsaSequencerPortSelection, sortOrder)
+    JSON_MAP_REFERENCE(AlsaSequencerPortSelection, input)
+    JSON_MAP_REFERENCE(AlsaSequencerPortSelection, output)
+    JSON_MAP_REFERENCE(AlsaSequencerPortSelection, bluetooth)
     JSON_MAP_END()
 
     JSON_MAP_BEGIN(AlsaSequencerConfiguration)
     JSON_MAP_REFERENCE(AlsaSequencerConfiguration, midiChannel)
     JSON_MAP_REFERENCE(AlsaSequencerConfiguration, connections)
+    JSON_MAP_REFERENCE(AlsaSequencerConfiguration, outputConnections)
     JSON_MAP_END()
 
 } // namespace pipedal

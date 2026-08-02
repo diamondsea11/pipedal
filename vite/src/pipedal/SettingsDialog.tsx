@@ -530,9 +530,10 @@ const SettingsDialog = withStyles(
 
         midiSummary(): string {
             let ports = this.state.alsaSequencerConfiguration.connections;
-            if (ports.length === 0) return "Disabled";
+            let outputs = this.state.alsaSequencerConfiguration.outputConnections;
+            if (ports.length === 0 && outputs.length === 0) return "Disabled";
 
-            let result = "";
+            let result = ports.length === 0 ? "No input" : "";
             for (let port of ports) {
                 if (result.length !== 0) {
                     result += ", ";
@@ -543,6 +544,9 @@ const SettingsDialog = withStyles(
                 result += " (Ch " + this.state.alsaSequencerConfiguration.midiChannel + ")";
             } else {
                 result += " (OMNI)";
+            }
+            if (outputs.length !== 0) {
+                result += " -> " + outputs.map((port) => port.name).join(", ");
             }
             return result;
         }

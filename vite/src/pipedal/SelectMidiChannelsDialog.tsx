@@ -29,6 +29,11 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Typography from '@mui/material/Typography';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
+import Divider from '@mui/material/Divider';
+import BluetoothIcon from '@mui/icons-material/Bluetooth';
+import UsbIcon from '@mui/icons-material/Usb';
+import InputIcon from '@mui/icons-material/Input';
+import OutputIcon from '@mui/icons-material/Output';
 
 import Checkbox from '@mui/material/Checkbox';
 import { AlsaSequencerConfiguration, AlsaSequencerPortSelection } from './AlsaSequencer';
@@ -46,6 +51,7 @@ interface DeviceListItem {
     name: string;
     sortOrder: number
     offline: boolean;
+    bluetooth: boolean;
 };
 
 function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
@@ -53,7 +59,8 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
     const { open, onClose } = props;
     const [availablePorts, setAvailablePorts] = useState<AlsaSequencerPortSelection[] | null>(null);
     const [configuration, setConfiguration] = useState<AlsaSequencerConfiguration | null>(null);
-    const [allPorts, setAllPorts] = useState<DeviceListItem[] | null>(null);
+    const [inputPorts, setInputPorts] = useState<DeviceListItem[] | null>(null);
+    const [outputPorts, setOutputPorts] = useState<DeviceListItem[] | null>(null);
     const [model] = useState<PiPedalModel>(PiPedalModelFactory.getInstance());
     const [changed, setChanged] = useState<boolean>(false);
     const [ readyToDisplay, setReadyToDisplay ] = useState<boolean>(false);
@@ -84,47 +91,52 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
     }, [open]);
     React.useEffect(() => {
         if (availablePorts !== null && configuration !== null) {
-            let result: DeviceListItem[] = [];
-            setReadyToDisplay(true);
-            for (let port of availablePorts) {
-                result.push({
-                    id: port.id,
-                    name: port.name,
-                    sortOrder: port.sortOrder,
-                    offline: false
-                });
-            }
-
-            // include ports that have been previously selected but are not in the current list of available ports
-            for (let port of configuration.connections) {
-                if (!availablePorts.some((p) => p.id === port.id)) {
-                    result.push(
-                        {
+            const makeList = (direction: 'input' | 'output') => {
+                const selected = direction === 'input'
+                    ? configuration.connections : configuration.outputConnections;
+                let result: DeviceListItem[] = [];
+                for (let port of availablePorts) {
+                    if (!port[direction]) continue;
+                    result.push({
+                        id: port.id,
+                        name: port.name,
+                        sortOrder: port.sortOrder,
+                        offline: false,
+                        bluetooth: port.bluetooth,
+                    });
+                }
+                for (let port of selected) {
+                    if (!availablePorts.some((p) => p.id === port.id && p[direction])) {
+                        result.push({
                             id: port.id,
                             name: port.name,
-                            sortOrder: port.sortOrder+100,
-                            offline: true
-                        }
-                    );
+                            sortOrder: port.sortOrder + 100,
+                            offline: true,
+                            bluetooth: port.bluetooth,
+                        });
+                    }
                 }
-            }
-            result.sort((a, b) => {
-                return a.sortOrder - b.sortOrder;
-            });
-            setAllPorts(result);
+                return result.sort((a, b) => a.sortOrder - b.sortOrder);
+            };
+            setReadyToDisplay(true);
+            setInputPorts(makeList('input'));
+            setOutputPorts(makeList('output'));
         } else {
-            setAllPorts(null);
+            setInputPorts(null);
+            setOutputPorts(null);
         }
 
     }, [availablePorts, configuration]);
 
-    const isChecked = (value: DeviceListItem) => {
+    const isChecked = (value: DeviceListItem, direction: 'input' | 'output') => {
         if (availablePorts === null || configuration === null) {
             return false;
         }
-        return configuration.connections.some((port) => port.id === value.id);
+        const selected = direction === 'input'
+            ? configuration.connections : configuration.outputConnections;
+        return selected.some((port) => port.id === value.id);
     };
-    const setChecked = (value_: DeviceListItem, checked: boolean) => {
+    const setChecked = (value_: DeviceListItem, direction: 'input' | 'output', checked: boolean) => {
         if (availablePorts === null || configuration === null) {
             return;
         }
@@ -132,7 +144,11 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
         value.id = value_.id;
         value.name = value_.name;
         value.sortOrder = value_.sortOrder;
-        let newConnections = configuration.connections.slice();
+        value.bluetooth = value_.bluetooth;
+        value.input = direction === 'input';
+        value.output = direction === 'output';
+        let newConnections = (direction === 'input'
+            ? configuration.connections : configuration.outputConnections).slice();
         if (checked) {
             newConnections.push(value);
         } else {
@@ -140,17 +156,20 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
         }
         let newConfiguration = new AlsaSequencerConfiguration();
         newConfiguration.midiChannel = configuration.midiChannel;
-        newConfiguration.connections = newConnections;
+        newConfiguration.connections = direction === 'input'
+            ? newConnections : configuration.connections.slice();
+        newConfiguration.outputConnections = direction === 'output'
+            ? newConnections : configuration.outputConnections.slice();
         setConfiguration(newConfiguration);
     };
-    let toggleSelect = (value: DeviceListItem) => {
+    let toggleSelect = (value: DeviceListItem, direction: 'input' | 'output') => {
         if (availablePorts === null || configuration === null) {
             return;
         }
-        if (!isChecked(value)) {
-            setChecked(value, true);
+        if (!isChecked(value, direction)) {
+            setChecked(value, direction, true);
         } else {
-            setChecked(value, false);
+            setChecked(value, direction, false);
         }
         setChanged(true);
     };
@@ -169,6 +188,7 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
             let newConfiguration = new AlsaSequencerConfiguration();
             newConfiguration.midiChannel = channel;
             newConfiguration.connections = configuration.connections.slice();
+            newConfiguration.outputConnections = configuration.outputConnections.slice();
             setConfiguration(newConfiguration);
             setChanged(true);
         }
@@ -178,51 +198,80 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
     return (
         <DialogEx tag="midiChannels" onClose={handleClose} aria-labelledby="select-midi-inputs"
             open={open && readyToDisplay}
-            fullWidth maxWidth="xs"
+            fullWidth maxWidth="sm"
             onEnterKey={handleClose}
         >
-            <DialogTitle id="select-midi-inputs">Select MIDI Inputs</DialogTitle>
+            <DialogTitle id="select-midi-inputs">MIDI Connections</DialogTitle>
             <DialogContent dividers>
-                <div style={{ marginLeft: 16, marginRight: 16, marginTop: 8, marginBottom: 8 }}>
-                    <Typography display="block" variant="caption">MIDI Channel</Typography>
+                <div style={{ margin: '8px 16px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <InputIcon color="secondary" />
+                    <div style={{ flex: 1 }}>
+                    <Typography display="block" variant="caption">Input channel</Typography>
                     <Select variant='standard' value={configuration? configuration.midiChannel.toString(): ""} style={{ width: 100 }}
                         sx={{ '& .MuiSelect-select': { textAlign: 'right' } }} disabled={!readyToDisplay}
                         onChange={(event) => handleChannelChanged(parseInt(event.target.value))}>
                         <MenuItem key={-1} value={-1} sx={{ justifyContent: 'flex-end' }}>OMNI</MenuItem>
-                        <MenuItem key={0} value={0} sx={{ justifyContent: 'flex-end' }}>0</MenuItem>
-                        <MenuItem key={1} value={1} sx={{ justifyContent: 'flex-end' }}>1</MenuItem>
-                        <MenuItem key={2} value={2} sx={{ justifyContent: 'flex-end' }}>2</MenuItem>
-                        <MenuItem key={3} value={3} sx={{ justifyContent: 'flex-end' }}>3</MenuItem>
-                        <MenuItem key={4} value={4} sx={{ justifyContent: 'flex-end' }}>4</MenuItem>
-                        <MenuItem key={5} value={5} sx={{ justifyContent: 'flex-end' }}>5</MenuItem>
-                        <MenuItem key={6} value={6} sx={{ justifyContent: 'flex-end' }}>6</MenuItem>
-                        <MenuItem key={7} value={7} sx={{ justifyContent: 'flex-end' }}>7</MenuItem>
-                        <MenuItem key={8} value={8} sx={{ justifyContent: 'flex-end' }}>8</MenuItem>
-                        <MenuItem key={9} value={9} sx={{ justifyContent: 'flex-end' }}>9</MenuItem>
-                        <MenuItem key={10} value={10} sx={{ justifyContent: 'flex-end' }}>10</MenuItem>
-                        <MenuItem key={11} value={11} sx={{ justifyContent: 'flex-end' }}>11</MenuItem>
-                        <MenuItem key={12} value={12} sx={{ justifyContent: 'flex-end' }}>12</MenuItem>
-                        <MenuItem key={13} value={13} sx={{ justifyContent: 'flex-end' }}>13</MenuItem>
-                        <MenuItem key={14} value={14} sx={{ justifyContent: 'flex-end' }}>14</MenuItem>
-                        <MenuItem key={15} value={15} sx={{ justifyContent: 'flex-end' }}>15</MenuItem>
+                        {Array.from({ length: 16 }, (_, channel) => (
+                            <MenuItem key={channel} value={channel} sx={{ justifyContent: 'flex-end' }}>
+                                {channel + 1}
+                            </MenuItem>
+                        ))}
                     </Select>
+                    </div>
                 </div>
-                <List>
-                    {allPorts !== null && allPorts.length === 0 && (
+                <PortList title="MIDI inputs" ports={inputPorts} direction="input"
+                    isChecked={isChecked} toggleSelect={toggleSelect} />
+                <Divider sx={{ my: 2 }} />
+                <PortList title="MIDI outputs" ports={outputPorts} direction="output"
+                    isChecked={isChecked} toggleSelect={toggleSelect} />
+                {availablePorts !== null && !availablePorts.some((port) => port.bluetooth) && (
+                    <div style={{ display: 'flex', gap: 10, margin: '18px 16px 4px', alignItems: 'center' }}>
+                        <BluetoothIcon color="disabled" />
+                        <Typography variant="caption" color="textSecondary">
+                            A connected BLE MIDI device will appear here automatically.
+                        </Typography>
+                    </div>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={handleClose} variant="dialogSecondary" >Cancel</Button>
+                <Button onClick={handleOk} variant="dialogPrimary" >OK</Button>
+            </DialogActions>
+        </DialogEx>
+    );
+}
+
+function PortList(props: {
+    title: string;
+    ports: DeviceListItem[] | null;
+    direction: 'input' | 'output';
+    isChecked: (port: DeviceListItem, direction: 'input' | 'output') => boolean;
+    toggleSelect: (port: DeviceListItem, direction: 'input' | 'output') => void;
+}) {
+    return <div>
+        <Typography variant="subtitle2" sx={{ px: 2, display: 'flex', gap: 1, alignItems: 'center' }}>
+            {props.direction === 'input' ? <InputIcon fontSize="small" /> : <OutputIcon fontSize="small" />}
+            {props.title}
+        </Typography>
+        <List dense>
+                    {props.ports !== null && props.ports.length === 0 && (
                         <Typography variant="body2" style={{ marginLeft: 32, marginRight: 24, marginTop: 8, marginBottom: 16 }}>
-                            No MIDI devices found.
+                            No {props.direction === 'input' ? 'input' : 'output'} devices found.
                         </Typography>)}
-                    {allPorts != null && allPorts.map((port) => (
-                        <ListItemButton key={port.id}>
+                    {props.ports != null && props.ports.map((port) => (
+                        <ListItemButton key={port.id} onClick={() => props.toggleSelect(port, props.direction)}>
                             <FormControlLabel
+                                sx={{ width: '100%', m: 0 }}
                                 control={
                                     <Checkbox
-                                        checked={isChecked(port)}
-                                        onClick={() => toggleSelect(port)} />
+                                        checked={props.isChecked(port, props.direction)}
+                                        onClick={(event) => event.stopPropagation()}
+                                        onChange={() => props.toggleSelect(port, props.direction)} />
                                 }
                                 label={
                                     (
-                                    <div style={{ display: "flex", flexFlow: "row nowrap", alignItems: "center" }}>
+                                    <div style={{ display: "flex", flexFlow: "row nowrap", alignItems: "center", gap: 10, width: '100%' }}>
+                                        {port.bluetooth ? <BluetoothIcon fontSize="small" color="secondary" /> : <UsbIcon fontSize="small" color="disabled" />}
                                         <Typography
                                             color={ port.offline ? "textSecondary" : "textPrimary" }
                                             noWrap variant="body2"
@@ -240,20 +289,9 @@ function SelectMidiChannelsDialog(props: SelectMidiChannelsDialogProps) {
                             />
                         </ListItemButton>
                     )
-
                     )}
                 </List>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={handleClose} variant="dialogSecondary" >
-                    Cancel
-                </Button>
-                <Button onClick={handleOk} variant="dialogPrimary"   >
-                    OK
-                </Button>
-            </DialogActions>
-        </DialogEx>
-    );
+    </div>;
 }
 
 export default SelectMidiChannelsDialog;

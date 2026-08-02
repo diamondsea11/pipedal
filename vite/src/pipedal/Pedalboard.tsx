@@ -458,6 +458,7 @@ export enum MidiActionType {
     ToggleGlobalEq = 13,
     SendMidiControl = 14,
     SendMidiProgram = 15,
+    SendMidiNote = 16,
 }
 
 export enum MidiActionGesture {

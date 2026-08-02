@@ -75,6 +75,8 @@ MIDI controllers.
   complete assignments.
 - [x] Add a MIDI activity and action monitor for troubleshooting controller
   mappings without SSH access.
+- [x] Add BLE-MIDI-aware input selection and explicit external MIDI output
+  routing for Control Hub CC, Program Change and Note actions.
 - [x] Add focused, grouped Dusk Audio skins. DuskVerb, Multi-Comp, Multi-Q,
   4K EQ, both TapeMachine variants and Spectrum Analyzer now use compact
   processor-specific groups; Multi-Comp also exposes its live GR telemetry.
@@ -87,8 +89,8 @@ MIDI controllers.
 
 - Base release: `2.0.110`
 - Current development branch: `feature/multipath-v1`
-- Current tagged build: `pipedal-2.0.110-codex21`
-- Current package build: `2.0.110+codex21`
+- Current tagged build: `pipedal-2.0.110-codex22`
+- Current package build: `2.0.110+codex22`
 
 ## Performance Record
 

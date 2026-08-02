@@ -47,6 +47,7 @@ export const midiActionNames = new Map<number, string>([
     [MidiActionType.ToggleGlobalEq, 'Toggle Global EQ'],
     [MidiActionType.SendMidiControl, 'Send MIDI CC'],
     [MidiActionType.SendMidiProgram, 'Send MIDI PC'],
+    [MidiActionType.SendMidiNote, 'Send MIDI note'],
 ]);
 
 const GRID_COLUMNS =
@@ -199,7 +200,8 @@ export default function MidiActionTable(props: MidiActionTableProps) {
                     action.actionType === MidiActionType.TogglePathMute;
                 const midiOutputAction =
                     action.actionType === MidiActionType.SendMidiControl ||
-                    action.actionType === MidiActionType.SendMidiProgram;
+                    action.actionType === MidiActionType.SendMidiProgram ||
+                    action.actionType === MidiActionType.SendMidiNote;
                 const controls = pluginControls.get(action.targetId) ?? [];
                 const selectedControl = controls.find(
                     (control) => control.symbol === action.symbol);
@@ -208,7 +210,8 @@ export default function MidiActionTable(props: MidiActionTableProps) {
                     action.actionType === MidiActionType.TogglePluginControl ||
                     action.actionType === MidiActionType.TogglePluginBypass ||
                     action.actionType === MidiActionType.SetPathMute ||
-                    action.actionType === MidiActionType.SendMidiControl;
+                    action.actionType === MidiActionType.SendMidiControl ||
+                    action.actionType === MidiActionType.SendMidiNote;
                 const usesAlternateValue =
                     action.actionType === MidiActionType.TogglePluginControl ||
                     action.actionType === MidiActionType.TogglePluginBypass;
@@ -246,15 +249,16 @@ export default function MidiActionTable(props: MidiActionTableProps) {
                                     }
                                     update(index, values);
                                 }}>
-                                <MenuItem value={MidiBinding.BINDING_TYPE_NOTE}>Note</MenuItem>
-                                <MenuItem value={MidiBinding.BINDING_TYPE_CONTROL}>CC</MenuItem>
-                                <MenuItem value={MidiBinding.BINDING_TYPE_PROGRAM}>PC</MenuItem>
+                                <MenuItem value={MidiBinding.BINDING_TYPE_NOTE}>MIDI Note</MenuItem>
+                                <MenuItem value={MidiBinding.BINDING_TYPE_CONTROL}>MIDI CC</MenuItem>
+                                <MenuItem value={MidiBinding.BINDING_TYPE_PROGRAM}>MIDI PC</MenuItem>
                             </Select>
                             <TextField size="small" type="number" value={action.number}
                                 inputProps={{ min: 0, max: 127 }}
                                 onChange={(event) => update(index, { number: Number(event.target.value) })} />
-                            <Tooltip title={
-                                learningIndex === index ? 'Cancel MIDI learn' : 'Learn MIDI trigger'}>
+                            <Tooltip title={learningIndex === index
+                                ? 'Cancel MIDI learn'
+                                : 'Learn from a selected USB or Bluetooth MIDI input'}>
                                 <IconButton size="small"
                                     color={learningIndex === index ? 'secondary' : 'default'}
                                     onClick={() => learningIndex === index
@@ -303,6 +307,9 @@ export default function MidiActionTable(props: MidiActionTableProps) {
                                         value: 1,
                                         alternateValue: 0,
                                     });
+                                } else if (actionType === MidiActionType.SendMidiControl ||
+                                    actionType === MidiActionType.SendMidiNote) {
+                                    values.value = 127;
                                 }
                                 update(index, values);
                             }}>
@@ -323,7 +330,8 @@ export default function MidiActionTable(props: MidiActionTableProps) {
                                     ))}
                                 </Select>
                                 <TextField size="small" type="number" label={
-                                    action.actionType === MidiActionType.SendMidiControl ? 'CC' : 'PC'}
+                                    action.actionType === MidiActionType.SendMidiControl ? 'CC' :
+                                        action.actionType === MidiActionType.SendMidiProgram ? 'PC' : 'Note'}
                                     value={action.actionNumber}
                                     inputProps={{ min: 0, max: 127 }}
                                     onChange={(event) => update(index, {

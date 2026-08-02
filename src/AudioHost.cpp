@@ -1128,6 +1128,20 @@ private:
             }
             break;
         }
+        case MidiActionType::SendMidiNote:
+        {
+            const int velocity = std::clamp((int)std::round(action.value()), 0, 127);
+            const uint8_t message[3] = {
+                (uint8_t)((velocity == 0 ? 0x80 : 0x90) |
+                    std::clamp(action.outputChannel(), 0, 15)),
+                (uint8_t)std::clamp(action.actionNumber(), 0, 127),
+                (uint8_t)velocity};
+            if (alsaSequencer != nullptr)
+            {
+                alsaSequencer->SendMessage(message, sizeof(message));
+            }
+            break;
+        }
         default:
             break;
         }

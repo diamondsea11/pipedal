@@ -49,11 +49,15 @@ namespace pipedal
         std::string id_;
         std::string name_;
         int32_t sortOrder_ = 0;
+        bool input_ = true;
+        bool output_ = false;
+        bool bluetooth_ = false;
 
     public:
         AlsaSequencerPortSelection() = default;
-        AlsaSequencerPortSelection(const std::string &id, const std::string &name, int32_t displaySortOrder)
-            : id_(id), name_(name), sortOrder_(displaySortOrder) {}
+        AlsaSequencerPortSelection(const std::string &id, const std::string &name, int32_t displaySortOrder,
+                                   bool input = true, bool output = false, bool bluetooth = false)
+            : id_(id), name_(name), sortOrder_(displaySortOrder), input_(input), output_(output), bluetooth_(bluetooth) {}
         AlsaSequencerPortSelection(const AlsaSequencerPortSelection &other) = default;
         AlsaSequencerPortSelection(AlsaSequencerPortSelection &&other) = default;
         AlsaSequencerPortSelection &operator=(const AlsaSequencerPortSelection &other) = default;
@@ -64,6 +68,14 @@ namespace pipedal
         void id(const std::string &value) { id_ = value; }
         const std::string &name() const { return name_; }
         void name(const std::string &value) { name_ = value; }
+        int32_t sortOrder() const { return sortOrder_; }
+        void sortOrder(int32_t value) { sortOrder_ = value; }
+        bool input() const { return input_; }
+        void input(bool value) { input_ = value; }
+        bool output() const { return output_; }
+        void output(bool value) { output_ = value; }
+        bool bluetooth() const { return bluetooth_; }
+        void bluetooth(bool value) { bluetooth_ = value; }
 
         DECLARE_JSON_MAP(AlsaSequencerPortSelection);
     };
@@ -71,10 +83,14 @@ namespace pipedal
     private:
         int32_t midiChannel_ = -1; // -1 -> OMNI, or channels 0..15.
         std::vector<AlsaSequencerPortSelection> connections_;
+        std::vector<AlsaSequencerPortSelection> outputConnections_;
     public:
         const std::vector<AlsaSequencerPortSelection>& connections() const { return connections_; }
         std::vector<AlsaSequencerPortSelection>& connections() { return connections_; }
         void connections(const std::vector<AlsaSequencerPortSelection>& value) { connections_ = value; }
+        const std::vector<AlsaSequencerPortSelection>& outputConnections() const { return outputConnections_; }
+        std::vector<AlsaSequencerPortSelection>& outputConnections() { return outputConnections_; }
+        void outputConnections(const std::vector<AlsaSequencerPortSelection>& value) { outputConnections_ = value; }
 
         int32_t midiChannel() const { return midiChannel_; }
         void midiChannel(int32_t value) { this->midiChannel_ = value; }
@@ -94,6 +110,14 @@ namespace pipedal
             if (this->midiChannel() != other.midiChannel())
             {
                 return false;
+            }
+            if (outputConnections_.size() != other.outputConnections_.size())
+                return false;
+            for (size_t i = 0; i < outputConnections_.size(); ++i)
+            {
+                if (outputConnections_[i].id() != other.outputConnections_[i].id() ||
+                    outputConnections_[i].name() != other.outputConnections_[i].name())
+                    return false;
             }
             return true;
         }
