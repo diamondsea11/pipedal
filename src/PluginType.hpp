@@ -81,6 +81,10 @@ PluginType uri_to_plugin_type(const std::string&uri);
 PluginType string_to_plugin_type(const std::string&value);
 const std::string& plugin_type_to_string(PluginType value);
 
+// Tail-free processors may remain instantiated while their audio processing is
+// suspended after the host bypass transition has completed.
+bool plugin_type_can_suspend_when_bypassed(PluginType type);
+
 
 json_enum_converter<PluginType> *get_plugin_type_enum_converter();
 

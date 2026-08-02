@@ -478,6 +478,7 @@ add_executable(pipedaltest
 
     AudioFilesTest.cpp
     LRUCacheTest.cpp
+    PluginTypeTest.cpp
     ModFileTypesTest.cpp
     jsonTest.cpp
     UpdaterTest.cpp

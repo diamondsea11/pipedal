@@ -43,6 +43,7 @@
 #include <exception>
 #include "RingBufferReader.hpp"
 #include "Worker.hpp"
+#include "PluginType.hpp"
 
 using namespace pipedal;
 namespace fs = std::filesystem;
@@ -139,6 +140,9 @@ Lv2Effect::Lv2Effect(
             break;
         }
     }
+    this->suspendDspWhenBypassed =
+        this->bypassControlIndex == -1 &&
+        plugin_type_can_suspend_when_bypassed(uri_to_plugin_type(info_->plugin_class()));
     lilv_node_free(uriNode);
     {
         AutoLilvNode bundleUri = lilv_plugin_get_bundle_uri(pPlugin);
@@ -981,19 +985,34 @@ void Lv2Effect::resetStagedInputAtomBuffer()
         const uint32_t notify_capacity = pHost->GetAtomBufferSize();
         lv2_atom_forge_set_buffer(
             &(this->stagedInputForgeRt), (uint8_t *)(this->stagedInputAtomBufferPointer), notify_capacity);
-        lv2_atom_forge_sequence_head(&this->inputForgeRt, &staged_input_frame, urids.units__frame);
+        lv2_atom_forge_sequence_head(&this->stagedInputForgeRt, &staged_input_frame, urids.units__frame);
     }
 }
 void Lv2Effect::RunWithBufferStaging(uint32_t samples, RealtimeRingBufferWriter *realtimeRingBufferWriter)
 {
+    bool hasInputEvents = false;
     // accumulte control input sequence until we can execute a run operation.
     if (this->inputAtomBuffers.size() != 0)
     {
         lv2_atom_forge_pop(&this->inputForgeRt, &input_frame);
 
         LV2_Atom_Sequence *controlInput = (LV2_Atom_Sequence *)GetAtomInputBuffer(0);
+        hasInputEvents = controlInput->atom.size > sizeof(LV2_Atom_Sequence_Body);
         copyAtomBufferEventSequence(controlInput, this->stagedInputForgeRt);
     }
+
+    if (ShouldSuspendDsp(hasInputEvents))
+    {
+        if (worker)
+        {
+            worker->EmitResponses();
+        }
+        EnterDspSuspendedState();
+        MixOutput(samples, realtimeRingBufferWriter);
+        return;
+    }
+    this->dspSuspended = false;
+
     // Prepare ACTUAL control output port.
     if (this->stagedOutputAtomBufferPointer)
     {
@@ -1187,11 +1206,27 @@ inline void Lv2Effect::MixOutput(uint32_t samples, RealtimeRingBufferWriter *rea
 
 void Lv2Effect::Run(uint32_t samples, RealtimeRingBufferWriter *realtimeRingBufferWriter)
 {
+    bool hasInputEvents = false;
     // close off the atom input frame.
     if (this->inputAtomBuffers.size() != 0)
     {
         lv2_atom_forge_pop(&this->inputForgeRt, &input_frame);
+        LV2_Atom_Sequence *controlInput = (LV2_Atom_Sequence *)GetAtomInputBuffer(0);
+        hasInputEvents = controlInput->atom.size > sizeof(LV2_Atom_Sequence_Body);
     }
+
+    if (ShouldSuspendDsp(hasInputEvents))
+    {
+        if (worker)
+        {
+            worker->EmitResponses();
+        }
+        EnterDspSuspendedState();
+        MixOutput(samples, realtimeRingBufferWriter);
+        return;
+    }
+    this->dspSuspended = false;
+
     lilv_instance_run(pInstance, samples);
 
     if (worker)
@@ -1201,6 +1236,35 @@ void Lv2Effect::Run(uint32_t samples, RealtimeRingBufferWriter *realtimeRingBuff
     }
 
     MixOutput(samples, realtimeRingBufferWriter);
+}
+
+bool Lv2Effect::ShouldSuspendDsp(bool hasInputEvents) const
+{
+    return suspendDspWhenBypassed &&
+           !hasInputEvents &&
+           !bypass &&
+           bypassSamplesRemaining == 0 &&
+           currentBypass == 0;
+}
+
+void Lv2Effect::EnterDspSuspendedState()
+{
+    if (dspSuspended)
+    {
+        return;
+    }
+    dspSuspended = true;
+
+    if (stagingBufferSize != 0)
+    {
+        stagingInputIx = 0;
+        stagingOutputIx = 0;
+        for (auto &buffer : outputStagingBuffers)
+        {
+            std::fill_n(buffer.data(), stagingBufferSize, 0.0f);
+        }
+        resetStagedInputAtomBuffer();
+    }
 }
 
 LV2_Worker_Status Lv2Effect::worker_schedule_fn(LV2_Worker_Schedule_Handle handle,

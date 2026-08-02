@@ -20,8 +20,21 @@
 #include "catch.hpp"
 #include <string>
 #include "PluginHost.hpp"
+#include "PluginType.hpp"
 
 using namespace piddle;
+using namespace pipedal;
+
+TEST_CASE("Bypassed DSP suspension policy", "[plugin_type]")
+{
+    REQUIRE(plugin_type_can_suspend_when_bypassed(PluginType::AmplifierPlugin));
+    REQUIRE(plugin_type_can_suspend_when_bypassed(PluginType::SimulatorPlugin));
+    REQUIRE(plugin_type_can_suspend_when_bypassed(PluginType::DistortionPlugin));
+    REQUIRE(plugin_type_can_suspend_when_bypassed(PluginType::EQPlugin));
+
+    REQUIRE_FALSE(plugin_type_can_suspend_when_bypassed(PluginType::DelayPlugin));
+    REQUIRE_FALSE(plugin_type_can_suspend_when_bypassed(PluginType::ReverbPlugin));
+}
 
 TEST_CASE( "Lv2 Plugins", "[lv2_plugins]" ) {
 

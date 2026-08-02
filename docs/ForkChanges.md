@@ -54,6 +54,10 @@ installed only on the Raspberry Pi target.
 - Input and output terminals expose routing choices from the active interface,
   rather than only volume.
 - Chow Tape, Calf, Dragonfly, Dusk and TooB NAM have tailored control layouts.
+- Tail-free amplifier, simulator, distortion and EQ/filter LV2 plugins suspend
+  DSP after the host bypass fade completes. Instances and loaded NAM models stay
+  resident for immediate snapshot switching; delay, reverb and modulation tails
+  continue processing normally.
   Dusk MOD GUIs support numeric LV2 patch properties and live gain reduction
   when a plugin publishes reduction telemetry.
 

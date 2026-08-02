@@ -207,6 +207,11 @@ namespace pipedal
         double currentBypassDx = 0;
         uint32_t bypassSamplesRemaining = 0;
 
+        bool suspendDspWhenBypassed = false;
+        bool dspSuspended = false;
+        bool ShouldSuspendDsp(bool hasInputEvents) const;
+        void EnterDspSuspendedState();
+
         bool requestStateChangedNotification = false;
 
         float zeroInputMix = 0.5f;

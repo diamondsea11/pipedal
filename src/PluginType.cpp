@@ -190,6 +190,27 @@ const std::string &pipedal::plugin_type_to_string(PluginType type)
 
 }
 
+bool pipedal::plugin_type_can_suspend_when_bypassed(PluginType type)
+{
+    switch (type)
+    {
+    case PluginType::AmplifierPlugin:
+    case PluginType::SimulatorPlugin:
+    case PluginType::DistortionPlugin:
+    case PluginType::WaveshaperPlugin:
+    case PluginType::EQPlugin:
+    case PluginType::MultiEQPlugin:
+    case PluginType::ParaEQPlugin:
+    case PluginType::FilterPlugin:
+    case PluginType::HighpassPlugin:
+    case PluginType::LowpassPlugin:
+    case PluginType::BandpassPlugin:
+        return true;
+    default:
+        return false;
+    }
+}
+
 
 
 
@@ -212,4 +233,3 @@ json_enum_converter<PluginType> *pipedal::get_plugin_type_enum_converter()
 {
     return &g_plugin_type_converter;
 }
-
