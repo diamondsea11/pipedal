@@ -101,6 +101,26 @@ function nextMidiNumber(actions: MidiAction[]): number {
     return 0;
 }
 
+function nextProgramNumber(actions: MidiAction[]): number {
+    const used = new Set(actions
+        .filter((action) => action.bindingType === MidiBinding.BINDING_TYPE_PROGRAM)
+        .map((action) => action.number));
+    for (let number = 0; number < 128; ++number) {
+        if (!used.has(number)) return number;
+    }
+    return 0;
+}
+
+function nextSnapshotTarget(actions: MidiAction[]): number {
+    const used = new Set(actions
+        .filter((action) => action.actionType === MidiActionType.SelectSnapshot)
+        .map((action) => action.targetId));
+    for (let snapshot = 0; snapshot < 6; ++snapshot) {
+        if (!used.has(snapshot)) return snapshot;
+    }
+    return 0;
+}
+
 function sourceName(action: MidiAction): string {
     if (action.bindingType === MidiBinding.BINDING_TYPE_NOTE) return `Note ${action.number}`;
     if (action.bindingType === MidiBinding.BINDING_TYPE_PROGRAM) return `Program ${action.number}`;
@@ -406,6 +426,29 @@ export default function ControlHubDialog(props: ControlHubDialogProps) {
         setActiveActions(next);
         setSelectedActionIndex(next.length - 1);
     };
+    const addGeneralAction = () => {
+        const action = new MidiAction();
+        action.bindingType = MidiBinding.BINDING_TYPE_PROGRAM;
+        action.number = nextProgramNumber(activeActions);
+        action.gesture = MidiActionGesture.Press;
+        action.actionType = MidiActionType.SelectSnapshot;
+        action.targetId = nextSnapshotTarget(activeActions);
+
+        if (tab === -1) {
+            setBase([...base, action]);
+        } else {
+            setSnapshots((current) => current.map((entry, index) => {
+                if (index !== tab || !entry) return entry;
+                const source = entry.hasMidiActions
+                    ? entry.actions
+                    : base.map((baseAction) => baseAction.clone());
+                return { ...entry, hasMidiActions: true, actions: [...source, action] };
+            }));
+        }
+        setSelectedActionIndex(null);
+        stopLearning();
+        setView('actions');
+    };
     const removeAssignment = (index: number) => {
         setActiveActions(activeActions.filter((_action, actionIndex) => actionIndex !== index));
         setSelectedActionIndex(null);
@@ -457,8 +500,14 @@ export default function ControlHubDialog(props: ControlHubDialogProps) {
                     </Box>
                     <ToggleButtonGroup exclusive size="small" value={view}
                         onChange={(_event, value) => value && setView(value)} sx={{ mr: 1.5 }}>
-                        <ToggleButton value="blocks" aria-label="Block assignments"><ViewModuleIcon fontSize="small" /></ToggleButton>
-                        <ToggleButton value="actions" aria-label="All actions"><ListAltIcon fontSize="small" /></ToggleButton>
+                        <ToggleButton value="blocks" aria-label="Block and parameter assignments" sx={{ gap: 0.75, px: 1.25 }}>
+                            <ViewModuleIcon fontSize="small" />
+                            <Typography component="span" variant="button" sx={{ display: { xs: 'none', sm: 'inline' } }}>Parameters</Typography>
+                        </ToggleButton>
+                        <ToggleButton value="actions" aria-label="All MIDI actions" sx={{ gap: 0.75, px: 1.25 }}>
+                            <ListAltIcon fontSize="small" />
+                            <Typography component="span" variant="button" sx={{ display: { xs: 'none', sm: 'inline' } }}>Actions</Typography>
+                        </ToggleButton>
                     </ToggleButtonGroup>
                     <Button onClick={props.onClose}>Cancel</Button>
                     <Button variant="contained" onClick={save} sx={{ ml: 1 }}>Save</Button>
@@ -502,6 +551,12 @@ export default function ControlHubDialog(props: ControlHubDialogProps) {
                     )}
 
                     <Box sx={{ px: { xs: 1.5, md: 3 }, py: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <Typography sx={{ flex: 1, fontWeight: 750 }}>Blocks &amp; parameters</Typography>
+                            <Button variant="outlined" startIcon={<AddIcon />} onClick={addGeneralAction} sx={{ minHeight: 42 }}>
+                                Add action
+                            </Button>
+                        </Box>
                         <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5 }}>
                             {blocks.map((block) => {
                                 const selected = block.item.instanceId === selectedBlock?.item.instanceId;

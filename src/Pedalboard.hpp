@@ -31,6 +31,23 @@ namespace pipedal
     class Snapshot;
     class PluginHost;
 
+    class GlobalEqSettings
+    {
+    public:
+        bool enabled_ = false;
+        float lowCutHz_ = 20;
+        int lowCutSlopeDb_ = 12;
+        float lowGainDb_ = 0;
+        float midGainDb_ = 0;
+        float midFrequencyHz_ = 800;
+        float midQ_ = 1;
+        float highGainDb_ = 0;
+        float highCutHz_ = 20000;
+        int highCutSlopeDb_ = 12;
+
+        DECLARE_JSON_MAP(GlobalEqSettings);
+    };
+
 #define SPLIT_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#Split"
 #define EMPTY_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#Empty"
 

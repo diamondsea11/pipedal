@@ -26,7 +26,9 @@ installed only on the Raspberry Pi target.
   paths. Dragging a block downward creates a parallel split in the editor.
 - Compatible preset changes preserve supported delay and reverb tails.
 - Global EQ provides low/high cuts with selectable slopes, shelves and a
-  parametric mid band (`src/Lv2Pedalboard.*`, `GlobalEqDialog.tsx`).
+  parametric mid band. Graph and numeric edits are previewed in the audio thread
+  in real time; the full pedalboard is persisted only when an edit is committed
+  (`src/Lv2Pedalboard.*`, `GlobalEqDialog.tsx`).
 - Every input terminal includes a linked-channel noise gate before the effect
   chain. Gate, threshold and decay are stored per path and in snapshots. The
   gate defaults off, uses a 20 ms hold and closes over the selected decay time.
@@ -67,6 +69,9 @@ installed only on the Raspberry Pi target.
   ports in the UI. Control Hub actions can send CC, Program Change and Note
   messages to selected USB or Bluetooth destinations. Offline destinations are
   restored automatically when a controller reconnects.
+- MIDI actions use a responsive card editor with explicit PC, CC and Note
+  fields and a large MIDI Learn control. A general `Add action` command is also
+  available directly from the Control Hub block/parameter view.
 
 ## Host Compatibility and Performance
 

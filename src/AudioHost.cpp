@@ -817,6 +817,13 @@ private:
                 this->realtimeActivePedalboard->SetPathBOutputVolume(body.value);
                 break;
             }
+            case RingBufferCommand::SetGlobalEq:
+            {
+                GlobalEqSettings settings;
+                realtimeReader.readComplete(&settings);
+                this->realtimeActivePedalboard->SetGlobalEq(settings);
+                break;
+            }
             case RingBufferCommand::ParameterRequest:
             {
                 RealtimePatchPropertyRequest *pRequest = nullptr;
@@ -2497,6 +2504,14 @@ public:
         if (active && this->currentPedalboard)
         {
             hostWriter.SetPathBOutputVolume(value);
+        }
+    }
+    virtual void SetGlobalEq(const GlobalEqSettings &settings)
+    {
+        std::lock_guard guard(mutex);
+        if (active && this->currentPedalboard)
+        {
+            hostWriter.SetGlobalEq(settings);
         }
     }
 

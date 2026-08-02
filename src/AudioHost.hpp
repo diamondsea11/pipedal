@@ -246,6 +246,7 @@ namespace pipedal
         virtual void SetOutputVolume(float value) = 0;
         virtual void SetPathBInputVolume(float value) = 0;
         virtual void SetPathBOutputVolume(float value) = 0;
+        virtual void SetGlobalEq(const GlobalEqSettings &settings) = 0;
         virtual void SetPluginPreset(uint64_t instanceId, const std::vector<ControlValue> &values) = 0;
         virtual void SetBypass(uint64_t instanceId, bool enabled) = 0;
 

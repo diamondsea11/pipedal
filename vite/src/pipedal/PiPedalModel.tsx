@@ -2548,6 +2548,21 @@ export class PiPedalModel //implements PiPedalModel
         this.updateServerPedalboard();
     }
 
+    previewGlobalEq(settings: {
+        enabled: boolean;
+        lowCutHz: number;
+        lowCutSlopeDb: number;
+        lowGainDb: number;
+        midGainDb: number;
+        midFrequencyHz: number;
+        midQ: number;
+        highGainDb: number;
+        highCutHz: number;
+        highCutSlopeDb: number;
+    }): void {
+        this.webSocket?.send("previewGlobalEq", settings);
+    }
+
     applyRoutingTemplate(template: "single" | "guitar-vocal" | "dual"): void {
         let newPedalboard = this.pedalboard.get().clone();
         const inputCount = this.jackConfiguration.get().inputAudioPorts.length;

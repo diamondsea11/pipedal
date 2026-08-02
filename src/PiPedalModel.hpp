@@ -401,6 +401,7 @@ namespace pipedal
         void SetPathBOutputVolume(float value);
         void PreviewPathBInputVolume(float value);
         void PreviewPathBOutputVolume(float value);
+        void PreviewGlobalEq(const GlobalEqSettings &settings);
 
         void SetPedalboard(int64_t clientId, Pedalboard &pedalboard);
         Pedalboard &GetPedalboard();

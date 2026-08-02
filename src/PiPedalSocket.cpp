@@ -1300,6 +1300,14 @@ public:
     }
     REGISTER_MESSAGE_HANDLER(previewPathBOutputVolume)
 
+    void handle_previewGlobalEq(int replyTo, json_reader *pReader)
+    {
+        GlobalEqSettings settings;
+        pReader->read(&settings);
+        this->model.PreviewGlobalEq(settings);
+    }
+    REGISTER_MESSAGE_HANDLER(previewGlobalEq)
+
     void handle_listenForMidiEvent(int replyTo, json_reader *pReader)
     {
         ListenForMidiEventBody body;

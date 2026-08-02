@@ -27,6 +27,19 @@
 
 using namespace pipedal;
 
+JSON_MAP_BEGIN(GlobalEqSettings)
+JSON_MAP_REFERENCE(GlobalEqSettings, enabled)
+JSON_MAP_REFERENCE(GlobalEqSettings, lowCutHz)
+JSON_MAP_REFERENCE(GlobalEqSettings, lowCutSlopeDb)
+JSON_MAP_REFERENCE(GlobalEqSettings, lowGainDb)
+JSON_MAP_REFERENCE(GlobalEqSettings, midGainDb)
+JSON_MAP_REFERENCE(GlobalEqSettings, midFrequencyHz)
+JSON_MAP_REFERENCE(GlobalEqSettings, midQ)
+JSON_MAP_REFERENCE(GlobalEqSettings, highGainDb)
+JSON_MAP_REFERENCE(GlobalEqSettings, highCutHz)
+JSON_MAP_REFERENCE(GlobalEqSettings, highCutSlopeDb)
+JSON_MAP_END()
+
 
 static const PedalboardItem* GetItem_(const std::vector<PedalboardItem>&items,int64_t pedalboardItemId)
 {

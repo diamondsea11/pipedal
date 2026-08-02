@@ -2239,6 +2239,7 @@ const PedalboardView =
                             {pedalboard && <GlobalEqDialog
                                 open={this.state.globalEqDialogOpen}
                                 pedalboard={pedalboard}
+                                onPreview={(settings) => this.model.previewGlobalEq(settings)}
                                 onChange={(settings) => this.model.configureGlobalEq(settings)}
                                 onClose={() => this.setState({ globalEqDialogOpen: false })}
                             />}

@@ -40,6 +40,7 @@ type GlobalEqDialogProps = {
     open: boolean;
     pedalboard: Pedalboard;
     onChange: (settings: GlobalEqSettings) => void;
+    onPreview: (settings: GlobalEqSettings) => void;
     onClose: () => void;
 };
 
@@ -365,11 +366,28 @@ function SlopeControl(props: { value: number; onChange: (value: number) => void 
 export default function GlobalEqDialog(props: GlobalEqDialogProps) {
     const [settings, setSettings] = React.useState(() => settingsFromPedalboard(props.pedalboard));
     const settingsRef = React.useRef(settings);
+    const previewFrameRef = React.useRef<number | null>(null);
     const preview = (next: GlobalEqSettings) => {
         settingsRef.current = next;
         setSettings(next);
+        if (previewFrameRef.current === null) {
+            previewFrameRef.current = requestAnimationFrame(() => {
+                previewFrameRef.current = null;
+                props.onPreview(settingsRef.current);
+            });
+        }
     };
-    const commit = (next = settingsRef.current) => props.onChange(next);
+    const commit = (next = settingsRef.current) => {
+        if (previewFrameRef.current !== null) {
+            cancelAnimationFrame(previewFrameRef.current);
+            previewFrameRef.current = null;
+        }
+        props.onChange(next);
+    };
+
+    React.useEffect(() => () => {
+        if (previewFrameRef.current !== null) cancelAnimationFrame(previewFrameRef.current);
+    }, []);
 
     React.useEffect(() => {
         if (!props.open) return;

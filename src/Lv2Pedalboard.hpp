@@ -385,6 +385,7 @@ namespace pipedal
         void SetOutputVolume(float value) { this->outputVolume.SetTarget(value); }
         void SetPathBInputVolume(float value) { this->pathBInputVolume.SetTarget(value); }
         void SetPathBOutputVolume(float value) { this->pathBOutputVolume.SetTarget(value); }
+        void SetGlobalEq(const GlobalEqSettings &settings);
         void SetBypass(int effectIndex, bool enabled);
 
         void ComputeVus(RealtimeVuBuffers *vuConfiguration, uint32_t samples);

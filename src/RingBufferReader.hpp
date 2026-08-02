@@ -91,6 +91,7 @@ namespace pipedal
         SetOutputVolume,
         SetPathBInputVolume,
         SetPathBOutputVolume,
+        SetGlobalEq,
         Lv2ErrorMessage,
 
         RealtimeMidiEvent,
@@ -484,6 +485,10 @@ namespace pipedal
             SetVolumeBody body;
             body.value = value;
             write(RingBufferCommand::SetPathBOutputVolume, body);
+        }
+        void SetGlobalEq(const GlobalEqSettings &settings)
+        {
+            write(RingBufferCommand::SetGlobalEq, settings);
         }
 
         void FreeVuSubscriptions(RealtimeVuBuffers *configuration)

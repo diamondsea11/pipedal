@@ -1236,6 +1236,35 @@ void Lv2Pedalboard::SetControlValue(int effectIndex, int index, float value)
     auto effect = realtimeEffects[effectIndex];
     effect->SetControl(index, value);
 }
+
+void Lv2Pedalboard::SetGlobalEq(const GlobalEqSettings &settings)
+{
+    globalEqEnabled = settings.enabled_;
+    const float sampleRate = (float)pHost->GetSampleRate();
+    for (auto &filters : globalEq)
+    {
+        std::array<std::pair<float, float>, 7> state;
+        for (size_t i = 0; i < filters.size(); ++i)
+        {
+            state[i] = {filters[i].z1, filters[i].z2};
+        }
+
+        ConfigureCutFilters(filters[0], filters[1], EqType::HighPass, sampleRate,
+                            settings.lowCutHz_, settings.lowCutSlopeDb_);
+        ConfigureBiquad(filters[2], EqType::LowShelf, sampleRate, 120, settings.lowGainDb_);
+        ConfigureBiquad(filters[3], EqType::Peak, sampleRate,
+                        settings.midFrequencyHz_, settings.midGainDb_, settings.midQ_);
+        ConfigureBiquad(filters[4], EqType::HighShelf, sampleRate, 4000, settings.highGainDb_);
+        ConfigureCutFilters(filters[5], filters[6], EqType::LowPass, sampleRate,
+                            settings.highCutHz_, settings.highCutSlopeDb_);
+
+        for (size_t i = 0; i < filters.size(); ++i)
+        {
+            filters[i].z1 = state[i].first;
+            filters[i].z2 = state[i].second;
+        }
+    }
+}
 void Lv2Pedalboard::SetBypass(int effectIndex, bool enabled)
 {
     auto effect = realtimeEffects[effectIndex];

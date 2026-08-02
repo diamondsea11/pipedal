@@ -646,6 +646,11 @@ void PiPedalModel::PreviewPathBOutputVolume(float value)
     audioHost->SetPathBOutputVolume(value);
 }
 
+void PiPedalModel::PreviewGlobalEq(const GlobalEqSettings &settings)
+{
+    audioHost->SetGlobalEq(settings);
+}
+
 void PiPedalModel::SetControl(int64_t clientId, int64_t pedalItemId, const std::string &symbol, float value)
 {
     SubscriberList subscribers;
