@@ -76,6 +76,7 @@ interface SettingsDialogProps extends WithStyles<typeof styles> {
 
 interface SettingsDialogState {
     showStatusMonitor: boolean;
+    autoSaveSnapshotChanges: boolean;
     showStatusMonitorDialog: boolean;
     jackConfiguration: JackConfiguration;
     jackSettings: JackChannelSelection | null;
@@ -193,6 +194,7 @@ const SettingsDialog = withStyles(
             this.handleDialogClose = this.handleDialogClose.bind(this);
             this.state = {
                 showStatusMonitor: this.model.showStatusMonitor.get(),
+                autoSaveSnapshotChanges: this.model.autoSaveSnapshotChanges.get(),
                 showStatusMonitorDialog: false,
 
                 jackServerSettings: this.model.jackServerSettings.get(),
@@ -237,6 +239,7 @@ const SettingsDialog = withStyles(
             this.handleGovernorSettingsChanged = this.handleGovernorSettingsChanged.bind(this);
             this.handleConnectionStateChanged = this.handleConnectionStateChanged.bind(this);
             this.handleShowStatusMonitorChanged = this.handleShowStatusMonitorChanged.bind(this);
+            this.handleAutoSaveSnapshotChangesChanged = this.handleAutoSaveSnapshotChangesChanged.bind(this);
             this.handleHasWifiChanged = this.handleHasWifiChanged.bind(this);
             this.handleKeepScreenOnChanged = this.handleKeepScreenOnChanged.bind(this);
             this.handleScreenOrientationChanged = this.handleScreenOrientationChanged.bind(this);
@@ -257,6 +260,9 @@ const SettingsDialog = withStyles(
 
         handleShowStatusMonitorChanged(): void {
             this.setState({ showStatusMonitor: this.model.showStatusMonitor.get() });
+        }
+        handleAutoSaveSnapshotChangesChanged(): void {
+            this.setState({ autoSaveSnapshotChanges: this.model.autoSaveSnapshotChanges.get() });
         }
         handleConnectionStateChanged(): void {
             if (this.model.state.get() === State.Ready) {
@@ -377,6 +383,7 @@ const SettingsDialog = withStyles(
                     this.model.hasWifiDevice.addOnChangedHandler(this.handleHasWifiChanged);
                     this.model.state.addOnChangedHandler(this.handleConnectionStateChanged);
                     this.model.showStatusMonitor.addOnChangedHandler(this.handleShowStatusMonitorChanged);
+                    this.model.autoSaveSnapshotChanges.addOnChangedHandler(this.handleAutoSaveSnapshotChangesChanged);
                     this.model.jackSettings.addOnChangedHandler(this.handleJackSettingsChanged);
                     this.model.jackConfiguration.addOnChangedHandler(this.handleJackConfigurationChanged);
                     this.model.alsaSequencerConfiguration.addOnChangedHandler(this.handleAlsaSequencerConfigurationChanged);
@@ -403,6 +410,7 @@ const SettingsDialog = withStyles(
                     this.handleAlsaSequencerConfigurationChanged();
                     this.handleJackSettingsChanged();
                     this.handleShowStatusMonitorChanged();
+                    this.handleAutoSaveSnapshotChangesChanged();
                     this.handleJackServerSettingsChanged();
                     this.handleChannelRouterSettingsChanged();
                     this.handleWifiConfigSettingsChanged();
@@ -416,6 +424,7 @@ const SettingsDialog = withStyles(
                     }
                     this.model.state.removeOnChangedHandler(this.handleConnectionStateChanged);
                     this.model.showStatusMonitor.removeOnChangedHandler(this.handleShowStatusMonitorChanged);
+                    this.model.autoSaveSnapshotChanges.removeOnChangedHandler(this.handleAutoSaveSnapshotChangesChanged);
                     this.model.keepScreenOn.removeOnChangedHandler(this.handleKeepScreenOnChanged);
                     this.model.screenOrientation.removeOnChangedHandler(this.handleScreenOrientationChanged);
 
@@ -820,6 +829,42 @@ const SettingsDialog = withStyles(
 
                                 </div>
                             </div>
+                            <Divider />
+                            {(!this.props.onboarding) && (
+                                <div>
+                                    <Typography className={classes.sectionHead} display="block" variant="caption" color="secondary">
+                                        SNAPSHOTS
+                                    </Typography>
+                                    <ButtonBase
+                                        className={classes.setting}
+                                        onClick={() => this.model.setAutoSaveSnapshotChanges(
+                                            !this.state.autoSaveSnapshotChanges)}
+                                    >
+                                        <SelectHoverBackground selected={false} showHover={true} />
+                                        <div style={{ width: "100%" }}>
+                                            <div style={{
+                                                width: "100%", display: "flex", flexDirection: "row",
+                                                flexWrap: "nowrap", alignItems: "center", maxWidth: 560
+                                            }}>
+                                                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                                                    <Typography display="block" variant="body2" color="textPrimary">
+                                                        Auto-save snapshot changes
+                                                    </Typography>
+                                                    <Typography display="block" variant="caption" color="textSecondary">
+                                                        Update the active snapshot shortly after editing stops.
+                                                    </Typography>
+                                                </div>
+                                                <div style={{ flex: "0 0 auto" }}>
+                                                    <Switch
+                                                        checked={this.state.autoSaveSnapshotChanges}
+                                                        onChange={(e) => this.model.setAutoSaveSnapshotChanges(e.target.checked)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </ButtonBase>
+                                </div>
+                            )}
                             <Divider />
                             {(!this.props.onboarding) &&
                                 (

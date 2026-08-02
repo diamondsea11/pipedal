@@ -96,23 +96,19 @@ export default class ChannelBindingHelpDialog extends ResizeResponsiveComponent<
                             MIDI message processing occurs in the following order
                         </p>
                         <ul>
-                            <li>If the message is a Program Change message, the message is first offered to any MIDI plugins in the currently loaded preset (Message Filters permitting).
-                                The message is sent to each MIDI plugin in the current preset that wants it. If any MIDI plugin accepts the program change,
-                                no futher processing occurs. Specifically, the program change will not change the currently selected PiPedal preset.
+                            <li>Control Hub actions are evaluated first. A matching action consumes the message.
                                 <br />
                             </li>
                             <li>
-                                If the message is a Program Change message, and no MIDI plugin has accepted the message, PiPedal selects the PiPedal preset that corresponds
-                                to the requested program.
+                                Unassigned Program Change messages are not mapped to PiPedal presets automatically. They are forwarded to MIDI plugins using the configured channel filters.
                                 <br />
                             </li>
                             <li>
-                                The message is then checked to see if it has been bound to a Pipedal feature using the System Midi Bindings settings. If it has,
-                                Pipedal processes the message, and it is not forwarded to MIDI plugins.
+                                The message is then checked against System MIDI Bindings. A matching binding is handled by PiPedal and is not forwarded.
                                 <br />
                             </li>
                             <li>
-                                Otherwise, the message is sent to each MIDI plugin in the currently loaded Pipedal preset (channel filters permitting).)
+                                Otherwise, the message is sent to each MIDI plugin in the current PiPedal preset when its channel filters allow it.
                                 <br />
                             </li>
                         </ul>

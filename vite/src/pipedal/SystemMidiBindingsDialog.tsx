@@ -128,6 +128,10 @@ export const SystemMidiBindingDialog =
             createBindings(): BindingEntry[] {
                 let result: BindingEntry[] = [];
                 let listenInstanceId = 0;
+                const snapshotName = (index: number): string => {
+                    const name = this.model.pedalboard.get().snapshots[index]?.name?.trim();
+                    return name || `Snapshot ${index + 1}`;
+                };
                 for (var item of this.model.systemMidiBindings.get()) {
                     let displayName = "";
                     let found = true;
@@ -143,22 +147,22 @@ export const SystemMidiBindingDialog =
                         displayName = "Previous Preset";
                     }
                     else if (item.symbol === "snapshot1") {
-                        displayName = "Snapshot 1";
+                        displayName = snapshotName(0);
                     }
                     else if (item.symbol === "snapshot2") {
-                        displayName = "Snapshot 2";
+                        displayName = snapshotName(1);
                     }
                     else if (item.symbol === "snapshot3") {
-                        displayName = "Snapshot 3";
+                        displayName = snapshotName(2);
                     }
                     else if (item.symbol === "snapshot4") {
-                        displayName = "Snapshot 4";
+                        displayName = snapshotName(3);
                     }
                     else if (item.symbol === "snapshot5") {
-                        displayName = "Snapshot 5";
+                        displayName = snapshotName(4);
                     }
                     else if (item.symbol === "snapshot6") {
-                        displayName = "Snapshot 6";
+                        displayName = snapshotName(5);
                     }
                     else if (item.symbol === "nextSnapshot") {
                         displayName = "Next Snapshot";

@@ -44,6 +44,8 @@ import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 import EqualizerIcon from '@mui/icons-material/Equalizer';
 import HubIcon from '@mui/icons-material/Hub';
 import GridViewIcon from '@mui/icons-material/GridView';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import AddBoxOutlinedIcon from '@mui/icons-material/AddBoxOutlined';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import ControlHubDialog from './ControlHubDialog';
 import GigViewDialog from './GigViewDialog';
@@ -206,6 +208,10 @@ const pedalboardStyles = (theme: Theme) => createStyles({
         '&:hover': {
             background: `${alpha(theme.palette.text.primary, 0.1)} !important`,
             color: `${theme.palette.text.primary} !important`,
+        },
+        '&.Mui-disabled': {
+            opacity: 0.38,
+            color: `${theme.palette.text.disabled} !important`,
         },
         '@media (max-width: 1180px)': {
             minWidth: "44px !important",
@@ -1772,6 +1778,17 @@ const PedalboardView =
                     const nextAdditionalPathId = !enabledAdditionalPathIds.has("C")
                         ? "C"
                         : (!enabledAdditionalPathIds.has("D") ? "D" : null);
+                    const selectedSnapshot = pedalboard?.selectedSnapshot ?? -1;
+                    const hasSelectedSnapshot = selectedSnapshot >= 0 &&
+                        selectedSnapshot < (pedalboard?.snapshots.length ?? 0) &&
+                        pedalboard?.snapshots[selectedSnapshot] !== null;
+                    const selectedSnapshotName = hasSelectedSnapshot
+                        ? pedalboard?.snapshots[selectedSnapshot]?.name?.trim()
+                        : '';
+                    const hasFreeSnapshot = (pedalboard?.snapshots ?? [])
+                        .slice(0, 6)
+                        .some((snapshot) => snapshot === null) ||
+                        (pedalboard?.snapshots.length ?? 0) < 6;
                     const outputPortName = (index: number): string => {
                         const rawName = outputPorts[index] ?? "";
                         if (!rawName || /playback[_:-]?\d+$/i.test(rawName)) {
@@ -2000,6 +2017,48 @@ const PedalboardView =
                                             title="Gig View"
                                         >
                                             <span className={classes.pathToolLabel}>Gig View</span>
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            startIcon={<SaveOutlinedIcon />}
+                                            disabled={!hasSelectedSnapshot}
+                                            onClick={() => {
+                                                void this.model.updateSelectedSnapshot().then((updated) => {
+                                                    if (!updated) {
+                                                        this.model.showAlert("Select a snapshot before updating it.");
+                                                    }
+                                                }).catch((error) => this.model.showAlert(error));
+                                            }}
+                                            className={classes.pathToolButton}
+                                            aria-label={selectedSnapshotName
+                                                ? `Update ${selectedSnapshotName}`
+                                                : "Update Snapshot"}
+                                            title={hasSelectedSnapshot
+                                                ? "Update the active snapshot"
+                                                : "Select a snapshot first"}
+                                        >
+                                            <span className={classes.pathToolLabel}>
+                                                {selectedSnapshotName ? `Update ${selectedSnapshotName}` : 'Update Snapshot'}
+                                            </span>
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            startIcon={<AddBoxOutlinedIcon />}
+                                            disabled={!hasFreeSnapshot}
+                                            onClick={() => {
+                                                void this.model.saveCurrentSettingsAsNewSnapshot().then((index) => {
+                                                    if (index < 0) {
+                                                        this.model.showAlert("All six snapshot slots are in use.");
+                                                    }
+                                                }).catch((error) => this.model.showAlert(error));
+                                            }}
+                                            className={classes.pathToolButton}
+                                            aria-label="New Snapshot"
+                                            title={hasFreeSnapshot
+                                                ? "Save the current settings as a new snapshot"
+                                                : "All six snapshot slots are in use"}
+                                        >
+                                            <span className={classes.pathToolLabel}>New Snapshot</span>
                                         </Button>
                                         {(!pedalboard?.pathBEnabled || nextAdditionalPathId !== null) && (
                                         <Button

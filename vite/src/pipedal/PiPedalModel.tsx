@@ -576,6 +576,7 @@ export class PiPedalModel //implements PiPedalModel
     alertMessage: ObservableProperty<string> = new ObservableProperty<string>("");
 
     showStatusMonitor: ObservableProperty<boolean> = new ObservableProperty<boolean>(true);
+    autoSaveSnapshotChanges: ObservableProperty<boolean> = new ObservableProperty<boolean>(false);
 
     pedalboard: ObservableProperty<Pedalboard> = new ObservableProperty<Pedalboard>(new Pedalboard());
     presetChanged: ObservableProperty<boolean> = new ObservableProperty<boolean>(false);
@@ -893,6 +894,8 @@ export class PiPedalModel //implements PiPedalModel
         } else if (message === "onShowStatusMonitorChanged") {
             let value = body as boolean;
             this.showStatusMonitor.set(value);
+        } else if (message === "onAutoSaveSnapshotChangesChanged") {
+            this.autoSaveSnapshotChanges.set(body as boolean);
         } else if (message === "onChannelRouterSettingsChanged") {
             let channelRouterSettingChangedBody = body as ChannelRouterSettingsChangedBody;
             let channelRouterSettings = new ChannelRouterSettings().deserialize(
@@ -1507,6 +1510,9 @@ export class PiPedalModel //implements PiPedalModel
             this.showStatusMonitor.set(
                 await this.getWebSocket().request<boolean>("getShowStatusMonitor")
             );
+            this.autoSaveSnapshotChanges.set(
+                await this.getWebSocket().request<boolean>("getAutoSaveSnapshotChanges")
+            );
             this.jackServerSettings.set(
                 new JackServerSettings().deserialize(
                     await this.getWebSocket().request<any>("getJackServerSettings")
@@ -1843,6 +1849,14 @@ export class PiPedalModel //implements PiPedalModel
         this.webSocket?.send("setSnapshots", { snapshots: pedalboard.snapshots, selectedSnapshot: selectedSnapshot });
     }
 
+    updateSelectedSnapshot(): Promise<boolean> {
+        return nullCast(this.webSocket).request<boolean>("updateSelectedSnapshot");
+    }
+
+    saveCurrentSettingsAsNewSnapshot(): Promise<number> {
+        return nullCast(this.webSocket).request<number>("saveCurrentSettingsAsNewSnapshot");
+    }
+
     setInputVolume(volume_db: number): void {
         this._setInputVolume(volume_db, true);
     }
@@ -2112,6 +2126,10 @@ export class PiPedalModel //implements PiPedalModel
 
     setShowStatusMonitor(show: boolean): void {
         this.webSocket?.send("setShowStatusMonitor", show);
+    }
+
+    setAutoSaveSnapshotChanges(enabled: boolean): void {
+        this.webSocket?.send("setAutoSaveSnapshotChanges", enabled);
     }
 
     loadPedalboardPlugin(itemId: number, selectedUri: string): number {

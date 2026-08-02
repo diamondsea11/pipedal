@@ -1597,6 +1597,15 @@ bool Storage::GetShowStatusMonitor() const
 {
     return this->userSettings.showStatusMonitor_;
 }
+void Storage::SetAutoSaveSnapshotChanges(bool enabled)
+{
+    this->userSettings.autoSaveSnapshotChanges_ = enabled;
+    SaveUserSettings();
+}
+bool Storage::GetAutoSaveSnapshotChanges() const
+{
+    return this->userSettings.autoSaveSnapshotChanges_;
+}
 
 std::string Storage::GetGovernorSettings() const
 {
@@ -3410,6 +3419,7 @@ const ChannelSelection& Storage::GetChannelSelection() const
 JSON_MAP_BEGIN(UserSettings)
 JSON_MAP_REFERENCE(UserSettings, governor)
 JSON_MAP_REFERENCE(UserSettings, showStatusMonitor)
+JSON_MAP_REFERENCE(UserSettings, autoSaveSnapshotChanges)
 JSON_MAP_END()
 
 JSON_MAP_BEGIN(CurrentPreset)

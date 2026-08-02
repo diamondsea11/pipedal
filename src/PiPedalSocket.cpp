@@ -1597,6 +1597,18 @@ public:
     }
     REGISTER_MESSAGE_HANDLER(setSnapshots)
 
+    void handle_updateSelectedSnapshot(int replyTo, json_reader *pReader)
+    {
+        Reply(replyTo, "updateSelectedSnapshot", this->model.UpdateSelectedSnapshot());
+    }
+    REGISTER_MESSAGE_HANDLER(updateSelectedSnapshot)
+
+    void handle_saveCurrentSettingsAsNewSnapshot(int replyTo, json_reader *pReader)
+    {
+        Reply(replyTo, "saveCurrentSettingsAsNewSnapshot", this->model.SaveCurrentSettingsAsNewSnapshot());
+    }
+    REGISTER_MESSAGE_HANDLER(saveCurrentSettingsAsNewSnapshot)
+
     void handle_currentPedalboard(int replyTo, json_reader *pReader)
     {
         auto pedalboard = model.GetCurrentPedalboardCopy();
@@ -1638,6 +1650,20 @@ public:
         Reply(replyTo, "getShowStatusMonitor", this->model.GetShowStatusMonitor());
     }
     REGISTER_MESSAGE_HANDLER(getShowStatusMonitor)
+
+    void handle_setAutoSaveSnapshotChanges(int replyTo, json_reader *pReader)
+    {
+        bool enabled;
+        pReader->read(&enabled);
+        this->model.SetAutoSaveSnapshotChanges(enabled);
+    }
+    REGISTER_MESSAGE_HANDLER(setAutoSaveSnapshotChanges)
+
+    void handle_getAutoSaveSnapshotChanges(int replyTo, json_reader *pReader)
+    {
+        Reply(replyTo, "getAutoSaveSnapshotChanges", this->model.GetAutoSaveSnapshotChanges());
+    }
+    REGISTER_MESSAGE_HANDLER(getAutoSaveSnapshotChanges)
 
     void handle_version(int replyTo, json_reader *pReader)
     {
@@ -2397,6 +2423,11 @@ private:
     virtual void OnShowStatusMonitorChanged(bool show)
     {
         Send("onShowStatusMonitorChanged", show);
+    }
+
+    virtual void OnAutoSaveSnapshotChangesChanged(bool enabled)
+    {
+        Send("onAutoSaveSnapshotChangesChanged", enabled);
     }
 
     virtual void OnChannelRouterSettingsChanged(int64_t clientId, const ChannelRouterSettings &channelRouterSettings)

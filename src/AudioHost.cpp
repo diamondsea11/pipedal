@@ -1232,14 +1232,10 @@ private:
         {
             return;
         }
-        if (midiCommand == 0xC0) // midi program change.
-        {
-            this->deferredMidiMessageCount = 0; // we can discard previous control changes.
-            midiProgramChangePending = true;
-
-            this->realtimeWriter.OnMidiProgramChange(++(this->midiProgramChangeId), selectedBank, event.buffer[1]);
-        }
-        else if (isBankChange(event))
+        // Program Change messages only change PiPedal state through an explicit
+        // system binding or Control Hub action. Unassigned messages continue to
+        // MIDI plugins instead of selecting a same-numbered preset.
+        if (isBankChange(event))
         {
             this->selectedBank = event.buffer[2];
         }

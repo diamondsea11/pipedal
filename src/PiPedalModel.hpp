@@ -90,6 +90,7 @@ namespace pipedal
         virtual void OnGovernorSettingsChanged(const std::string &governor) = 0;
         virtual void OnFavoritesChanged(const std::map<std::string, bool> &favorites) = 0;
         virtual void OnShowStatusMonitorChanged(bool show) = 0;
+        virtual void OnAutoSaveSnapshotChangesChanged(bool enabled) = 0;
         virtual void OnSystemMidiBindingsChanged(const std::vector<MidiBinding> &bindings) = 0;
         virtual void OnNotifyPathPatchPropertyChanged(int64_t instanceId, const std::string &pathPatchPropertyString, const std::string &atomString) = 0;
 
@@ -215,6 +216,10 @@ namespace pipedal
         using SubscriberList = std::vector<std::shared_ptr<IPiPedalModelSubscriber>>;
         SubscriberList subscribers;
         void SetPresetChanged(int64_t clientId, bool value, bool changeSnapshotSelect = true);
+        bool CaptureSelectedSnapshot();
+        void ScheduleSnapshotAutoSave();
+        void CancelSnapshotAutoSave();
+        void AutoSaveSelectedSnapshot();
         void FireSnapshotModified(int64_t snapshotIndex, bool modified);
         void FireSelectedSnapshotChanged(int64_t selectedSnapshot);
         void FirePresetsChanged(int64_t clientId);
@@ -277,6 +282,8 @@ namespace pipedal
         virtual void OnNotifyLv2RealtimeError(int64_t instanceId, const std::string &error) override;
 
         PostHandle networkChangingDelayHandle = 0;
+        PostHandle snapshotAutoSavePostHandle = 0;
+        int64_t snapshotAutoSaveIndex = -1;
         void CancelNetworkChangingTimer();
 
         void OnNetworkChanging(bool ethernetConnected, bool hotspotConnected);
@@ -411,6 +418,8 @@ namespace pipedal
 
         void SetSnapshots(std::vector<std::shared_ptr<Snapshot>> &snapshots, int64_t selectedSnapshot);
         void SetSnapshot(int64_t selectedSnapshot);
+        bool UpdateSelectedSnapshot();
+        int64_t SaveCurrentSettingsAsNewSnapshot();
 
         void GetPresets(PresetIndex *pResult);
 
@@ -448,6 +457,8 @@ namespace pipedal
 
         void SetShowStatusMonitor(bool show);
         bool GetShowStatusMonitor();
+        void SetAutoSaveSnapshotChanges(bool enabled);
+        bool GetAutoSaveSnapshotChanges();
 
         void SetWifiConfigSettings(const WifiConfigSettings &wifiConfigSettings);
         WifiConfigSettings GetWifiConfigSettings();

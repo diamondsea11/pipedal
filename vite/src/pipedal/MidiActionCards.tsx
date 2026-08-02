@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Box,
     Button,
+    Collapse,
     Divider,
     IconButton,
     MenuItem,
@@ -18,6 +19,8 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SensorsIcon from '@mui/icons-material/Sensors';
 import MidiBinding from './MidiBinding';
 import { MidiAction, MidiActionGesture, MidiActionType } from './Pedalboard';
@@ -57,7 +60,12 @@ function bindingLabel(action: MidiAction): string {
 export default function MidiActionCards({ actions, onChange }: MidiActionCardsProps) {
     const model = PiPedalModelFactory.getInstance();
     const pedalboard = model.pedalboard.get();
+    const snapshotName = (index: number): string => {
+        const name = pedalboard.snapshots[index]?.name?.trim();
+        return name || `Snapshot ${index + 1}`;
+    };
     const [learningIndex, setLearningIndex] = useState<number | null>(null);
+    const [advancedRows, setAdvancedRows] = useState<Set<number>>(() => new Set());
     const listenHandle = useRef<ListenHandle | null>(null);
     const actionsRef = useRef(actions);
     actionsRef.current = actions;
@@ -99,6 +107,22 @@ export default function MidiActionCards({ actions, onChange }: MidiActionCardsPr
     };
     const remove = (index: number) => {
         onChange(actionsRef.current.filter((_action, row) => row !== index));
+        setAdvancedRows((current) => {
+            const result = new Set<number>();
+            current.forEach((row) => {
+                if (row < index) result.add(row);
+                else if (row > index) result.add(row - 1);
+            });
+            return result;
+        });
+    };
+    const toggleAdvanced = (index: number) => {
+        setAdvancedRows((current) => {
+            const result = new Set(current);
+            if (result.has(index)) result.delete(index);
+            else result.add(index);
+            return result;
+        });
     };
     const add = () => {
         const action = new MidiAction();
@@ -185,9 +209,15 @@ export default function MidiActionCards({ actions, onChange }: MidiActionCardsPr
                 const usesAlternateValue = action.actionType === MidiActionType.TogglePluginControl ||
                     action.actionType === MidiActionType.TogglePluginBypass;
                 const numberLabel = action.bindingType === MidiBinding.BINDING_TYPE_PROGRAM
-                    ? 'Incoming PC number (0-127)'
+                    ? 'Incoming PC number'
                     : action.bindingType === MidiBinding.BINDING_TYPE_NOTE
-                        ? 'Note number (0-127)' : 'CC number (0-127)';
+                        ? 'Note number' : 'CC number';
+                const targetSummary = action.actionType === MidiActionType.SelectSnapshot
+                    ? snapshotName(Math.max(0, action.targetId))
+                    : pluginAction
+                        ? pluginItems.find((item) => item.instanceId === action.targetId)?.title ||
+                            pluginItems.find((item) => item.instanceId === action.targetId)?.pluginName || ''
+                        : pathAction ? `Path ${action.symbol || 'A'}` : '';
 
                 return (
                     <Box key={index} sx={{
@@ -208,8 +238,9 @@ export default function MidiActionCards({ actions, onChange }: MidiActionCardsPr
                                     Action {index + 1}: {midiActionNames.get(action.actionType) ?? 'MIDI action'}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" noWrap display="block">
-                                    {bindingLabel(action)} {action.number} {' -> '}
-                                    {midiActionNames.get(action.actionType) ?? 'Action'}
+                                    {bindingLabel(action)} {action.number}
+                                    {action.channel < 0 ? ' / Omni' : ` / Ch ${action.channel + 1}`}
+                                    {'  ->  '}{targetSummary || midiActionNames.get(action.actionType) || 'Action'}
                                 </Typography>
                             </Box>
                             <Tooltip title="Move up"><span><IconButton disabled={index === 0} onClick={() => move(index, -1)}><ArrowUpwardIcon /></IconButton></span></Tooltip>
@@ -244,7 +275,7 @@ export default function MidiActionCards({ actions, onChange }: MidiActionCardsPr
                                     inputProps={{ min: 0, max: 127 }}
                                     helperText={action.bindingType === MidiBinding.BINDING_TYPE_PROGRAM
                                         ? action.actionType === MidiActionType.SelectSnapshot
-                                            ? `PC ${action.number} selects Snapshot ${Math.max(0, action.targetId) + 1}`
+                                            ? `PC ${action.number} selects ${snapshotName(Math.max(0, action.targetId))}`
                                             : `Listens for PC ${action.number}`
                                         : undefined}
                                     onChange={(event) => update(index, { number: Number(event.target.value) })} />
@@ -328,7 +359,7 @@ export default function MidiActionCards({ actions, onChange }: MidiActionCardsPr
                                     <TextField select fullWidth size="small" label="Snapshot" value={action.targetId < 0 ? 0 : action.targetId}
                                         onChange={(event) => update(index, { targetId: Number(event.target.value) })}>
                                         {Array.from({ length: 6 }, (_entry, snapshot) => (
-                                            <MenuItem key={snapshot} value={snapshot}>Snapshot {snapshot + 1}</MenuItem>
+                                            <MenuItem key={snapshot} value={snapshot}>{snapshotName(snapshot)}</MenuItem>
                                         ))}
                                     </TextField>
                                 ) : <Box />}
@@ -353,25 +384,36 @@ export default function MidiActionCards({ actions, onChange }: MidiActionCardsPr
                             </Box>
                         </Box>
                         <Divider />
-                        <Box sx={{
-                            px: { xs: 1.5, sm: 2 }, py: 1.5,
-                            display: 'grid',
-                            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, minmax(110px, 1fr))' },
-                            gap: 1.5,
-                        }}>
-                            <TextField select fullWidth size="small" label="Toggle position" value={action.togglePosition}
-                                onChange={(event) => update(index, { togglePosition: Number(event.target.value) })}>
-                                <MenuItem value={0}>Both</MenuItem>
-                                <MenuItem value={1}>A</MenuItem>
-                                <MenuItem value={2}>B</MenuItem>
-                            </TextField>
-                            <TextField fullWidth size="small" type="number" label="Toggle group" value={action.toggleGroup}
-                                inputProps={{ min: 0, max: 64 }} onChange={(event) => update(index, { toggleGroup: Number(event.target.value) })} />
-                            <TextField fullWidth size="small" type="number" label="Reset group" value={action.resetGroup}
-                                inputProps={{ min: 0, max: 64 }} onChange={(event) => update(index, { resetGroup: Number(event.target.value) })} />
-                            <TextField fullWidth size="small" type="number" label="Delay (ms)" value={action.delayMs}
-                                inputProps={{ min: 0, max: 10000 }} onChange={(event) => update(index, { delayMs: Number(event.target.value) })} />
-                        </Box>
+                        <Button
+                            fullWidth
+                            color="inherit"
+                            onClick={() => toggleAdvanced(index)}
+                            endIcon={advancedRows.has(index) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                            sx={{ minHeight: 42, justifyContent: 'flex-start', px: 2, color: 'text.secondary' }}
+                        >
+                            Advanced options
+                        </Button>
+                        <Collapse in={advancedRows.has(index)}>
+                            <Box sx={{
+                                px: { xs: 1.5, sm: 2 }, pb: 2, pt: 1,
+                                display: 'grid',
+                                gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, minmax(110px, 1fr))' },
+                                gap: 1.5,
+                            }}>
+                                <TextField select fullWidth size="small" label="Toggle position" value={action.togglePosition}
+                                    onChange={(event) => update(index, { togglePosition: Number(event.target.value) })}>
+                                    <MenuItem value={0}>Both</MenuItem>
+                                    <MenuItem value={1}>A</MenuItem>
+                                    <MenuItem value={2}>B</MenuItem>
+                                </TextField>
+                                <TextField fullWidth size="small" type="number" label="Toggle group" value={action.toggleGroup}
+                                    inputProps={{ min: 0, max: 64 }} onChange={(event) => update(index, { toggleGroup: Number(event.target.value) })} />
+                                <TextField fullWidth size="small" type="number" label="Reset group" value={action.resetGroup}
+                                    inputProps={{ min: 0, max: 64 }} onChange={(event) => update(index, { resetGroup: Number(event.target.value) })} />
+                                <TextField fullWidth size="small" type="number" label="Delay (ms)" value={action.delayMs}
+                                    inputProps={{ min: 0, max: 10000 }} onChange={(event) => update(index, { delayMs: Number(event.target.value) })} />
+                            </Box>
+                        </Collapse>
                     </Box>
                 );
             })}

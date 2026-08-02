@@ -782,6 +782,12 @@ export class Pedalboard implements Deserializable<Pedalboard> {
         result.outputVolumeDb = this.output_volume_db;
         result.pathBInputVolumeDb = this.pathBInputVolumeDb;
         result.pathBOutputVolumeDb = this.pathBOutputVolumeDb;
+        result.inputGateEnabled = this.inputGateEnabled;
+        result.inputGateThresholdDb = this.inputGateThresholdDb;
+        result.inputGateDecayMs = this.inputGateDecayMs;
+        result.pathBInputGateEnabled = this.pathBInputGateEnabled;
+        result.pathBInputGateThresholdDb = this.pathBInputGateThresholdDb;
+        result.pathBInputGateDecayMs = this.pathBInputGateDecayMs;
         result.pathAMute = this.pathAMute;
         result.pathAPan = this.pathAPan;
         result.pathBMute = this.pathBMute;
@@ -800,6 +806,9 @@ export class Pedalboard implements Deserializable<Pedalboard> {
             const mix = new SnapshotPathMix();
             mix.id = path.id;
             mix.inputVolumeDb = path.inputVolumeDb;
+            mix.inputGateEnabled = path.inputGateEnabled;
+            mix.inputGateThresholdDb = path.inputGateThresholdDb;
+            mix.inputGateDecayMs = path.inputGateDecayMs;
             mix.outputVolumeDb = path.outputVolumeDb;
             mix.mute = path.mute;
             mix.pan = path.pan;

@@ -174,6 +174,7 @@ void PiPedalModel::Close()
 
 PiPedalModel::~PiPedalModel()
 {
+    CancelSnapshotAutoSave();
     CancelNetworkChangingTimer();
     hotspotManager = nullptr; // turn off the hotspot.
 
@@ -752,6 +753,7 @@ void PiPedalModel::SetPedalboard(int64_t clientId, Pedalboard &pedalboard)
 
 void PiPedalModel::SetSnapshot(int64_t selectedSnapshot)
 {
+    CancelSnapshotAutoSave();
     bool pedalboardChanged = false;
     {
         std::lock_guard<std::recursive_mutex> lock(mutex);
@@ -781,6 +783,7 @@ void PiPedalModel::SetSnapshot(int64_t selectedSnapshot)
 
 void PiPedalModel::SetSnapshots(std::vector<std::shared_ptr<Snapshot>> &snapshots, int64_t selectedSnapshot)
 {
+    CancelSnapshotAutoSave();
     {
         std::lock_guard<std::recursive_mutex> lock(mutex);
 
@@ -922,11 +925,147 @@ void PiPedalModel::SetPresetChanged(int64_t clientId, bool value, bool changeSna
         }
 
         this->pedalboard.SetCurrentSnapshotModified(true);
+        ScheduleSnapshotAutoSave();
     }
     if (value != this->hasPresetChanged)
     {
         hasPresetChanged = value;
         FirePresetChanged(value);
+    }
+}
+
+bool PiPedalModel::CaptureSelectedSnapshot()
+{
+    int64_t selectedSnapshot = pedalboard.selectedSnapshot();
+    auto &snapshots = pedalboard.snapshots();
+    if (selectedSnapshot < 0 || selectedSnapshot >= (int64_t)snapshots.size() || !snapshots[selectedSnapshot])
+    {
+        return false;
+    }
+
+    UpdateVst3Settings(pedalboard);
+    SyncLv2State();
+    auto previous = snapshots[selectedSnapshot];
+    Snapshot captured = pedalboard.MakeSnapshotFromCurrentSettings(previousPedalboard);
+    captured.name_ = previous->name_;
+    captured.color_ = previous->color_;
+    captured.hasMidiActions_ = previous->hasMidiActions_;
+    captured.midiActions_ = previous->midiActions_;
+    captured.isModified_ = false;
+    snapshots[selectedSnapshot] = std::make_shared<Snapshot>(std::move(captured));
+    return true;
+}
+
+bool PiPedalModel::UpdateSelectedSnapshot()
+{
+    CancelSnapshotAutoSave();
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        if (!CaptureSelectedSnapshot())
+        {
+            return false;
+        }
+    }
+    FirePedalboardChanged(-1, false);
+    SetPresetChanged(-1, true, false);
+    return true;
+}
+
+int64_t PiPedalModel::SaveCurrentSettingsAsNewSnapshot()
+{
+    CancelSnapshotAutoSave();
+    int64_t newIndex = -1;
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        constexpr size_t MAX_SNAPSHOTS = 6;
+        auto &snapshots = pedalboard.snapshots();
+        if (snapshots.size() < MAX_SNAPSHOTS)
+        {
+            snapshots.resize(MAX_SNAPSHOTS);
+        }
+        for (size_t i = 0; i < MAX_SNAPSHOTS; ++i)
+        {
+            if (!snapshots[i])
+            {
+                newIndex = (int64_t)i;
+                break;
+            }
+        }
+        if (newIndex == -1)
+        {
+            return -1;
+        }
+
+        UpdateVst3Settings(pedalboard);
+        SyncLv2State();
+        static constexpr std::array<const char *, MAX_SNAPSHOTS> colors{
+            "red", "orange", "yellow", "green", "blue", "purple"};
+        Snapshot captured = pedalboard.MakeSnapshotFromCurrentSettings(previousPedalboard);
+        captured.name_ = "Snapshot " + std::to_string(newIndex + 1);
+        captured.color_ = colors[newIndex];
+        captured.isModified_ = false;
+        snapshots[newIndex] = std::make_shared<Snapshot>(std::move(captured));
+        pedalboard.selectedSnapshot(newIndex);
+    }
+    FirePedalboardChanged(-1, false);
+    SetPresetChanged(-1, true, false);
+    return newIndex;
+}
+
+void PiPedalModel::ScheduleSnapshotAutoSave()
+{
+    if (!storage.GetAutoSaveSnapshotChanges())
+    {
+        return;
+    }
+    int64_t selectedSnapshot = pedalboard.selectedSnapshot();
+    if (selectedSnapshot < 0)
+    {
+        return;
+    }
+    CancelSnapshotAutoSave();
+    snapshotAutoSaveIndex = selectedSnapshot;
+    snapshotAutoSavePostHandle = PostDelayed(std::chrono::milliseconds(900), [this]()
+    {
+        AutoSaveSelectedSnapshot();
+    });
+}
+
+void PiPedalModel::CancelSnapshotAutoSave()
+{
+    if (snapshotAutoSavePostHandle != 0)
+    {
+        CancelPost(snapshotAutoSavePostHandle);
+        snapshotAutoSavePostHandle = 0;
+    }
+    snapshotAutoSaveIndex = -1;
+}
+
+void PiPedalModel::AutoSaveSelectedSnapshot()
+{
+    bool captured = false;
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex);
+        int64_t expectedIndex = snapshotAutoSaveIndex;
+        snapshotAutoSavePostHandle = 0;
+        snapshotAutoSaveIndex = -1;
+        if (storage.GetAutoSaveSnapshotChanges() &&
+            expectedIndex >= 0 &&
+            pedalboard.selectedSnapshot() == expectedIndex)
+        {
+            captured = CaptureSelectedSnapshot();
+            if (captured)
+            {
+                CurrentPreset currentPreset;
+                currentPreset.modified_ = hasPresetChanged;
+                currentPreset.preset_ = pedalboard;
+                storage.SaveCurrentPreset(currentPreset);
+            }
+        }
+    }
+    if (captured)
+    {
+        FirePedalboardChanged(-1, false);
     }
 }
 
@@ -1650,6 +1789,27 @@ bool PiPedalModel::GetShowStatusMonitor()
 {
     std::lock_guard<std::recursive_mutex> lock(mutex); // copy atomically.
     return storage.GetShowStatusMonitor();
+}
+
+void PiPedalModel::SetAutoSaveSnapshotChanges(bool enabled)
+{
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    storage.SetAutoSaveSnapshotChanges(enabled);
+    if (!enabled)
+    {
+        CancelSnapshotAutoSave();
+    }
+    std::vector<IPiPedalModelSubscriber::ptr> currentSubscribers{subscribers.begin(), subscribers.end()};
+    for (auto &subscriber : currentSubscribers)
+    {
+        subscriber->OnAutoSaveSnapshotChangesChanged(enabled);
+    }
+}
+
+bool PiPedalModel::GetAutoSaveSnapshotChanges()
+{
+    std::lock_guard<std::recursive_mutex> lock(mutex);
+    return storage.GetAutoSaveSnapshotChanges();
 }
 
 JackConfiguration PiPedalModel::GetJackConfiguration()

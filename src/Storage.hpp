@@ -56,6 +56,7 @@ class UserSettings {
 public:
     std::string governor_ = "performance";
     bool showStatusMonitor_ = true;
+    bool autoSaveSnapshotChanges_ = false;
     DECLARE_JSON_MAP(UserSettings);
 };
 
@@ -274,6 +275,8 @@ public:
 
     void SetShowStatusMonitor(bool show);
     bool GetShowStatusMonitor() const;
+    void SetAutoSaveSnapshotChanges(bool enabled);
+    bool GetAutoSaveSnapshotChanges() const;
     void SetSystemMidiBindings(const std::vector<MidiBinding>&bindings);
     std::vector<MidiBinding> GetSystemMidiBindings();
     void DeleteSampleFile(const std::filesystem::path &fileName);
