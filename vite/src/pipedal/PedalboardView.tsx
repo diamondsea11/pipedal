@@ -1437,7 +1437,17 @@ const PedalboardView =
                     let outputs: ReactNode[] = [];
                     this.renderConnectors(outputs, layoutChain, true, false);
                     return (
-                        <div key="connectors" style={{ width: layoutSize.width, height: layoutSize.height, overflow: "hidden" }}>
+                        <div
+                            key="connectors"
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                width: layoutSize.width,
+                                height: layoutSize.height,
+                                overflow: "hidden",
+                                pointerEvents: "none",
+                            }}
+                        >
                             <svg width={layoutSize.width} height={layoutSize.height}
                                 xmlns="http://www.w3.org/2000/svg" viewBox={"0 0 " + layoutSize.width + " " + layoutSize.height}>
                                 <g fill="none">
