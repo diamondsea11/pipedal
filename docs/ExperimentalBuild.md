@@ -1,7 +1,7 @@
 # Experimental ARM64 Test Build
 
-The [GitHub prerelease](https://github.com/diamondsea11/pipedal/releases/tag/pipedal-2.0.110-codex26)
-for `pipedal-2.0.110-codex26` provides the complete
+The [GitHub prerelease](https://github.com/diamondsea11/pipedal/releases/tag/pipedal-2.0.110-codex27)
+for `pipedal-2.0.110-codex27` provides the complete
 PiPedal Performance Fork server, web application and bundled TooB Amp LV2
 plugins as an installable Debian package.
 
@@ -20,7 +20,7 @@ Download the `.deb` and its checksum from the GitHub prerelease, then run:
 
 ```bash
 sha256sum -c SHA256SUMS
-sudo apt install ./pipedal_2.0.110+codex26_arm64.deb
+sudo apt install ./pipedal_2.0.110+codex27_arm64.deb
 sudo systemctl restart pipedald
 ```
 
@@ -39,7 +39,7 @@ from the projects' own releases.
 
 ## Source and Validation
 
-- Source tag: `pipedal-2.0.110-codex26`
+- Source tag: `pipedal-2.0.110-codex27`
 - Integration branch: `feature/multipath-v1`
 - Change inventory: `docs/ForkChanges.md`
 - Open hardware checks: `ROADMAP.md`

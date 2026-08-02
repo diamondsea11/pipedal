@@ -49,6 +49,13 @@ using namespace pipedal;
 namespace fs = std::filesystem;
 
 const float BYPASS_TIME_S = 0.1f;
+const float BYPASS_RESUME_WARMUP_S = 0.02f;
+
+static inline double SmoothBypassMix(double value)
+{
+    value = std::clamp(value, 0.0, 1.0);
+    return value * value * (3.0 - 2.0 * value);
+}
 
 static fs::path makeAbsolutePath(const std::filesystem::path &path, const std::filesystem::path &parentPath)
 {
@@ -96,6 +103,8 @@ Lv2Effect::Lv2Effect(
     optionsFeature.Prepare(pHost->GetMapFeature(), 44100, stagedBufferSize, pHost->GetAtomBufferSize());
 
     this->bypassStartingSamples = (uint32_t)(pHost->GetSampleRate() * BYPASS_TIME_S);
+    this->resumeWarmupStartingSamples =
+        (uint32_t)(pHost->GetSampleRate() * BYPASS_RESUME_WARMUP_S);
 
     this->bypass = pedalboardItem.isEnabled();
 
@@ -1051,6 +1060,7 @@ void Lv2Effect::RunWithBufferStaging(uint32_t samples, RealtimeRingBufferWriter 
         }
     }
     MixOutput(samples, realtimeRingBufferWriter);
+    AdvanceResumeWarmup(samples);
 }
 
 inline void Lv2Effect::MixOutput(uint32_t samples, RealtimeRingBufferWriter *realtimeRingBufferWriter)
@@ -1151,7 +1161,8 @@ inline void Lv2Effect::MixOutput(uint32_t samples, RealtimeRingBufferWriter *rea
             float *restrict output = this->outputAudioBuffers.at(0);
             for (uint32_t i = 0; i < samples; ++i)
             {
-                output[i] = currentBypass * output[i] + (1 - currentBypass) * input[i];
+                double wetMix = SmoothBypassMix(currentBypass);
+                output[i] = wetMix * output[i] + (1 - wetMix) * input[i];
 
                 if (--bypassSamplesRemaining == 0)
                 {
@@ -1178,8 +1189,9 @@ inline void Lv2Effect::MixOutput(uint32_t samples, RealtimeRingBufferWriter *rea
             float *restrict outputR = outputAudioBuffers.at(1);
             for (uint32_t i = 0; i < samples; ++i)
             {
-                outputL[i] = currentBypass * outputL[i] + (1 - currentBypass) * inputL[i];
-                outputR[i] = currentBypass * outputR[i] + (1 - currentBypass) * inputR[i];
+                double wetMix = SmoothBypassMix(currentBypass);
+                outputL[i] = wetMix * outputL[i] + (1 - wetMix) * inputL[i];
+                outputR[i] = wetMix * outputR[i] + (1 - wetMix) * inputR[i];
                 if (--bypassSamplesRemaining == 0)
                 {
                     currentBypassDx = 0;
@@ -1236,6 +1248,7 @@ void Lv2Effect::Run(uint32_t samples, RealtimeRingBufferWriter *realtimeRingBuff
     }
 
     MixOutput(samples, realtimeRingBufferWriter);
+    AdvanceResumeWarmup(samples);
 }
 
 bool Lv2Effect::ShouldSuspendDsp(bool hasInputEvents) const
@@ -1254,6 +1267,7 @@ void Lv2Effect::EnterDspSuspendedState()
         return;
     }
     dspSuspended = true;
+    resumeWarmupSamplesRemaining = 0;
 
     if (stagingBufferSize != 0)
     {
@@ -1264,6 +1278,24 @@ void Lv2Effect::EnterDspSuspendedState()
             std::fill_n(buffer.data(), stagingBufferSize, 0.0f);
         }
         resetStagedInputAtomBuffer();
+    }
+}
+
+void Lv2Effect::AdvanceResumeWarmup(uint32_t samples)
+{
+    if (resumeWarmupSamplesRemaining == 0)
+    {
+        return;
+    }
+
+    if (samples >= resumeWarmupSamplesRemaining)
+    {
+        resumeWarmupSamplesRemaining = 0;
+        BypassDezipperTo(1.0f);
+    }
+    else
+    {
+        resumeWarmupSamplesRemaining -= samples;
     }
 }
 

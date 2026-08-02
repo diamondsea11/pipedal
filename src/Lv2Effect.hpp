@@ -200,6 +200,8 @@ namespace pipedal
         void ResetOutputAtomBuffer(char*data);
 
         uint32_t bypassStartingSamples = 0;
+        uint32_t resumeWarmupStartingSamples = 0;
+        uint32_t resumeWarmupSamplesRemaining = 0;
 
         bool bypass = true;
         double targetBypass = 0;
@@ -220,6 +222,7 @@ namespace pipedal
         std::vector<std::vector<float>> outputMixBuffers;
         void BypassDezipperTo(float value);
         void BypassDezipperSet(float value);
+        void AdvanceResumeWarmup(uint32_t samples);
 
         bool borrowedEffect = false;
         bool activated = false;
@@ -389,15 +392,27 @@ namespace pipedal
             return 0;
         }
 
-        virtual void SetBypass(bool bypass)
+        virtual void SetBypass(bool enabled)
         {
-            if (bypass != this->bypass)
+            if (enabled != this->bypass)
             {
-                this->bypass = bypass;
-                if (bypassControlIndex == -1) {
-                    BypassDezipperTo(bypass? 1.0f: 0.0f);
-                } else {
-                    controlValues[bypassControlIndex] = bypass? 1.0f: 0.0f;
+                this->bypass = enabled;
+                if (bypassControlIndex == -1)
+                {
+                    if (enabled && suspendDspWhenBypassed &&
+                        currentBypass == 0 && targetBypass == 0)
+                    {
+                        resumeWarmupSamplesRemaining = resumeWarmupStartingSamples;
+                    }
+                    else
+                    {
+                        resumeWarmupSamplesRemaining = 0;
+                        BypassDezipperTo(enabled ? 1.0f : 0.0f);
+                    }
+                }
+                else
+                {
+                    controlValues[bypassControlIndex] = enabled ? 1.0f : 0.0f;
                 }
             }
 

@@ -58,6 +58,9 @@ installed only on the Raspberry Pi target.
   DSP after the host bypass fade completes. Instances and loaded NAM models stay
   resident for immediate snapshot switching; delay, reverb and modulation tails
   continue processing normally.
+- Suspended processors receive a short dry warm-up before a smooth S-curve
+  bypass crossfade, reducing clicks from stale internal DSP state when snapshots
+  reactivate preloaded NAM blocks.
   Dusk MOD GUIs support numeric LV2 patch properties and live gain reduction
   when a plugin publishes reduction telemetry.
 
