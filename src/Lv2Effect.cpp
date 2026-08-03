@@ -41,6 +41,7 @@
 #include "lv2/atom/util.h"
 #include "AudioHost.hpp"
 #include <exception>
+#include <cstdlib>
 #include "RingBufferReader.hpp"
 #include "Worker.hpp"
 #include "PluginType.hpp"
@@ -49,7 +50,32 @@ using namespace pipedal;
 namespace fs = std::filesystem;
 
 const float BYPASS_TIME_S = 0.1f;
-const float BYPASS_RESUME_WARMUP_S = 0.02f;
+
+// Dry warm-up run before a suspended, host-bypassed processor is faded back in.
+// It must be long enough to flush the plugin's stale internal state before the
+// crossfade starts -- for a NAM model that means covering its receptive-field
+// history, otherwise the resumed "wet" signal still carries a transient that
+// bleeds through the crossfade as a click/pop.
+//
+// The old value (20 ms) is far shorter than a typical NAM receptive field
+// (~100-200 ms), which is why the pop survived. Default is now 150 ms and can
+// be tuned at run time -- no rebuild -- via the PIPEDAL_NAM_WARMUP_MS
+// environment variable (e.g. set it in the pipedald systemd unit and restart
+// the service). Try values in the 50-300 ms range to trade switch latency
+// against how completely the pop is masked.
+static float GetBypassResumeWarmupSeconds()
+{
+    const char *env = std::getenv("PIPEDAL_NAM_WARMUP_MS");
+    if (env != nullptr && env[0] != '\0')
+    {
+        double ms = std::atof(env);
+        if (ms >= 0.0 && ms <= 2000.0)
+        {
+            return (float)(ms / 1000.0);
+        }
+    }
+    return 0.150f;
+}
 
 static inline double SmoothBypassMix(double value)
 {
@@ -104,7 +130,7 @@ Lv2Effect::Lv2Effect(
 
     this->bypassStartingSamples = (uint32_t)(pHost->GetSampleRate() * BYPASS_TIME_S);
     this->resumeWarmupStartingSamples =
-        (uint32_t)(pHost->GetSampleRate() * BYPASS_RESUME_WARMUP_S);
+        (uint32_t)(pHost->GetSampleRate() * GetBypassResumeWarmupSeconds());
 
     this->bypass = pedalboardItem.isEnabled();
 
