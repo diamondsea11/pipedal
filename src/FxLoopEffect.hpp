@@ -90,7 +90,8 @@ namespace pipedal
         static constexpr int SEND_CHANNEL_R_CTL = 4;
         static constexpr int RETURN_CHANNEL_CTL = 5;
         static constexpr int RETURN_CHANNEL_R_CTL = 6;
-        static constexpr int MAX_INPUT_CONTROL = 7;
+        static constexpr int LOOP_LATENCY_CTL = 7;
+        static constexpr int MAX_INPUT_CONTROL = 8;
 
         FxLoopEffect(
             uint64_t instanceId,
@@ -133,9 +134,13 @@ namespace pipedal
         virtual bool HasErrorMessage() const override { return false; }
         virtual const char *TakeErrorMessage() override { return ""; }
 
-        // The external round trip cannot be measured from here, so report none.
-        // See the latency note at the top of this file.
-        virtual uint32_t GetLatencySamples() const override { return 0; }
+        // The block itself is sample-aligned and adds no latency of its own.
+        // What it *does* introduce is the external round trip, which cannot be
+        // measured from here -- so the user reports it via the Loop Latency
+        // control. Feeding it back to the host lets the existing parallel-path
+        // delay compensation align the other branches of a split against this
+        // one. Zero (the default) reproduces plain Helix behaviour.
+        virtual uint32_t GetLatencySamples() const override { return latencySamples; }
 
         virtual void PrepareNoInputEffect(int, size_t) override {}
 
@@ -198,6 +203,10 @@ namespace pipedal
         float mixCurrent = 1.0f;
         float mixTarget = 1.0f;
         float mixStep = 1.0f;
+
+        // Cached from the Loop Latency control so GetLatencySamples() stays
+        // trivial -- it is polled once per audio cycle.
+        uint32_t latencySamples = 0;
     };
 
 } // namespace pipedal

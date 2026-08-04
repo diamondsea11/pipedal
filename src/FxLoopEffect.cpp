@@ -36,6 +36,8 @@ namespace
     constexpr float LEVEL_MIN_DB = -60.0f;
     constexpr float LEVEL_MAX_DB = 12.0f;
 
+    constexpr float MAX_LOOP_LATENCY_MS = 200.0f;
+
     // Ramp times. Levels use the shared dB dezipper; mix gets a linear ramp.
     constexpr float LEVEL_RAMP_S = 0.02f;
     constexpr float MIX_RAMP_S = 0.02f;
@@ -174,6 +176,16 @@ namespace
             result.ports().push_back(
                 MakeChannelPort(FXLOOP_RETURN_CHANNEL_R_KEY, "Return Ch R",
                                 FxLoopEffect::RETURN_CHANNEL_R_CTL));
+        }
+        if (isLoop || isReturn)
+        {
+            // Measured round-trip time of the external gear. Only used to align
+            // parallel paths; it does not delay this block's own audio.
+            auto port = MakeControlPort(
+                FXLOOP_LATENCY_KEY, "Loop Lat", FxLoopEffect::LOOP_LATENCY_CTL,
+                0.0f, MAX_LOOP_LATENCY_MS, 0.0f);
+            port->scale_points().push_back(Lv2ScalePoint(0.0f, "Off"));
+            result.ports().push_back(port);
         }
 
         AddAudioPorts(result, isLoop ? 2 : 1, FxLoopEffect::MAX_INPUT_CONTROL);
@@ -345,6 +357,8 @@ float FxLoopEffect::GetDefaultInputControlValue(uint64_t index) const
     case RETURN_CHANNEL_CTL:
     case RETURN_CHANNEL_R_CTL:
         return (float)UNASSIGNED_CHANNEL;
+    case LOOP_LATENCY_CTL:
+        return 0.0f; // no compensation unless the user measures the loop
     default:
         return 0.0f;
     }
@@ -359,6 +373,7 @@ int FxLoopEffect::GetControlIndex(const std::string &symbol) const
     if (symbol == FXLOOP_SEND_CHANNEL_R_KEY) return SEND_CHANNEL_R_CTL;
     if (symbol == FXLOOP_RETURN_CHANNEL_KEY) return RETURN_CHANNEL_CTL;
     if (symbol == FXLOOP_RETURN_CHANNEL_R_KEY) return RETURN_CHANNEL_R_CTL;
+    if (symbol == FXLOOP_LATENCY_KEY) return LOOP_LATENCY_CTL;
     return -1;
 }
 
@@ -411,6 +426,9 @@ void FxLoopEffect::UpdateTargets()
 
     sendLevel.SetTarget(std::clamp(controlValues[SEND_LEVEL_CTL], LEVEL_MIN_DB, LEVEL_MAX_DB));
     returnLevel.SetTarget(std::clamp(controlValues[RETURN_LEVEL_CTL], LEVEL_MIN_DB, LEVEL_MAX_DB));
+
+    const float latencyMs = std::clamp(controlValues[LOOP_LATENCY_CTL], 0.0f, MAX_LOOP_LATENCY_MS);
+    latencySamples = (uint32_t)std::lround(latencyMs * 0.001 * sampleRate);
 }
 
 float *FxLoopEffect::ResolveDirectOutput(int channel) const

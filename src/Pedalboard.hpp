@@ -73,6 +73,7 @@ namespace pipedal
 #define FXLOOP_SEND_CHANNEL_R_KEY "sendChannelR"
 #define FXLOOP_RETURN_CHANNEL_KEY "returnChannel"
 #define FXLOOP_RETURN_CHANNEL_R_KEY "returnChannelR"
+#define FXLOOP_LATENCY_KEY "loopLatencyMs"
 
 #define GETTER_SETTER_REF(name)                               \
     const decltype(name##_) &name() const { return name##_; } \
