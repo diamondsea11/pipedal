@@ -248,6 +248,46 @@ std::vector<float *> Lv2Pedalboard::PrepareItems(
                     }
                 }
             }
+            else if (IsFxLoopUri(item.uri()))
+            {
+                // Helix-style insert point. Not a real LV2 plugin: it reaches
+                // straight through to the driver's physical I/O buffers.
+                auto pFxLoop = new FxLoopEffect(
+                    item.instanceId(),
+                    FxLoopModeFromUri(item.uri()),
+                    pHost->GetSampleRate(),
+                    &this->hardwareLoopBuffers);
+                pEffect = std::shared_ptr<IEffect>(pFxLoop);
+
+                pFxLoop->SetChannelCount((int)inputBuffers.size());
+                for (int channel = 0; channel < pFxLoop->GetNumberOfInputAudioBuffers(); ++channel)
+                {
+                    size_t sourceIndex = std::min(
+                        (size_t)channel,
+                        inputBuffers.empty() ? (size_t)0 : inputBuffers.size() - 1);
+                    if (!inputBuffers.empty())
+                    {
+                        pFxLoop->SetAudioInputBuffer(channel, inputBuffers[sourceIndex]);
+                    }
+                }
+
+                for (int i = 0; i < item.controlValues().size(); ++i)
+                {
+                    auto &controlValue = item.controlValues()[i];
+                    int index = pFxLoop->GetControlIndex(controlValue.key());
+                    if (index != -1)
+                    {
+                        pFxLoop->SetControl(index, controlValue.value());
+                    }
+                }
+                pFxLoop->SetBypass(item.isEnabled());
+
+                this->processActions.push_back(
+                    [pFxLoop, this](uint32_t frames)
+                    {
+                        pFxLoop->Run(frames, this->ringBufferWriter);
+                    });
+            }
             else
             {
                 std::shared_ptr<IEffect> pLv2Effect;
@@ -888,6 +928,12 @@ bool Lv2Pedalboard::Run(
     RealtimeRingBufferWriter *ringBufferWriter)
 {
     this->ringBufferWriter = ringBufferWriter;
+
+    // Publish this cycle's physical outputs to FX Loop / Send blocks. The
+    // capture side is supplied separately by SetHardwareLoopInputs().
+    this->hardwareLoopBuffers.directOutputs = directOutputBuffers;
+    this->hardwareLoopBuffers.directOutputCount = directOutputBufferCount;
+
     for (size_t i = 0; i < this->pedalboardInputBuffers.size(); ++i)
     {
         if (inputBuffers[i] == nullptr)

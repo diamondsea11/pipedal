@@ -1545,6 +1545,13 @@ private:
             }
             pedalboard->ProcessParameterRequests(pParameterRequests, nframes);
 
+            // Raw capture channels, so FX Loop / Return blocks can pull audio
+            // back in from external gear at any point in the chain.
+            {
+                auto &deviceInputs = audioDriver->DeviceInputBuffers();
+                pedalboard->SetHardwareLoopInputs(deviceInputs.data(), deviceInputs.size());
+            }
+
             pedalboard->Run(
                 inputBuffers,
                 outputBuffers,

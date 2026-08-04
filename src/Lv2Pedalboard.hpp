@@ -22,6 +22,7 @@
 #include "MidiEvent.hpp"
 #include "PluginHost.hpp"
 #include "Lv2Effect.hpp"
+#include "FxLoopEffect.hpp"
 #include "BufferPool.hpp"
 #include <functional>
 #include <lv2/urid/urid.h>
@@ -210,6 +211,11 @@ namespace pipedal
         std::vector<std::shared_ptr<IEffect>> effects;
         std::vector<IEffect *> realtimeEffects;
 
+        // Physical I/O reachable from inside the graph, used by FX Loop / Send /
+        // Return blocks. Refreshed once per audio cycle; the blocks hold a
+        // pointer to it so nothing is allocated on the realtime thread.
+        HardwareLoopBuffers hardwareLoopBuffers;
+
         using Action = std::function<void()>;
         using ProcessAction = std::function<void(uint32_t frames)>;
 
@@ -387,6 +393,15 @@ namespace pipedal
         void SetPathBOutputVolume(float value) { this->pathBOutputVolume.SetTarget(value); }
         void SetGlobalEq(const GlobalEqSettings &settings);
         void SetBypass(int effectIndex, bool enabled);
+
+        // Hands the graph the raw capture channels that FX Loop / Return blocks
+        // read from. Call once per audio cycle, before Run(). Direct output
+        // buffers are supplied by Run() itself.
+        void SetHardwareLoopInputs(float *const *deviceInputs, size_t deviceInputCount)
+        {
+            this->hardwareLoopBuffers.deviceInputs = deviceInputs;
+            this->hardwareLoopBuffers.deviceInputCount = deviceInputCount;
+        }
 
         void ComputeVus(RealtimeVuBuffers *vuConfiguration, uint32_t samples);
 

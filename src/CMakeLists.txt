@@ -340,6 +340,7 @@ set (PIPEDAL_SOURCES
     Lv2Pedalboard.cpp Lv2Pedalboard.hpp
     BufferPool.hpp
     SplitEffect.hpp SplitEffect.cpp
+    FxLoopEffect.hpp FxLoopEffect.cpp
     RingBufferReader.hpp
     MapFeature.hpp MapFeature.cpp
     LogFeature.hpp LogFeature.cpp

@@ -59,6 +59,21 @@ namespace pipedal
 #define SPLIT_PANR_KEY "panR"
 #define SPLIT_VOLR_KEY "volR"
 
+// Helix-style insert points for external hardware. See FxLoopEffect.hpp.
+#define FXLOOP_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#FxLoop"
+#define SEND_L_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#SendL"
+#define SEND_R_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#SendR"
+#define RETURN_L_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#ReturnL"
+#define RETURN_R_PEDALBOARD_ITEM_URI "uri://two-play/pipedal/pedalboard#ReturnR"
+
+#define FXLOOP_SEND_LEVEL_KEY "sendLevel"
+#define FXLOOP_RETURN_LEVEL_KEY "returnLevel"
+#define FXLOOP_MIX_KEY "loopMix"
+#define FXLOOP_SEND_CHANNEL_KEY "sendChannel"
+#define FXLOOP_SEND_CHANNEL_R_KEY "sendChannelR"
+#define FXLOOP_RETURN_CHANNEL_KEY "returnChannel"
+#define FXLOOP_RETURN_CHANNEL_R_KEY "returnChannelR"
+
 #define GETTER_SETTER_REF(name)                               \
     const decltype(name##_) &name() const { return name##_; } \
     void name(const decltype(name##_) &value) { name##_ = value; }

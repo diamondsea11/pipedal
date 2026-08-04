@@ -30,6 +30,7 @@
 #include "Pedalboard.hpp"
 #include "Lv2Effect.hpp"
 #include "Lv2Pedalboard.hpp"
+#include "FxLoopEffect.hpp"
 #include "JackConfiguration.hpp"
 #include "lv2/urid/urid.h"
 #include "lv2/ui/ui.h"
@@ -596,6 +597,14 @@ void PluginHost::LoadLilv(const char *lv2Path)
                 ui_plugins_.push_back(std::move(info));
             }
         }
+    }
+
+    // Built-in insert points for external hardware (FX Loop, Send L/R,
+    // Return L/R). These are pseudo-plugins handled by FxLoopEffect, but they
+    // appear in the catalog so they can be placed like any other block.
+    for (const auto &fxLoopInfo : GetAllFxLoopPluginInfos())
+    {
+        ui_plugins_.push_back(Lv2PluginUiInfo(this, fxLoopInfo.get()));
     }
 
 #if ENABLE_VST3
@@ -1564,7 +1573,10 @@ std::shared_ptr<Lv2PluginInfo> PluginHost::GetPluginInfo(const std::string &uri)
     auto ff = pluginsByUri.find(uri);
     if (ff == pluginsByUri.end())
     {
-        return nullptr;
+        // FX Loop / Send / Return are pseudo-plugins, so they are not in the
+        // lilv-derived map. Resolving them here keeps control defaults, MIDI
+        // mapping and UI lookups working without special-casing every caller.
+        return GetFxLoopPluginInfo(uri);
     }
     return ff->second;
 }
