@@ -7,6 +7,9 @@ on:
       - "docs/**"
   #pull_request:
   #  branches: [ main ]
+  # Lets the build be run by hand on any branch, which is the only way to get
+  # compile verification for work that is not on main or dev yet.
+  workflow_dispatch:
     
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
