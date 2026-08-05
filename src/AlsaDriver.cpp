@@ -38,6 +38,7 @@
 #include "PiPedalException.hpp"
 #include "DummyAudioDriver.hpp"
 #include "SchedulerPriority.hpp"
+#include "DenormalProtection.hpp"
 #include "CrashGuard.hpp"
 #include <iostream>
 #include <iomanip>
@@ -1795,6 +1796,12 @@ namespace pipedal
             try
             {
                 SetThreadPriority(SchedulerPriority::RealtimeAudio);
+
+                // Denormal flushing is per-thread on x86, so it has to happen
+                // here rather than being inherited from process startup.
+                // See DenormalProtection.hpp for why this matters more on x86
+                // than it did on the Pi.
+                EnableDenormalProtection();
 
                 bool ok = true;
 

@@ -39,6 +39,7 @@
 #include <stdexcept>
 #include "ss.hpp"
 #include "SchedulerPriority.hpp"
+#include "DenormalProtection.hpp"
 #include "CrashGuard.hpp"
 #include "ChannelRouterSettings.hpp"
 
@@ -295,6 +296,7 @@ namespace pipedal
             {
 
                 SetThreadPriority(SchedulerPriority::RealtimeAudio);
+                EnableDenormalProtection();
 
                 bool ok = true;
 
