@@ -220,6 +220,23 @@ else()
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -DNDEBUG" )
 endif()
 
+# Build for the machine doing the build. Off by default because the .deb this
+# produces is otherwise no longer portable -- a binary built with -march=native
+# on one CPU can fault with an illegal instruction on another.
+#
+# Worth turning on when you build on the same machine you play on:
+#     cmake .. -DPIPEDAL_NATIVE_ARCH=ON
+#
+# Note where the benefit is and is not. PiPedal's own realtime work (global EQ,
+# gate, mixing, VU) is modest, so expect a modest gain. The heavy DSP -- NAM --
+# lives in ToobAmp, which is a separately built package and is unaffected by
+# this flag.
+option(PIPEDAL_NATIVE_ARCH "Optimise for the build machine's CPU (non-portable binary)" OFF)
+if (PIPEDAL_NATIVE_ARCH AND NOT CMAKE_BUILD_TYPE MATCHES Debug)
+    message(STATUS "Building with -march=native (binary is not portable)")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
+
 if (ENABLE_BACKTRACE)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -rdynamic")
     if (${DEBIAN_ARCHITECTURE} MATCHES arm64)
