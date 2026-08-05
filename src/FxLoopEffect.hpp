@@ -74,8 +74,13 @@ namespace pipedal
     // the fx-loop pseudo-plugins.
     bool IsFxLoopUri(const std::string &uri);
     FxLoopMode FxLoopModeFromUri(const std::string &uri);
-    std::shared_ptr<Lv2PluginInfo> GetFxLoopPluginInfo(const std::string &uri);
-    const std::vector<std::shared_ptr<Lv2PluginInfo>> &GetAllFxLoopPluginInfos();
+    // The channel controls are rendered as a drop-down of the interface's real
+    // channels, so these take the current output/input channel counts. Pass 0
+    // when the audio device isn't known yet (falls back to the full range).
+    std::shared_ptr<Lv2PluginInfo> GetFxLoopPluginInfo(
+        const std::string &uri, size_t outputChannelCount = 0, size_t inputChannelCount = 0);
+    std::vector<std::shared_ptr<Lv2PluginInfo>> GetAllFxLoopPluginInfos(
+        size_t outputChannelCount = 0, size_t inputChannelCount = 0);
 
     class FxLoopEffect : public IEffect
     {

@@ -75,14 +75,31 @@ namespace
     std::shared_ptr<Lv2PortInfo> MakeChannelPort(
         const char *symbol,
         const char *name,
-        int index)
+        int index,
+        size_t channelCount,
+        bool isOutput)
     {
         auto port = MakeControlPort(
             symbol, name, index,
             (float)UNASSIGNED_CHANNEL, (float)MAX_ASSIGNABLE_CHANNEL,
             (float)UNASSIGNED_CHANNEL);
         port->integer_property(true);
+        // Render as a named drop-down of the interface's real channels instead
+        // of a raw numeric dial.
+        port->enumeration_property(true);
         port->scale_points().push_back(Lv2ScalePoint((float)UNASSIGNED_CHANNEL, "None"));
+        // If the channel count isn't known yet (audio device not configured when
+        // the plugin list is built) fall back to the full assignable range so the
+        // control stays usable.
+        size_t count = channelCount > 0
+            ? std::min(channelCount, (size_t)(MAX_ASSIGNABLE_CHANNEL + 1))
+            : (size_t)(MAX_ASSIGNABLE_CHANNEL + 1);
+        const char *prefix = isOutput ? "Out " : "In ";
+        for (size_t ch = 0; ch < count; ++ch)
+        {
+            port->scale_points().push_back(
+                Lv2ScalePoint((float)ch, std::string(prefix) + std::to_string(ch + 1)));
+        }
         return port;
     }
 
@@ -120,7 +137,9 @@ namespace
         const char *uri,
         const char *name,
         const char *comment,
-        FxLoopMode mode)
+        FxLoopMode mode,
+        size_t outputChannelCount,
+        size_t inputChannelCount)
     {
         Lv2PluginInfo result;
         result.uri(uri);
@@ -156,26 +175,30 @@ namespace
             result.ports().push_back(
                 MakeChannelPort(FXLOOP_SEND_CHANNEL_KEY,
                                 isLoop ? "Send Ch L" : "Send Ch",
-                                FxLoopEffect::SEND_CHANNEL_CTL));
+                                FxLoopEffect::SEND_CHANNEL_CTL,
+                                outputChannelCount, /*isOutput=*/true));
         }
         if (isLoop)
         {
             result.ports().push_back(
                 MakeChannelPort(FXLOOP_SEND_CHANNEL_R_KEY, "Send Ch R",
-                                FxLoopEffect::SEND_CHANNEL_R_CTL));
+                                FxLoopEffect::SEND_CHANNEL_R_CTL,
+                                outputChannelCount, /*isOutput=*/true));
         }
         if (isLoop || isReturn)
         {
             result.ports().push_back(
                 MakeChannelPort(FXLOOP_RETURN_CHANNEL_KEY,
                                 isLoop ? "Return Ch L" : "Return Ch",
-                                FxLoopEffect::RETURN_CHANNEL_CTL));
+                                FxLoopEffect::RETURN_CHANNEL_CTL,
+                                inputChannelCount, /*isOutput=*/false));
         }
         if (isLoop)
         {
             result.ports().push_back(
                 MakeChannelPort(FXLOOP_RETURN_CHANNEL_R_KEY, "Return Ch R",
-                                FxLoopEffect::RETURN_CHANNEL_R_CTL));
+                                FxLoopEffect::RETURN_CHANNEL_R_CTL,
+                                inputChannelCount, /*isOutput=*/false));
         }
         if (isLoop || isReturn)
         {
@@ -195,41 +218,34 @@ namespace
     struct FxLoopCatalogEntry
     {
         const char *uri;
+        const char *name;
+        const char *comment;
         FxLoopMode mode;
-        std::shared_ptr<Lv2PluginInfo> info;
     };
 
-    std::vector<FxLoopCatalogEntry> &Catalog()
+    // Static metadata only. The actual Lv2PluginInfo (with channel drop-downs
+    // sized to the current interface) is built on demand -- see GetFxLoopPluginInfo.
+    const std::vector<FxLoopCatalogEntry> &Catalog()
     {
-        static std::vector<FxLoopCatalogEntry> catalog = {
-            {FXLOOP_PEDALBOARD_ITEM_URI, FxLoopMode::Loop,
-             std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
-                 FXLOOP_PEDALBOARD_ITEM_URI, "FX Loop",
-                 "Stereo insert point for external hardware: sends the signal to a "
-                 "pair of physical outputs and blends the physical inputs back in.",
-                 FxLoopMode::Loop))},
-            {SEND_L_PEDALBOARD_ITEM_URI, FxLoopMode::SendLeft,
-             std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
-                 SEND_L_PEDALBOARD_ITEM_URI, "Send L",
-                 "Taps the left/mono chain signal to a physical output. The chain "
-                 "itself passes through unchanged.",
-                 FxLoopMode::SendLeft))},
-            {SEND_R_PEDALBOARD_ITEM_URI, FxLoopMode::SendRight,
-             std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
-                 SEND_R_PEDALBOARD_ITEM_URI, "Send R",
-                 "Taps the right chain signal to a physical output. The chain "
-                 "itself passes through unchanged.",
-                 FxLoopMode::SendRight))},
-            {RETURN_L_PEDALBOARD_ITEM_URI, FxLoopMode::ReturnLeft,
-             std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
-                 RETURN_L_PEDALBOARD_ITEM_URI, "Return L",
-                 "Blends a physical input into the left/mono side of the chain.",
-                 FxLoopMode::ReturnLeft))},
-            {RETURN_R_PEDALBOARD_ITEM_URI, FxLoopMode::ReturnRight,
-             std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
-                 RETURN_R_PEDALBOARD_ITEM_URI, "Return R",
-                 "Blends a physical input into the right side of the chain.",
-                 FxLoopMode::ReturnRight))},
+        static const std::vector<FxLoopCatalogEntry> catalog = {
+            {FXLOOP_PEDALBOARD_ITEM_URI, "FX Loop",
+             "Stereo insert point for external hardware: sends the signal to a "
+             "pair of physical outputs and blends the physical inputs back in.",
+             FxLoopMode::Loop},
+            {SEND_L_PEDALBOARD_ITEM_URI, "Send L",
+             "Taps the left/mono chain signal to a physical output. The chain "
+             "itself passes through unchanged.",
+             FxLoopMode::SendLeft},
+            {SEND_R_PEDALBOARD_ITEM_URI, "Send R",
+             "Taps the right chain signal to a physical output. The chain "
+             "itself passes through unchanged.",
+             FxLoopMode::SendRight},
+            {RETURN_L_PEDALBOARD_ITEM_URI, "Return L",
+             "Blends a physical input into the left/mono side of the chain.",
+             FxLoopMode::ReturnLeft},
+            {RETURN_R_PEDALBOARD_ITEM_URI, "Return R",
+             "Blends a physical input into the right side of the chain.",
+             FxLoopMode::ReturnRight},
         };
         return catalog;
     }
@@ -258,24 +274,30 @@ FxLoopMode pipedal::FxLoopModeFromUri(const std::string &uri)
     return entry ? entry->mode : FxLoopMode::Loop;
 }
 
-std::shared_ptr<Lv2PluginInfo> pipedal::GetFxLoopPluginInfo(const std::string &uri)
+std::shared_ptr<Lv2PluginInfo> pipedal::GetFxLoopPluginInfo(
+    const std::string &uri, size_t outputChannelCount, size_t inputChannelCount)
 {
     const auto *entry = FindEntry(uri);
-    return entry ? entry->info : nullptr;
+    if (!entry)
+    {
+        return nullptr;
+    }
+    return std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
+        entry->uri, entry->name, entry->comment, entry->mode,
+        outputChannelCount, inputChannelCount));
 }
 
-const std::vector<std::shared_ptr<Lv2PluginInfo>> &pipedal::GetAllFxLoopPluginInfos()
+std::vector<std::shared_ptr<Lv2PluginInfo>> pipedal::GetAllFxLoopPluginInfos(
+    size_t outputChannelCount, size_t inputChannelCount)
 {
-    static std::vector<std::shared_ptr<Lv2PluginInfo>> infos = []()
+    std::vector<std::shared_ptr<Lv2PluginInfo>> result;
+    for (const auto &entry : Catalog())
     {
-        std::vector<std::shared_ptr<Lv2PluginInfo>> result;
-        for (const auto &entry : Catalog())
-        {
-            result.push_back(entry.info);
-        }
-        return result;
-    }();
-    return infos;
+        result.push_back(std::make_shared<Lv2PluginInfo>(MakeFxLoopInfo(
+            entry.uri, entry.name, entry.comment, entry.mode,
+            outputChannelCount, inputChannelCount)));
+    }
+    return result;
 }
 
 FxLoopEffect::FxLoopEffect(

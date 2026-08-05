@@ -929,6 +929,10 @@ namespace pipedal
         size_t maxAtomBufferSize = 16 * 1024;
         bool hasMidiInputChannel;
         ChannelSelection channelSelection;
+        // Total physical channel counts of the current interface, used to size
+        // the FX Loop send/return channel drop-downs.
+        size_t deviceOutputChannelCount = 0;
+        size_t deviceInputChannelCount = 0;
 
         double sampleRate = 48000;
 

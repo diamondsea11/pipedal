@@ -333,6 +333,8 @@ void PluginHost::OnConfigurationChanged(const JackConfiguration &configuration, 
     if (configuration.isValid())
     {
         this->maxBufferSize = configuration.blockLength();
+        this->deviceOutputChannelCount = configuration.outputAudioPorts().size();
+        this->deviceInputChannelCount = configuration.inputAudioPorts().size();
     }
     this->channelSelection = channelSelection;
 }
@@ -602,7 +604,8 @@ void PluginHost::LoadLilv(const char *lv2Path)
     // Built-in insert points for external hardware (FX Loop, Send L/R,
     // Return L/R). These are pseudo-plugins handled by FxLoopEffect, but they
     // appear in the catalog so they can be placed like any other block.
-    for (const auto &fxLoopInfo : GetAllFxLoopPluginInfos())
+    for (const auto &fxLoopInfo : GetAllFxLoopPluginInfos(
+             this->deviceOutputChannelCount, this->deviceInputChannelCount))
     {
         ui_plugins_.push_back(Lv2PluginUiInfo(this, fxLoopInfo.get()));
     }
@@ -1576,7 +1579,8 @@ std::shared_ptr<Lv2PluginInfo> PluginHost::GetPluginInfo(const std::string &uri)
         // FX Loop / Send / Return are pseudo-plugins, so they are not in the
         // lilv-derived map. Resolving them here keeps control defaults, MIDI
         // mapping and UI lookups working without special-casing every caller.
-        return GetFxLoopPluginInfo(uri);
+        return GetFxLoopPluginInfo(
+            uri, this->deviceOutputChannelCount, this->deviceInputChannelCount);
     }
     return ff->second;
 }
