@@ -815,6 +815,13 @@ void PiPedalModel::UpdateCurrentPedalboard(int64_t clientId, Pedalboard &pedalbo
     {
         std::lock_guard<std::recursive_mutex> lock(mutex);
 
+        // Apply plugin default/upgrade logic (e.g. TooB NAM interface calibration
+        // and full-quality default) on structural edits too, not just on preset
+        // loads -- otherwise a freshly added plugin keeps its raw plugin defaults
+        // (e.g. NAM Input Level stuck at the -6 dBU default instead of the
+        // interface's calibrated value).
+        UpdateDefaults(&pedalboard);
+
         // update vst3 presets if neccessary.
         // the pedalboard must be a manipualted instance of the current Lv2Pedalboard.
 
@@ -2633,6 +2640,35 @@ static bool NamModelHasInputLevelCalibration(
     return false;
 }
 
+// True once a (non-empty) NAM model file has actually been chosen. Used to avoid
+// flipping Input Calibration to "Raw" on a freshly added NAM that has no model
+// yet: "no calibration metadata" and "no model at all" are otherwise
+// indistinguishable, and a fresh block should keep the Calibrated default.
+static bool NamModelIsSelected(const std::map<std::string, std::string> &pathProperties)
+{
+    auto it = pathProperties.find("http://two-play.com/plugins/toob-nam#modelFile");
+    if (it == pathProperties.end())
+        return false;
+    try
+    {
+        std::istringstream stream(it->second);
+        json_reader reader(stream);
+        json_variant atom;
+        reader.read(&atom);
+        if (!atom.is_object())
+            return false;
+        auto object = atom.as_object();
+        auto path = object->find("value");
+        if (path == object->end() || !path->second.is_string())
+            return false;
+        return !path->second.as_string().empty();
+    }
+    catch (const std::exception &)
+    {
+        return false;
+    }
+}
+
 void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const PedalboardItem *pedalboardItem_)
 {
     std::shared_ptr<Lv2PluginInfo> pPlugin = pluginHost.GetPluginInfo(pedalboardItem_->uri());
@@ -2745,7 +2781,10 @@ void PiPedalModel::UpdateDefaults(SnapshotValue &snapshotValue, const Pedalboard
             // that field leaves it at unity while its trim may have been
             // stripped above -> over-driven (harsh aliasing).
             snapshotValue.SetControlValue(
-                "inputCalibrationMode", modelHasCalibration ? 1.0f : 0.0f);
+                "inputCalibrationMode",
+                (NamModelIsSelected(snapshotValue.pathProperties_) && !modelHasCalibration)
+                    ? 0.0f
+                    : 1.0f);
             snapshotValue.SetControlValue("version", 6.0f);
         }
         if (pPlugin->piPedalUI())
@@ -2882,7 +2921,10 @@ void PiPedalModel::UpdateDefaults(PedalboardItem *pedalboardItem, std::unordered
             // that field leaves it at unity while its trim may have been
             // stripped above -> over-driven (harsh aliasing).
             pedalboardItem->SetControlValue(
-                "inputCalibrationMode", modelHasCalibration ? 1.0f : 0.0f);
+                "inputCalibrationMode",
+                (NamModelIsSelected(pedalboardItem->pathProperties_) && !modelHasCalibration)
+                    ? 0.0f
+                    : 1.0f);
             pedalboardItem->SetControlValue("version", 6.0f);
         }
         for (size_t i = 0; i < pPlugin->ports().size(); ++i)
