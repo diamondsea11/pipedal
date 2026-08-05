@@ -189,7 +189,7 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.pathBInputGateThresholdDb() == -48.0f);
     REQUIRE(result.pathBInputGateDecayMs() == 320.0f);
     REQUIRE(result.pathAInputChannels() == std::vector<int64_t>{2});
-    REQUIRE(result.pathAOutputChannels() == std::vector<int64_t>{2, 3});
+    REQUIRE(result.pathAOutputChannels() == std::vector<int64_t>({2, 3}));
     REQUIRE(result.pathAMute());
     REQUIRE(result.pathAPan() == -1.0f);
     REQUIRE_FALSE(result.pathBMute());
@@ -208,8 +208,8 @@ TEST_CASE("multi-path pedalboards survive json roundtrip", "[json_read_test][mul
     REQUIRE(result.additionalPaths().size() == 2);
     REQUIRE(result.additionalPaths()[0].id() == "C");
     REQUIRE(result.additionalPaths()[0].name() == "Keys");
-    REQUIRE(result.additionalPaths()[0].inputChannels() == std::vector<int64_t>{4, 5});
-    REQUIRE(result.additionalPaths()[0].outputChannels() == std::vector<int64_t>{6, 7});
+    REQUIRE(result.additionalPaths()[0].inputChannels() == std::vector<int64_t>({4, 5}));
+    REQUIRE(result.additionalPaths()[0].outputChannels() == std::vector<int64_t>({6, 7}));
     REQUIRE(result.additionalPaths()[0].sourceSendsDb().at("A") == -12.0f);
     REQUIRE(result.additionalPaths()[0].sourceSendsDb().at("B") == -18.0f);
     REQUIRE(result.additionalPaths()[0].inputVolumeDb() == -2.0f);
