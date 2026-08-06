@@ -309,12 +309,33 @@ Ghost Note Audio "Amp Simulation Input Gain" database and matched on the ALSA
 device name, (3) a 12.0 dBu fallback. Resolution order and pattern matching
 are unit-tested in `jsonTest.cpp`.
 
-The scale of the mismatch follows from that: the table spans 6.8 … 22.0 dBu,
-and **53 of its 69 entries exceed the stock plugin's maximum of 12.0**. So
-against stock ToobAmp roughly three quarters of the database is silently
-clamped *and* reinterpreted as a different quantity. The RME Babyface Pro
-(13.0) is a mild case; a Behringer UMC22 (22.0) or PreSonus Quantum HD (21.0)
-is far worse. No error is raised anywhere.
+**Do not tell Robin his range is too small — it isn't.** Checked against his
+own `docs/NamCalibration.md` and `CalculateNamVolumeAdjustments()`: the stock
+port measures the *physical guitar's* signal voltage in dBu. His documented
+figures are −20 … −2 dBu for real guitars (humbucker ≈ −6, single coil ≈ −11),
+with −6.0 as the recommended fictional default, so −30 … 12 is generous for
+that quantity. Step 2 of his procedure — trim the interface gain to just under
+0 dBFS — deliberately normalises the interface *out* of the calculation, which
+is why `Db2Af(calibrationDbu - modelInputLevelDbu)` needs only the guitar level
+and the model's training level.
+
+The fork adopts the other convention (NAM Gateway): calibration = the
+interface's dBu at 0 dBFS, auto-resolved, no voltmeter and no manual trim. That
+is a **different calibration philosophy, not a bug fix**. Trade-off: Robin's is
+more accurate in principle (it accounts for the instrument, the thing that
+actually varies) but costs a measurement that any pickup/tone/attack change
+invalidates; the Gateway convention needs no measurement but ignores the guitar
+entirely.
+
+The real defect, and it is the fork's: it writes the interface-semantics number
+into whichever ToobAmp is installed. Coherent against the patched arm64 build;
+against stock it puts an interface figure (13.0 for a Babyface Pro) into a
+guitar-level port, where it is clamped to 12.0 and read as a guitar voltage.
+
+Open question, not verified: the Ghost Note figures are maximum input levels,
+presumably at minimum gain. If so the auto-filled value is only correct at that
+gain setting and drifts as the user raises gain — which would weaken the whole
+approach. Ask rather than assert.
 
 **Consequence for upstreaming:** the PiPedal side is not independently
 mergeable. The ToobAmp change has to land first, and it is a semantic

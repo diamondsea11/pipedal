@@ -222,33 +222,60 @@ ToobAmp that ships today. Reading the TTL of each build:
 | ToobAmp master (2026-07-27) | `Value` | −30 … 12 | −6.0 |
 | my patched arm64 build | `Interface Input Level` | −60 … 60 | 13.0 |
 
-The two ports mean different things — "analog input level in dBu RMS
-corresponding to 0 dBFS peak" versus "measured instrument voltage level in dBu".
+To be clear about what I am and am not claiming: **your −30 … 12 range is not
+too small.** It's exactly right for the quantity your port measures. I read
+`NamCalibration.md` and `CalculateNamVolumeAdjustments` again before writing
+this, and your design is internally consistent:
 
-Where PiPedal's value comes from matters for your decision, so to be precise:
-it is not a constant for my interface.
-`JackServerSettings::GetNamInputCalibrationDbu()` resolves it in three steps —
-an explicit per-ALSA-device override the user has set, else a lookup against a
-table of 69 interfaces built from the public Ghost Note Audio "Amp Simulation
-Input Gain" database matched on the ALSA device name, else a 12.0 dBu fallback.
-`PiPedalModel` applies the result to `toob-nam`'s `calibration` port
-automatically when a pedalboard loads. The mechanism is general, not
-device-specific, and the preset stores no interface value — it is resolved
-locally, so it doesn't have the sharability problem you objected to elsewhere.
+- The port is the **measured voltage level of the physical guitar** in dBu.
+  Your doc puts real guitars at −20 … −2 dBu, humbuckers nominally −6, single
+  coils around −11, with −6.0 as the recommended fictional default. A −30 … 12
+  range covers that with room to spare.
+- Step 2 of your procedure — trim the interface's gain so the digital signal
+  sits just under 0 dBFS — deliberately **normalises the interface out of the
+  calculation**. That's why `Db2Af(calibrationDbu - modelInputLevelDbu)` only
+  needs the guitar level and the model's training level. The interface isn't
+  missing from the model; you removed it on purpose.
 
-That generality is what makes the mismatch substantive rather than cosmetic:
-**53 of those 69 entries exceed 12.0 dBu**, the stock plugin's maximum, and the
-table spans 6.8 to 22.0. So against stock ToobAmp roughly three quarters of the
-database is silently clamped *and* reinterpreted as a different quantity. It is
-13.0 for my Babyface Pro; a Behringer UMC22 (22.0) or a PreSonus Quantum HD
-(21.0) is off by far more. Nothing raises an error.
+What my fork does is adopt the other convention, the one the NAM Gateway
+workflow uses: the calibration value is the interface's dBu level at 0 dBFS,
+resolved automatically — a per-ALSA-device user override, else a lookup in a
+69-entry table built from the public Ghost Note Audio "Amp Simulation Input
+Gain" database matched on the ALSA device name, else a 12.0 dBu fallback
+(`JackServerSettings::GetNamInputCalibrationDbu()`, unit-tested in
+`jsonTest.cpp`). `PiPedalModel` writes it to `toob-nam` on pedalboard load.
 
-The resolution order and the pattern matching do have unit tests
-(`jsonTest.cpp`). What is untestable until the port semantics are settled is
-what the number is supposed to mean.
+**That is a different calibration philosophy, not a bug fix, and I should not
+have implied otherwise.** The trade-off is real in both directions:
 
-So the ToobAmp side has to land first, and since it redefines an existing port
-it needs a versioning story. You own both repos, so the ordering is yours to pick. I'd
+- Yours is more accurate in principle: it accounts for the actual instrument,
+  which is the thing that actually varies. It costs the user a voltmeter
+  measurement and a manual gain trim, and, as you say yourself, the measurement
+  is invalidated by any change of pickup, tone control or attack.
+- The Gateway convention gets a plausible result with no measurement and no
+  manual trim, at the cost of ignoring the guitar entirely — it assumes a
+  nominal instrument level baked into the model metadata.
+
+Two things I'd genuinely like your read on:
+
+1. Is there a reason not to support **both**? They're not mutually exclusive:
+   interface dBu at 0 dBFS and guitar dBu are independent terms, and a plugin
+   that knew both wouldn't need the user to normalise to 0 dBFS by hand.
+2. The Ghost Note figures are each interface's maximum input level, which I
+   believe means *gain at minimum*. If so, the auto-filled value is only correct
+   at that gain setting and drifts as soon as the user turns the gain up — which
+   would make the whole approach weaker than I've been treating it. I haven't
+   verified that assumption and would rather ask than assert it.
+
+The concrete defect that remains regardless of which design wins: my fork writes
+the interface-semantics number into whichever ToobAmp is installed. Against my
+patched arm64 build that's coherent. Against stock it silently puts an
+interface-level figure into a guitar-level port — 13.0 for a Babyface Pro,
+clamped to 12.0 and then read as a guitar voltage. That's my bug to fix, not
+yours, and it's why I'm not proposing the PiPedal half of this.
+
+So the ToobAmp side has to be settled first, and if it changes the port at all
+it needs a versioning story. You own both repos, so the ordering is yours. I'd
 take you up on the versioning advice you offered *before* I write migration
 code — my schema steps 2→6 were designed around the patched semantics, and if
 you choose a different ToobAmp-side design the migration path changes with it.
