@@ -212,6 +212,29 @@ Fixing that means building ToobAmp from source with the patch applied for
 amd64, the same way the arm64 binaries were produced. Until then, treat NAM
 calibration on x86-64 as not working, regardless of what the UI shows.
 
+### What went to ToobAmp instead
+
+Two unambiguous bugs found in that block while investigating are now
+[ToobAmp draft PR #86](https://github.com/rerdavies/ToobAmp/pull/86), separate
+from the calibration-semantics question:
+
+- `output_level_dbu` was assigned from `GetModelInputLevelDBu()` instead of
+  `GetModelOutputLevelDBu()`.
+- `fgModelMetadata.flags` was written *before* `has_output_level_dbu` was
+  OR-ed in, so that bit never reached the host.
+
+Both values are published via `SendModelMetadataNotification()`, so a host
+reading them gets a wrong output level and never sees the availability flag.
+Seven lines, no design decision involved — deliberately kept apart from the
+port-redefinition question, which is Robin's call.
+
+The rest of `patches/toobamp-1.3.83-gateway-calibration.patch` was **not**
+submitted. It bundles two further topics that each need their own discussion:
+the calibration-semantics redefinition (the `calibration` port change above),
+and Raspberry-Pi-specific realtime work in `NamBackgroundProcessor.*`,
+`ConvolutionReverb.cpp` and `AudioThreadToBackgroundQueue.cpp` (CPU pinning,
+buffer preallocation) that has nothing to do with calibration.
+
 Take Robin up on his offer of versioning advice **before** writing any
 migration code: the fork's schema steps 2→6 were designed around the patched
 plugin's semantics, so if he chooses a different ToobAmp-side design the
