@@ -70,14 +70,13 @@ reflects what he will and will not consider rather than what we hoped he would.
 Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
 💬 his call to make, ⏳ blocked on his own design work landing first.
 
-1. ✅ **ALSA multichannel detection fix** — extracted and pushed:
+1. ✅ **ALSA multichannel detection fix** — draft PR [#558](https://github.com/rerdavies/pipedal/pull/558):
    [`upstream-pr/alsa-multichannel-detection`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/alsa-multichannel-detection),
    branched directly from `upstream/main`. One line: disables
    `ShouldForceStereoChannels()`'s channel-map heuristic for genuinely
    multichannel devices. No isolated test exists for this function; noted as an
-   open point in the commit rather than claimed. Not yet opened as a PR against
-   `rerdavies/pipedal` — that step is the maintainer's to take.
-2. ✅ **S24_LE scaling fix** — extracted and pushed:
+   open point in the PR rather than claimed.
+2. ✅ **S24_LE scaling fix** — draft PR [#559](https://github.com/rerdavies/pipedal/pull/559):
    [`upstream-pr/s24-le-scaling-fix`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/s24-le-scaling-fix),
    branched from `upstream/main`. Root cause confirmed precisely: the
    `SND_PCM_FORMAT_S24_LE`/`S24_BE` (24 bits unpacked into a 4-byte container)
@@ -104,7 +103,7 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
    long-press. He flagged the added gestures and the copy/paste entry point as
    a UI-conventions problem on small screens — resolve that discussion before
    opening this PR, since the interaction surface may need to change first.
-5. ✅ **LV2 category patching** — extracted and pushed:
+5. ✅ **LV2 category patching** — draft PR [#561](https://github.com/rerdavies/pipedal/pull/561):
    [`upstream-pr/lv2-category-patching`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/lv2-category-patching),
    branched from `upstream/main`. New `PluginCategories.ts` (13 guitarist-facing
    categories with colours and display order, mapped from `PluginType`, plus a
@@ -138,7 +137,7 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
    objection). Controller profiles and per-snapshot actions overlap with his
    own MIDI Mappings → Control Hub evolution plan — sequence after that
    conversation, not before.
-7. ✅ **JUCE sidechain port-group name fallback** — extracted and pushed:
+7. ✅ **JUCE sidechain port-group name fallback** — draft PR [#560](https://github.com/rerdavies/pipedal/pull/560):
    [`upstream-pr/juce-sidechain-group-fallback`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/juce-sidechain-group-fallback),
    branched from `upstream/main`. **This replaces an earlier, incorrect entry
    in this document** that described "sidechain input selection" (choosing a
