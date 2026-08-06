@@ -29,7 +29,9 @@ reflects what he will and will not consider rather than what we hoped he would.
 - JUCE-style control handling — his concern: whether the TTL parser used
   (Lilv/Serd, "drobzilla's") preserves JUCE control order, since TTL gives no
   ordering guarantee and JUCE plugins tend to need their generated layout
-  order to be usable. Confirm this before opening the PR, not after.
+  order to be usable. **Checked — see the section below.** Short answer: for
+  control ports the concern does not apply; for patch properties it does, and
+  that is the part worth discussing.
 - LV2 category patching
 - Custom layouts — **only Dragonfly is PiPedal code.** Draft PR
   [#562](https://github.com/rerdavies/pipedal/pull/562) covers
@@ -199,6 +201,51 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
 
 NAM Gateway behavior belongs partly to TooB Amp. Rebuilt TooB binaries, plugin
 bundles and third-party skins should not be mixed into PiPedal core PRs.
+
+## Answer to Robin's TTL-ordering question (control ports vs. patch properties)
+
+He asked whether the TTL parser preserves the control order a JUCE plugin
+intends, given that RDF/Turtle carries no statement-order guarantee. Traced
+through the actual code path rather than reasoned about in the abstract:
+
+**Control ports — the concern does not apply.** Order never comes from
+statement order at any stage:
+
+1. `lv2:index` is mandatory on every port. Lilv places each port at its
+   declared index (`lilv_plugin_get_port_by_index` indexes a densely-filled
+   array; a missing or duplicate index is a load error), so nothing downstream
+   ever sees RDF iteration order.
+2. `PluginHost.cpp:992` sorts `ports_` explicitly with `ports_sort_compare`,
+   which compares `index()`. Even if lilv's array order were ever to change,
+   PiPedal's order would not.
+3. `Lv2PluginUiInfo` builds `controls_` by walking `plugin->ports()` in that
+   sorted order (`PluginHost.cpp:1502`), so the wire order is index order.
+4. Port-*group* order is derived the same way: `portGroups` is filled while
+   walking ports `0..n-1` (`PluginHost.cpp:953`), so a group's position is the
+   index of its first port. `PluginControlView` then emits groups in the order
+   they first appear in `plugin.controls`.
+
+JUCE's LV2 wrapper emits control ports in `AudioProcessor` parameter order with
+sequential `lv2:index` values, so the plugin's intended layout order survives
+end to end. Nothing needs fixing here, and no PR is required for it.
+
+**Patch properties — the concern is real, and this is the part to discuss.**
+`lv2:Parameter` has no mandatory index, so for a plugin that exposes its
+controls as `patch:writable` parameters instead of ports there is genuinely no
+ordering information in the general case. This is not hypothetical: the Dusk
+Audio plugins do exactly that (see `modgui-skins/README.md`), which is why the
+Multi-Comp skin exists at all.
+
+Draft PR [#563](https://github.com/rerdavies/pipedal/pull/563) sorts numeric
+patch properties by `lv2:index` where the plugin declares one, and falls back
+to the property label. That fallback is alphabetical, i.e. *not* the plugin's
+intended order — it is deterministic, not correct. Whether PiPedal should
+require `lv2:index` on parameters, define its own ordering convention, or lean
+on `modgui` templates for these plugins is a design call, and it is his.
+
+Not verified here: whether the Dusk bundles actually declare `lv2:index` on
+their parameters. Their TTL is not in this tree — it would have to be read off
+the Pi installation.
 
 ## NAM calibration: blocked on ToobAmp, and a live bug in this fork's amd64 build
 
