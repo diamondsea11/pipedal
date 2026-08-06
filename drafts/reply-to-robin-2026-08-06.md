@@ -1,6 +1,22 @@
-# Reply to Robin Davies — Discussion #555
+# Reply to Robin Davies — email (rerdavies@gmail.com)
 
 *Draft. Not sent, not posted. Review and edit freely before using.*
+*He asked to move this off the discussion and onto direct email — so send it there.*
+
+> **YOU MUST FILL THESE IN BEFORE SENDING — I can't answer them for you.**
+> Search the draft for `[[TODO` to find each spot.
+>
+> 1. **Credentials + how AI-assisted this is.** His first two questions, and he
+>    said explicitly that the answers decide how carefully he reviews the PRs.
+>    Answer them plainly; understating the AI involvement would be found out in
+>    review and would cost the whole relationship.
+> 2. **Is the restyling copying Helix?** He likes the control-group restyling
+>    ("especially", "definitely like to pull that in") but said he has a problem
+>    with slavishly copying Helix UI. He specifically likes the *square groups*.
+> 3. **UI conventions.** He asked directly: "Discuss your UI conventions,
+>    please." Long-press is reserved for the plugin browser in his UI; he's
+>    weighing double-tap; Android discourages context menus; multiselect vs.
+>    drag-to-scroll is his concrete worry.
 
 ---
 
@@ -86,6 +102,57 @@ your call, not mine — I'd rather ask than pick.
 
 ---
 
+**Responsive UI — you were right to be suspicious.** Honest answer, checked
+rather than claimed:
+
+The custom plugin layouts do carry breakpoints — `DragonflyView` has
+`@media (max-width: 700px)` rules. But that only helps a narrow *portrait*
+phone; at 800x400 landscape the width is 800, the rule never fires, and the
+constraint is the 400 px height, which nothing in there accounts for. So even
+the part that has provisions doesn't have the right ones for your worst case.
+
+The larger new surfaces — the Gig view, the Control Hub, the graphical Global
+EQ, the inline plugin browser — have **no** responsive handling at all. Zero
+media queries, no `ResizeResponsiveComponent`, no landscape/portrait branch.
+They were laid out against an iPad Pro landscape viewport and nothing else. If
+you pull any of them, assume they need the responsive work done from scratch,
+and please don't take my word that they'll degrade gracefully — they won't.
+
+None of those are in the six PRs, so nothing currently in front of you carries
+that problem except the Dragonfly layout, where the breakpoint is present but
+untested below 700 px and unhelpful at 800x400.
+
+---
+
+**Custom layouts — I want to check a scoping decision with you.** You named
+Chow Tape, Calf, Dragonfly and Dusk. Only Dragonfly is in #562, and I should be
+straight about why the others aren't:
+
+- **Chow Tape and Calf** in my fork are not PiPedal code at all — they're MOD
+  GUI skins (HTML/CSS/`modgui.ttl`) that get installed *into the plugin
+  bundles*. Shipping them from the PiPedal tree means PiPedal starts carrying
+  third-party plugin assets. I assumed you'd rather not, but that was my
+  assumption, not something you said. If you do want them, say so and I'll
+  prepare them — the question is where they should live, not whether they work.
+- **Dusk** is a 540-line hardcoded view enumerating several hundred control
+  symbols by hand across four plugins. It works, but it's a maintenance
+  liability that breaks silently whenever Dusk renames anything, and it depends
+  on #563 landing first. I'd rather you look at it and tell me it's worth it
+  than push it at you. Say the word and it's a PR.
+- **Dragonfly Hall** is deliberately out of #562 — different control set,
+  and I didn't want to guess at it.
+
+---
+
+**Preset directories — taking your advice.** Point taken on
+`/var/pipedal/presets` and the incompatible-preset problem; the experimental
+release should not be able to contaminate a mainline install. I'll move the
+fork's preset tree to its own directory and follow the existing preset-upgrade
+code as the place to copy factory presets across. That's fork hygiene, not
+something you need to review.
+
+---
+
 **On the parts you declined:** understood on both, and no PR is coming for
 either.
 
@@ -128,6 +195,22 @@ The rest of that patch file is two further topics I've kept out entirely: the
 calibration redefinition above, and some Pi-specific realtime work (CPU pinning,
 buffer preallocation) in `NamBackgroundProcessor.*`, `ConvolutionReverb.cpp` and
 `AudioThreadToBackgroundQueue.cpp` that has nothing to do with calibration.
+
+---
+
+**Still to come from me, not forgotten:**
+
+- The **control-group restyling** you singled out. It's not in this batch
+  because I want to answer your Helix question first — [[TODO: see the note at
+  the top; if it *is* Helix-derived, say so and offer the square-group idea on
+  its own merits rather than as a port]]. It's a small, self-contained PR once
+  that's settled.
+- The **MIDI monitor diagnostics**, which you had no objection to. Sequenced
+  after the Control Hub conversation only because they share a screen; the
+  read-only monitor part can come first if you'd rather see it now.
+- **[[TODO: your answer on UI conventions]]** — everything gesture-related
+  (block copy/paste/duplicate, long-press, multiselect) is on hold until that
+  conversation, per your request. No PR incoming for any of it.
 
 Happy to reshape, split, or drop any of the six. Thanks again for the time you
 put into the review.
