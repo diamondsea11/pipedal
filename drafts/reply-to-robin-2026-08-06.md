@@ -10,13 +10,15 @@
 >    said explicitly that the answers decide how carefully he reviews the PRs.
 >    Answer them plainly; understating the AI involvement would be found out in
 >    review and would cost the whole relationship.
-> 2. **Is the restyling copying Helix?** He likes the control-group restyling
->    ("especially", "definitely like to pull that in") but said he has a problem
->    with slavishly copying Helix UI. He specifically likes the *square groups*.
-> 3. **UI conventions.** He asked directly: "Discuss your UI conventions,
+> 2. **UI conventions.** He asked directly: "Discuss your UI conventions,
 >    please." Long-press is reserved for the plugin browser in his UI; he's
 >    weighing double-tap; Android discourages context menus; multiselect vs.
 >    drag-to-scroll is his concrete worry.
+>
+> The Helix question is answered below and in #564 — checked against the code:
+> the only "Helix" strings anywhere in the fork are a NAM calibration profile
+> for a Line 6 Helix used as an audio interface, and a comment describing the
+> Control Hub as "Helix Command Center style". Nothing in the restyling.
 
 ---
 
@@ -24,7 +26,7 @@ Thanks for going through the fork in that much detail — the point-by-point
 reply made it much easier to work out what is actually worth your review time
 and what isn't.
 
-I've split the parts you flagged as interesting into six small draft PRs, one
+I've split the parts you flagged as interesting into eight small draft PRs, one
 topic each, all branched from `upstream/main` rather than from my integration
 branch. They're drafts because none of them has been through your CI yet; the
 TypeScript ones type-check clean locally (`tsc -b --force`), but I don't have a
@@ -71,6 +73,45 @@ ready — or tell me to fold them together differently — as you prefer.
   set. No protocol change. It deliberately does *not* touch `ModGuiHost` —
   resolving MOD-GUI `mod-port-symbol` references to patch properties is a much
   larger separate diff.
+- **#564 — control-group styling hooks.** This is the restyling you singled
+  out, and the answer to your Helix question is **no**. There is no
+  Helix-derived layout, artwork or colour anywhere in it — I went back through
+  the fork to check, and the only "Helix" strings in the whole tree are a NAM
+  calibration profile for a Line 6 Helix used as an audio interface, and one
+  comment describing the Control Hub as "Helix Command Center style" (a
+  different feature, and one you've asked to defer anyway).
+
+  What's actually in the PR is six `data-pipedal-role` attributes on the
+  control-group frame, title, grid and outer frame, plus `data-group-name`
+  carrying the LV2 port-group name. Attributes only — no behaviour change, and
+  the default appearance is byte-for-byte identical. The look you liked is a
+  *plugin view's own stylesheet* using those as selectors: for Dragonfly,
+  squared-off frames (`border-radius: 0`), flush panels with hairline
+  separators, inline uppercase titles and a coloured top rule per group, in
+  Dragonfly's palette. The square groups are one CSS line in a skin, and any
+  skin can decline them.
+
+  **This also fixes #562**, which I got wrong: `DragonflyView` styles
+  everything through these selectors, and I extracted the view without noticing
+  the attributes it depends on were still only in my fork. On `main` as
+  submitted, none of the selectors matched and the skin rendered unstyled. I've
+  pushed the missing commit onto that branch too and commented on it.
+- **#565 — MIDI monitor.** The diagnostics half you had no objection to, with
+  none of the Control Hub material. Right now the only path reporting incoming
+  MIDI to a client is MIDI learn, which by design shows only what it can bind
+  to; program change, note-off, pitch bend and aftertouch are filtered out in
+  two places. So when a footswitch "does nothing" there's nothing to look at,
+  and no way to distinguish "sent nothing" from "sent something PiPedal
+  ignores". Adds a monitor mode on the existing listener list (learn clients
+  receive exactly the same messages as before), plus a read-only dialog off the
+  System MIDI Bindings toolbar.
+
+  Two caveats I'd rather state than have you find: this one is **new code, not
+  an extraction** — in my fork the monitor lives inside the Control Hub dialog,
+  so I rewrote it standalone — and the C++ is **uncompiled**. Also worth your
+  judgement: while the monitor is open, every channel-voice message writes to
+  the ring buffer rather than only bindable ones. You know that buffer's
+  headroom better than I do.
 
 **ToobAmp**
 
@@ -198,19 +239,16 @@ buffer preallocation) in `NamBackgroundProcessor.*`, `ConvolutionReverb.cpp` and
 
 ---
 
-**Still to come from me, not forgotten:**
+**Still open, waiting on you:**
 
-- The **control-group restyling** you singled out. It's not in this batch
-  because I want to answer your Helix question first — [[TODO: see the note at
-  the top; if it *is* Helix-derived, say so and offer the square-group idea on
-  its own merits rather than as a port]]. It's a small, self-contained PR once
-  that's settled.
-- The **MIDI monitor diagnostics**, which you had no objection to. Sequenced
-  after the Control Hub conversation only because they share a screen; the
-  read-only monitor part can come first if you'd rather see it now.
 - **[[TODO: your answer on UI conventions]]** — everything gesture-related
   (block copy/paste/duplicate, long-press, multiselect) is on hold until that
   conversation, per your request. No PR incoming for any of it.
+- The **JUCE control-handling** PR turned out not to be needed for control
+  ports at all, per the ordering answer above. What remains of that topic is
+  the patch-property ordering question, which is #563 plus your design call.
+- Control Hub, Gig view, global EQ, the noise gate: all waiting on your
+  routing model and your hands-on pass, as you asked.
 
-Happy to reshape, split, or drop any of the six. Thanks again for the time you
-put into the review.
+Happy to reshape, split, or drop any of the eight. Thanks again for the time
+you put into the review.

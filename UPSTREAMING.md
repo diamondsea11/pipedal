@@ -25,7 +25,9 @@ questions required checking against the actual code, so the PR series below
 reflects what he will and will not consider rather than what we hoped he would.
 
 **Ready to prepare as PRs, per his explicit interest:**
-- Control-group restyling (his favorite; not a Helix copy, no objection raised)
+- Control-group restyling (his favorite) — draft PR
+  [#564](https://github.com/rerdavies/pipedal/pull/564), item 11 below. He
+  asked whether it copies Helix; verified against the tree that it does not.
 - JUCE-style control handling — his concern: whether the TTL parser used
   (Lilv/Serd, "drobzilla's") preserves JUCE control order, since TTL gives no
   ordering guarantee and JUCE plugins tend to need their generated layout
@@ -161,10 +163,45 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
 
    The **inline empty-block browser** originally bundled into this item is a
    separate, fork-only component and is *not* part of this branch.
-6. 💬 **MIDI monitor and action extensions**: start with diagnostics (no
-   objection). Controller profiles and per-snapshot actions overlap with his
-   own MIDI Mappings → Control Hub evolution plan — sequence after that
-   conversation, not before.
+6. ✅ **MIDI monitor** — draft PR
+   [#565](https://github.com/rerdavies/pipedal/pull/565):
+   [`upstream-pr/midi-monitor`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/midi-monitor),
+   branched from `upstream/main`. **Not an extraction** — in the fork the
+   monitor lives inside the deferred Control Hub dialog, so it was rewritten
+   standalone against `main`. Upstream has no monitor at all: `listenForMidiEvent`
+   is a MIDI-learn path, and non-bindable messages are dropped twice (the
+   realtime filter in `ProcessMidiMonitor` and again in
+   `PiPedalModel::OnNotifyMidiListen`). Adds `MidiListener::listenForAllEvents`,
+   a `monitorMidiEvents` socket message reusing the existing listener list,
+   `SetMonitorAllMidiEvents` on the audio host, a shared
+   `UpdateMidiListenerState()`, and a read-only `MidiMonitorDialog` off the
+   System MIDI Bindings toolbar. Learn behaviour is bit-identical: the
+   note-off and non-note/CC drops are preserved per-listener. `tsc -b --force`
+   clean; **C++ uncompiled**. Controller profiles and per-snapshot actions
+   remain deferred behind his MIDI Mappings → Control Hub plan.
+11. ✅ **Control-group styling hooks** — draft PR
+    [#564](https://github.com/rerdavies/pipedal/pull/564):
+    [`upstream-pr/control-group-style-hooks`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/control-group-style-hooks),
+    branched from `upstream/main`. This is the restyling he singled out as his
+    favourite. It turned out to be six `data-pipedal-role` attributes
+    (`plugin-control-frame`, `control-grid`, `control-group`,
+    `control-group-title`, `control-group-controls`, `custom-control`) plus
+    `data-group-name` — the visual change lives entirely in each skin's
+    stylesheet, which selects on them. Attributes only; default appearance
+    byte-for-byte unchanged. `tsc -b --force` clean.
+
+    **Helix question answered:** checked the whole tree. The only `Helix`
+    strings are a NAM calibration profile for a Line 6 Helix used as an audio
+    interface (`NamInputCalibrationProfiles`) and a comment calling the Control
+    Hub "Helix Command Center style". Nothing in the restyling derives from
+    Helix.
+
+    **This also fixes a real defect in #562**, which was submitted without
+    these attributes: `DragonflyView` selects on them exclusively, so on
+    `upstream/main` none of its rules matched and the skin rendered as an
+    unstyled control view. The commit has been cherry-picked onto
+    `upstream-pr/plugin-custom-layouts` and a correction comment posted on the
+    PR.
 7. ✅ **JUCE sidechain port-group name fallback** — draft PR [#560](https://github.com/rerdavies/pipedal/pull/560):
    [`upstream-pr/juce-sidechain-group-fallback`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/juce-sidechain-group-fallback),
    branched from `upstream/main`. **This replaces an earlier, incorrect entry
