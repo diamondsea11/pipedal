@@ -105,8 +105,26 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
    own PR if pursued. The JUCE-style sidechain-*group* compatibility part of
    this item is its own entry — see
    item 7 below, which supersedes the mention of it here.
-3. ✅ **Generic numeric LV2 patch properties**: host model, persistence, controls
-   and tests. This enables Dusk controls without bundling Dusk skins.
+3. ✅ **Generic numeric LV2 patch properties** — draft PR
+   [#563](https://github.com/rerdavies/pipedal/pull/563):
+   [`upstream-pr/numeric-patch-properties`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/numeric-patch-properties),
+   branched from `upstream/main`. `FindWritablePathProperties` gains an
+   `atom:Float` branch so numeric parameters no longer set
+   `unsupportedPatchProperty` (which hides the whole plugin);
+   `Lv2PatchPropertyInfo` reads `lv2:minimum`/`maximum`/`default`, the
+   `lv2:portProperty` flags and `lv2:scalePoint`/`rdf:value`, and finally
+   populates `rdfs:label`, which upstream serialized but never set;
+   `writable`, `readable` and `index` added to the JSON map because
+   `Lv2Plugin.tsx` already deserialized them. New
+   `PatchPropertyControl.tsx` renders one property through the existing
+   `PluginControl`; `PluginControlView` emits the writable numeric ones in
+   `lv2:index` order. No protocol change — `get/set/monitorPatchProperty`
+   already exist. Verified with `npx tsc -b --force`; C++ not built locally.
+   **Deliberately excluded:** `getPatchPropertyBySymbol` and the
+   `ModGuiHost` mod-port-symbol resolution (a separate, much larger topic).
+   No tests — no existing pattern for plugin-metadata parsing tests in the
+   tree; offered to follow Robin's preference. This unblocks the Dusk view
+   (item under Custom layouts), which needs `isNumeric()`/`toUiControl()`.
 4. 💬 **Block editing interactions**: copy, paste, duplicate, delete and touch
    long-press. He flagged the added gestures and the copy/paste entry point as
    a UI-conventions problem on small screens — resolve that discussion before
