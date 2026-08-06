@@ -104,8 +104,36 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
    long-press. He flagged the added gestures and the copy/paste entry point as
    a UI-conventions problem on small screens — resolve that discussion before
    opening this PR, since the interaction surface may need to change first.
-5. ✅ **Plugin categorization/browser**: category inference, search and inline
-   empty-block browser.
+5. ✅ **LV2 category patching** — extracted and pushed:
+   [`upstream-pr/lv2-category-patching`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/lv2-category-patching),
+   branched from `upstream/main`. New `PluginCategories.ts` (13 guitarist-facing
+   categories with colours and display order, mapped from `PluginType`, plus a
+   name/type/author heuristic that only runs to refine an unhelpful declared
+   class), a category-grouped filter dropdown in `LoadPluginDialog` (filter
+   values prefixed `category:`, hence `filterType` widened `PluginType` →
+   `string`), and category-coloured block icons in `PedalboardView` where the
+   user hasn't set an explicit `iconColor`. **Verified by actual compilation**
+   this time, not just diffing: `npx tsc -b --force` in `vite/` exits 0 on the
+   branch, and each edited region was additionally diffed byte-for-byte against
+   the fork original.
+
+   Two things deliberately left out, both noted in the commit message so he
+   isn't surprised: (a) the user-facing "re-categorise this plugin" localStorage
+   override — its two functions ship in `PluginCategories.ts` but are
+   unreferenced here, because the only caller is the fork-only
+   `InlinePluginBrowser` component; offer to strip them or propose that UI
+   separately. (b) Five unrelated fixes that happen to live in
+   `LoadPluginDialog.tsx` in the fork (a `"100%'"` typo, an operator-precedence
+   bug in a `Typography` expression, search debounce 2000 ms → 250 ms, and two
+   `disabled={selectedPlugin === null}` → `disabled={!selectedPlugin}` tweaks) —
+   these are real but off-topic, and would muddy a categories review.
+
+   Still open from his reply: internationalization. Category labels are English
+   literals in the new file. Nothing here makes translation harder than the rest
+   of the UI already does, but nothing makes it easier either.
+
+   The **inline empty-block browser** originally bundled into this item is a
+   separate, fork-only component and is *not* part of this branch.
 6. 💬 **MIDI monitor and action extensions**: start with diagnostics (no
    objection). Controller profiles and per-snapshot actions overlap with his
    own MIDI Mappings → Control Hub evolution plan — sequence after that
