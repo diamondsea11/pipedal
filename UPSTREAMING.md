@@ -300,10 +300,21 @@ The patched port means "analog input level in dBu RMS corresponding to 0 dBFS
 peak". The stock port means "measured instrument voltage level in dBU" — a
 different quantity, with a maximum of 12.0.
 
-`PiPedalModel.cpp` writes `calibration = GetNamInputCalibrationDbu()`, which is
-**13.0** for an RME Babyface Pro (`NamInputCalibrationProfiles.hpp`). Against a
-stock plugin that value is both out of range (clamped to 12.0) and interpreted
-as a different quantity. No error is raised; the gain staging is simply wrong.
+`PiPedalModel.cpp` writes `calibration = GetNamInputCalibrationDbu()` for
+`toob-nam` automatically on pedalboard load. That value is **not** a constant
+for one interface: `JackServerSettings::GetNamInputCalibrationDbu()` resolves
+it as (1) an explicit per-ALSA-device user override, (2) a lookup against the
+69-entry table in `NamInputCalibrationProfiles.hpp`, built from the public
+Ghost Note Audio "Amp Simulation Input Gain" database and matched on the ALSA
+device name, (3) a 12.0 dBu fallback. Resolution order and pattern matching
+are unit-tested in `jsonTest.cpp`.
+
+The scale of the mismatch follows from that: the table spans 6.8 … 22.0 dBu,
+and **53 of its 69 entries exceed the stock plugin's maximum of 12.0**. So
+against stock ToobAmp roughly three quarters of the database is silently
+clamped *and* reinterpreted as a different quantity. The RME Babyface Pro
+(13.0) is a mild case; a Behringer UMC22 (22.0) or PreSonus Quantum HD (21.0)
+is far worse. No error is raised anywhere.
 
 **Consequence for upstreaming:** the PiPedal side is not independently
 mergeable. The ToobAmp change has to land first, and it is a semantic

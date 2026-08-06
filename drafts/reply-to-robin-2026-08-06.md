@@ -224,10 +224,31 @@ ToobAmp that ships today. Reading the TTL of each build:
 
 The two ports mean different things — "analog input level in dBu RMS
 corresponding to 0 dBFS peak" versus "measured instrument voltage level in dBu".
-`PiPedalModel.cpp` writes 13.0 for an RME Babyface, which against the stock
-plugin is both out of range and the wrong quantity, silently. So the ToobAmp
-side has to land first, and since it redefines an existing port it needs a
-versioning story. You own both repos, so the ordering is yours to pick. I'd
+
+Where PiPedal's value comes from matters for your decision, so to be precise:
+it is not a constant for my interface.
+`JackServerSettings::GetNamInputCalibrationDbu()` resolves it in three steps —
+an explicit per-ALSA-device override the user has set, else a lookup against a
+table of 69 interfaces built from the public Ghost Note Audio "Amp Simulation
+Input Gain" database matched on the ALSA device name, else a 12.0 dBu fallback.
+`PiPedalModel` applies the result to `toob-nam`'s `calibration` port
+automatically when a pedalboard loads. The mechanism is general, not
+device-specific, and the preset stores no interface value — it is resolved
+locally, so it doesn't have the sharability problem you objected to elsewhere.
+
+That generality is what makes the mismatch substantive rather than cosmetic:
+**53 of those 69 entries exceed 12.0 dBu**, the stock plugin's maximum, and the
+table spans 6.8 to 22.0. So against stock ToobAmp roughly three quarters of the
+database is silently clamped *and* reinterpreted as a different quantity. It is
+13.0 for my Babyface Pro; a Behringer UMC22 (22.0) or a PreSonus Quantum HD
+(21.0) is off by far more. Nothing raises an error.
+
+The resolution order and the pattern matching do have unit tests
+(`jsonTest.cpp`). What is untestable until the port semantics are settled is
+what the number is supposed to mean.
+
+So the ToobAmp side has to land first, and since it redefines an existing port
+it needs a versioning story. You own both repos, so the ordering is yours to pick. I'd
 take you up on the versioning advice you offered *before* I write migration
 code — my schema steps 2→6 were designed around the patched semantics, and if
 you choose a different ToobAmp-side design the migration path changes with it.
