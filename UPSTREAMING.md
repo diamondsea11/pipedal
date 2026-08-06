@@ -305,9 +305,22 @@ different quantity, with a maximum of 12.0.
 for one interface: `JackServerSettings::GetNamInputCalibrationDbu()` resolves
 it as (1) an explicit per-ALSA-device user override, (2) a lookup against the
 69-entry table in `NamInputCalibrationProfiles.hpp`, built from the public
-Ghost Note Audio "Amp Simulation Input Gain" database and matched on the ALSA
+Ghost Note Audio "Amp Simulation Input Gain" database
+(https://ghostnoteaudio.uk/pages/app-inputgain) and matched on the ALSA
 device name, (3) a 12.0 dBu fallback. Resolution order and pattern matching
 are unit-tested in `jsonTest.cpp`.
+
+Robin's original message named this item "Align TooB Neural Amp Modeler
+calibration **and quality defaults** with the NAM Gateway workflow" — the
+quality-defaults half is a separate change in the same patch file, not yet
+analysed here. `patches/toobamp-1.3.83-gateway-calibration.patch` also flips
+`modelSize` ("Slim")'s default from 0.0 to 1.0, and `version`'s default/max
+from 1.0/1.0 to 5.0/5.0. What `modelSize`/`Slim` actually selects in the NAM
+inference path has not been traced — the `epp:expensive` port property on it
+suggests a full-vs-lighter-model tradeoff, but that is a guess, not a finding.
+Do not tell Robin what flipping that default does until it's actually been
+read from the NAM core source (sdatkinson/neural-amp-modeler) or ToobAmp's use
+of it.
 
 **Do not tell Robin his range is too small — it isn't.** Checked against his
 own `docs/NamCalibration.md` and `CalculateNamVolumeAdjustments()`: the stock

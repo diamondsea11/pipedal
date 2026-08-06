@@ -47,13 +47,29 @@ ready — or tell me to fold them together differently — as you prefer.
   packed `S24_3LE`/`S24_3BE` paths were already correct (they left-justify into
   the full 32-bit range, a different convention that genuinely wants a different
   constant) and are untouched.
-- **#560 — JUCE sidechain port groups.** I owe you a correction here: my earlier
-  write-up claimed sidechain *input selection* as fork work. That was wrong. I
-  checked it against `upstream/main` and the whole mechanism — `sideChainInputId`,
-  its `GetEffect()` resolution in `Lv2Pedalboard.cpp`, the `IEffect`/`Lv2Effect`
-  plumbing, `SideChainSelectControl.tsx` — is already yours, byte for byte. The
-  one genuine gap is a name-based fallback for JUCE plugins that omit
-  `pg:sideChainOf` but name the group "sidechain". Three lines plus a helper.
+- **#560 — JUCE sidechain port groups.** Directly answering your two
+  questions: **selection of a specific plugin's output as another plugin's
+  sidechain input is already supported** — and it's not fork work. I owe you a
+  correction here: my earlier write-up claimed that as something I'd added.
+  Checked against `upstream/main` and the whole mechanism —
+  `sideChainInputId`, its `GetEffect()` resolution in `Lv2Pedalboard.cpp`, the
+  `IEffect`/`Lv2Effect` plumbing, `SideChainSelectControl.tsx` — is already
+  yours, byte for byte. So if you were seeing that as a fork feature, it isn't
+  one; it's already in `main`.
+
+  **A send from a lower split branch to an upper one is not implemented**,
+  in either the fork or upstream. Signal processing is strictly top-to-bottom
+  in both, so that direction would still incur the one-buffer delay you asked
+  about. Building it means reordering plugin execution, which is new work, not
+  an extraction, and I'd want your view on the intended semantics (does the
+  reordering apply per-buffer or per-block, does it change bypass/latency
+  reporting) before starting rather than guess and hand you something you'd
+  have to unwind.
+
+  What #560 actually contains is much narrower: the one genuine gap I found is
+  a name-based fallback for JUCE plugins (Dusk Multi-Comp) that omit
+  `pg:sideChainOf` but name their port group "sidechain". Three lines plus a
+  helper function.
 - **#561 — Plugin categories.** A curated category set with a name/type/author
   heuristic that only runs to refine an unhelpful declared class. Two things
   left out on purpose and called out in the PR: the localStorage
@@ -212,73 +228,69 @@ hand you something shaped around a routing model you don't want.
 
 ---
 
-**One thing I'd like your view on before I write any of it: NAM calibration.**
+**NAM calibration — taking you up on the offer, one thing to settle first.**
 
-I'm not proposing the PiPedal half, because it can't work correctly against the
-ToobAmp that ships today. Reading the TTL of each build:
+Good that you're in favour of this — I'm not proposing the PiPedal half yet,
+because it can't work correctly against the ToobAmp that ships today, and I'd
+like your take on scope before I touch preset versioning. Reading the TTL of
+each build:
 
 | build | `calibration` port name | range | default |
 |---|---|---|---|
 | ToobAmp master (2026-07-27) | `Value` | −30 … 12 | −6.0 |
 | my patched arm64 build | `Interface Input Level` | −60 … 60 | 13.0 |
 
-To be clear about what I am and am not claiming: **your −30 … 12 range is not
-too small.** It's exactly right for the quantity your port measures. I read
-`NamCalibration.md` and `CalculateNamVolumeAdjustments` again before writing
-this, and your design is internally consistent:
+Worth being precise about what's actually changing, since it's more than a
+default: your current port measures the **physical guitar's** signal voltage
+(per `NamCalibration.md` — real guitars −20 … −2 dBu, humbucker ≈ −6, single
+coil ≈ −11), and step 2 of your procedure deliberately trims the interface out
+of the picture before that number ever gets used
+(`Db2Af(calibrationDbu - modelInputLevelDbu)` in `CalculateNamVolumeAdjustments`
+only ever sees the guitar level and the model's training level). The NAM
+Gateway convention my fork uses is a different quantity — the *interface's*
+dBu level at 0 dBFS — auto-resolved per device rather than measured with a
+voltmeter. So this isn't tightening a range, it's redefining what the port
+means, which is exactly the kind of change your own instinct to ask for
+"careful versioning" is right to flag.
 
-- The port is the **measured voltage level of the physical guitar** in dBu.
-  Your doc puts real guitars at −20 … −2 dBu, humbuckers nominally −6, single
-  coils around −11, with −6.0 as the recommended fictional default. A −30 … 12
-  range covers that with room to spare.
-- Step 2 of your procedure — trim the interface's gain so the digital signal
-  sits just under 0 dBFS — deliberately **normalises the interface out of the
-  calculation**. That's why `Db2Af(calibrationDbu - modelInputLevelDbu)` only
-  needs the guitar level and the model's training level. The interface isn't
-  missing from the model; you removed it on purpose.
+Where the fork's value comes from, concretely:
+`JackServerSettings::GetNamInputCalibrationDbu()` resolves it as an explicit
+per-ALSA-device user override, else a lookup in a 69-entry table built from the
+public Ghost Note Audio "Amp Simulation Input Gain" database
+(https://ghostnoteaudio.uk/pages/app-inputgain) matched on the ALSA device
+name, else a 12.0 dBu fallback — unit-tested in `jsonTest.cpp`. `PiPedalModel`
+writes the result to `toob-nam` automatically on pedalboard load.
 
-What my fork does is adopt the other convention, the one the NAM Gateway
-workflow uses: the calibration value is the interface's dBu level at 0 dBFS,
-resolved automatically — a per-ALSA-device user override, else a lookup in a
-69-entry table built from the public Ghost Note Audio "Amp Simulation Input
-Gain" database matched on the ALSA device name, else a 12.0 dBu fallback
-(`JackServerSettings::GetNamInputCalibrationDbu()`, unit-tested in
-`jsonTest.cpp`). `PiPedalModel` writes it to `toob-nam` on pedalboard load.
+One thing I haven't verified and would rather ask than assert: the Ghost Note
+figures look like each interface's *maximum* input level, which I'd guess
+means gain at minimum. If that's right, the auto-filled value is only accurate
+at that gain setting and drifts as soon as the user turns the interface gain
+up — worth knowing before it becomes the new default behaviour.
 
-**That is a different calibration philosophy, not a bug fix, and I should not
-have implied otherwise.** The trade-off is real in both directions:
+The live bug in the fork right now, unrelated to which design wins: it writes
+this interface-semantics number into whichever ToobAmp happens to be
+installed. Against my patched arm64 build that's coherent; against stock it
+silently puts an interface figure (13.0 for a Babyface Pro) into what is
+currently a guitar-voltage port, clamped to 12.0 and misread. That's on me to
+fix once the target port semantics are settled, not something for you to
+worry about.
 
-- Yours is more accurate in principle: it accounts for the actual instrument,
-  which is the thing that actually varies. It costs the user a voltmeter
-  measurement and a manual gain trim, and, as you say yourself, the measurement
-  is invalidated by any change of pickup, tone control or attack.
-- The Gateway convention gets a plausible result with no measurement and no
-  manual trim, at the cost of ignoring the guitar entirely — it assumes a
-  nominal instrument level baked into the model metadata.
+**Quality defaults, the other half of what you said yes to:** the patch also
+changes `modelSize`'s (`"Slim"`) default from 0.0 to 1.0, `version` from 1.0/max
+1.0 to 5.0/max 5.0, and `inputCalibrationMode` stays at default 1.0 (Calibrated)
+but the range around it changes. I have not traced what `modelSize`/`Slim`
+actually selects in the NAM inference path (full vs. a lighter model variant,
+by the naming and the `epp:expensive` tag on it), so I can't yet tell you
+whether flipping its default is something every user should get or something
+that should ship as an explicit opt-in. I'd rather flag that gap than guess at
+it — happy to dig into the NAM core (sdatkinson/neural-amp-modeler) source if
+that's where it's decided, once we're talking versioning anyway.
 
-Two things I'd genuinely like your read on:
-
-1. Is there a reason not to support **both**? They're not mutually exclusive:
-   interface dBu at 0 dBFS and guitar dBu are independent terms, and a plugin
-   that knew both wouldn't need the user to normalise to 0 dBFS by hand.
-2. The Ghost Note figures are each interface's maximum input level, which I
-   believe means *gain at minimum*. If so, the auto-filled value is only correct
-   at that gain setting and drifts as soon as the user turns the gain up — which
-   would make the whole approach weaker than I've been treating it. I haven't
-   verified that assumption and would rather ask than assert it.
-
-The concrete defect that remains regardless of which design wins: my fork writes
-the interface-semantics number into whichever ToobAmp is installed. Against my
-patched arm64 build that's coherent. Against stock it silently puts an
-interface-level figure into a guitar-level port — 13.0 for a Babyface Pro,
-clamped to 12.0 and then read as a guitar voltage. That's my bug to fix, not
-yours, and it's why I'm not proposing the PiPedal half of this.
-
-So the ToobAmp side has to be settled first, and if it changes the port at all
-it needs a versioning story. You own both repos, so the ordering is yours. I'd
-take you up on the versioning advice you offered *before* I write migration
-code — my schema steps 2→6 were designed around the patched semantics, and if
-you choose a different ToobAmp-side design the migration path changes with it.
+So: happy to build the PiPedal side once ToobAmp defines the new ports and
+their defaults. I'd take you up on the versioning advice you offered before
+writing migration code — my fork's schema steps 2→6 were built around the
+patched semantics for all three of these fields, and the migration path
+depends on exactly how you redefine them.
 
 The rest of that patch file is two further topics I've kept out entirely: the
 calibration redefinition above, and some Pi-specific realtime work (CPU pinning,
