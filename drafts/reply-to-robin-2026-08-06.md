@@ -275,16 +275,15 @@ currently a guitar-voltage port, clamped to 12.0 and misread. That's on me to
 fix once the target port semantics are settled, not something for you to
 worry about.
 
-**Quality defaults, the other half of what you said yes to:** the patch also
-changes `modelSize`'s (`"Slim"`) default from 0.0 to 1.0, `version` from 1.0/max
-1.0 to 5.0/max 5.0, and `inputCalibrationMode` stays at default 1.0 (Calibrated)
-but the range around it changes. I have not traced what `modelSize`/`Slim`
-actually selects in the NAM inference path (full vs. a lighter model variant,
-by the naming and the `epp:expensive` tag on it), so I can't yet tell you
-whether flipping its default is something every user should get or something
-that should ship as an explicit opt-in. I'd rather flag that gap than guess at
-it — happy to dig into the NAM core (sdatkinson/neural-amp-modeler) source if
-that's where it's decided, once we're talking versioning anyway.
+**Quality defaults, the other half of what you said yes to:** the patch flips
+`modelSize`'s (`"Slim"`) default from 0.0 to 1.0. `Slim` trades quality for
+CPU: low values run the cheaper, lower-quality inference path (hence
+`epp:expensive` being tied to it), high values run the full NAM model. So the
+default change means new instances get full model quality out of the box
+instead of the resource-saving mode, which only matters on Pi 4-class hardware
+— on Pi 5 and x86 there's no real reason not to default to full quality. The
+patch also raises `version`'s default/max from 1.0/1.0 to 5.0/5.0, which is
+just the preset-upgrade step counter, not a quality setting.
 
 So: happy to build the PiPedal side once ToobAmp defines the new ports and
 their defaults. I'd take you up on the versioning advice you offered before
