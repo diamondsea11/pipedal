@@ -31,7 +31,15 @@ reflects what he will and will not consider rather than what we hoped he would.
   ordering guarantee and JUCE plugins tend to need their generated layout
   order to be usable. Confirm this before opening the PR, not after.
 - LV2 category patching
-- Custom layouts for Chow Tape, Calf, Dragonfly, Dusk Reverb
+- Custom layouts — **only Dragonfly is PiPedal code.** Draft PR
+  [#562](https://github.com/rerdavies/pipedal/pull/562) covers
+  `urn:dragonfly:early`/`:plate`/`:room` (not Hall, which has a different
+  control set). Dusk is written but blocked on item 3 — its view needs seven
+  extra `Lv2PatchPropertyInfo` fields plus `isNumeric()`/`toUiControl()`,
+  populated host-side; `tsc` caught this when the first attempt at the branch
+  included it. Chow Tape and Calf are **not PiPedal code at all** — they are
+  MOD GUI skins under `patches/`, i.e. third-party plugin assets, and per
+  Robin's own note do not belong in a core PR.
 - S24_LE capture/playback scaling fix
 - NAM Gateway calibration/quality-default alignment — **blocked on a ToobAmp
   change, not ready to extract.** See the dedicated section below before doing
