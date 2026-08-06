@@ -16,31 +16,117 @@ Create every contribution branch from the current upstream development base,
 not from `feature/multipath-v1`. Port one coherent feature at a time, add focused
 tests and open it first as a draft pull request.
 
+## Maintainer Response (2026-08-05)
+
+Robin Davies reviewed the fork end to end and replied point by point in
+[Discussion #555](https://github.com/rerdavies/pipedal/discussions/555). This
+section records his position per topic and two facts about the fork that his
+questions required checking against the actual code, so the PR series below
+reflects what he will and will not consider rather than what we hoped he would.
+
+**Ready to prepare as PRs, per his explicit interest:**
+- Control-group restyling (his favorite; not a Helix copy, no objection raised)
+- JUCE-style control handling — his concern: whether the TTL parser used
+  (Lilv/Serd, "drobzilla's") preserves JUCE control order, since TTL gives no
+  ordering guarantee and JUCE plugins tend to need their generated layout
+  order to be usable. Confirm this before opening the PR, not after.
+- LV2 category patching
+- Custom layouts for Chow Tape, Calf, Dragonfly, Dusk Reverb
+- Sidechain input selection (choosing a specific plugin's output as another
+  plugin's sidechain input) — **not currently a numbered item above**; add as
+  its own PR, separate from the JUCE-style sidechain *group* metadata already
+  folded into item 2. **Verified scope, so this can be stated precisely in the
+  PR description rather than left open:** selecting any plugin's output as a
+  sidechain source is implemented end to end (`sideChainInputId`,
+  `SideChainSelectControl.tsx`, `Lv2Pedalboard::GetEffect` resolves across the
+  whole board). What is **not** implemented is execution reordering for a send
+  from a lower split branch to an upper one — signal processing is strictly
+  top-to-bottom, so that specific direction still incurs the one-buffer delay
+  he asked about. State this limitation up front rather than let him find it.
+- S24_LE capture/playback scaling fix
+- NAM Gateway calibration/quality-default alignment, with careful preset
+  versioning (he offered to advise on the versioning approach — take him up
+  on it before writing migration code)
+
+**Declined — do not prepare a PR:**
+- Four independent signal paths (multipath) as currently designed. He
+  considers it device-specific and non-shareable, and has his own preferred
+  design already in mind: separate main/aux(+aux2) signal paths that persist
+  independently of preset changes (so a microphone channel does not need to be
+  reconfigured, or even present, in every preset), plus a global preset layer
+  (pre/post EQ, gate, reverb) with its own bank. **Do not submit the multipath
+  routing model as a PR.** If a mic + guitar use case still needs solving,
+  wait for his channel model rather than re-proposing this one.
+- Suspended-processor warm-up + S-curve crossfade. He does not want this
+  pulled in and prefers keeping all processors running continuously — same
+  conclusion the fork independently reached in the parallel `uPedal` project
+  (see the note at the end of this document). He also asked directly whether
+  structurally-identical preset changes already preserve reverb tails the way
+  snapshots do, suspecting the fork's version does not. **Checked, and they
+  do**: `PluginHost::UpdateLv2PedalboardStructure` keeps an `ExistingEffectMap`
+  and `PedalboardItem::IsStructurallyIdentical` (matching instance ID, URI and
+  MIDI bindings) decides whether an effect instance is reused rather than
+  recreated. Tell him this directly — it closes the question and is not a bug
+  to fix.
+
+**Needs his design decision before any PR, not ours:**
+- UI gesture/context-menu conventions (Android vs. desktop conventions,
+  long-press vs. double-tap, where context menus are acceptable). He asked to
+  discuss this rather than receive a PR; do not preempt it with one.
+- Control Hub → he is evaluating it against his own MIDI Mappings roadmap.
+- Gig/Performance UI → same; waiting on his hands-on pass.
+
 ## Recommended Pull Request Series
 
-1. **ALSA multichannel detection fix**: the narrow device-detection correction
+Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
+💬 his call to make, ⏳ blocked on his own design work landing first.
+
+1. ✅ **ALSA multichannel detection fix**: the narrow device-detection correction
    and its hardware-independent tests.
-2. **S24_LE scaling and host fixes**: audio-format correction, bounded block
-   length and sidechain compatibility, split into separate PRs if requested.
-3. **Generic numeric LV2 patch properties**: host model, persistence, controls
+2. ✅ **S24_LE scaling and host fixes**: audio-format correction, bounded block
+   length and sidechain *group* compatibility, split into separate PRs if
+   requested.
+3. ✅ **Generic numeric LV2 patch properties**: host model, persistence, controls
    and tests. This enables Dusk controls without bundling Dusk skins.
-4. **Block editing interactions**: copy, paste, duplicate, delete and touch
-   long-press as a self-contained UI contribution.
-5. **Plugin categorization/browser**: category inference, search and inline
+4. 💬 **Block editing interactions**: copy, paste, duplicate, delete and touch
+   long-press. He flagged the added gestures and the copy/paste entry point as
+   a UI-conventions problem on small screens — resolve that discussion before
+   opening this PR, since the interaction surface may need to change first.
+5. ✅ **Plugin categorization/browser**: category inference, search and inline
    empty-block browser.
-6. **MIDI monitor and action extensions**: start with diagnostics, then propose
-   controller profiles and per-snapshot actions separately.
-7. **Input-terminal noise gate**: data model, DSP, UI, snapshot behavior and
-   tests. This depends on per-path terminals only if submitted in its current
-   multi-path form.
-8. **Multipath routing**: propose the model and audio architecture before a PR.
-   Split engine/preset serialization, hardware routing, editor and send/return
-   support into reviewable stages.
-9. **Global EQ and Control Hub/Gig UI**: submit only after the underlying state
-   and routing contracts are accepted.
+6. 💬 **MIDI monitor and action extensions**: start with diagnostics (no
+   objection). Controller profiles and per-snapshot actions overlap with his
+   own MIDI Mappings → Control Hub evolution plan — sequence after that
+   conversation, not before.
+7. ✅ **Sidechain input selection**: new item, not in the original series. See
+   the verified scope above; disclose the split-branch reordering limitation
+   in the PR description.
+8. ⏳ **Input-terminal noise gate**: data model, DSP, UI, snapshot behavior and
+   tests. Was scoped to depend on per-path terminals; multipath is declined
+   (item 9), so this needs re-scoping to his main/aux(+aux2) channel model once
+   he publishes it. Do not resubmit against the current multi-path terminals.
+9. ⛔ **Multipath routing**: declined. Do not open this PR. His alternative
+   (independent main/aux(+aux2) paths, global pre/post EQ + gate + reverb with
+   its own bank) is the direction to build toward instead, once he shares
+   design details.
+10. ⏳ **Global EQ and Control Hub/Gig UI**: unchanged from before — still gated
+    on state/routing contracts, which are now specifically *his* routing model
+    (item 9) rather than the fork's.
 
 NAM Gateway behavior belongs partly to TooB Amp. Rebuilt TooB binaries, plugin
 bundles and third-party skins should not be mixed into PiPedal core PRs.
+
+## uPedal (context, not part of this upstreaming effort)
+
+A separate from-scratch project, `uPedal`, is in early development in parallel:
+a headless, web-controlled Linux plugin host built on Carla (LV2/VST2/VST3/CLAP,
+including Windows VSTs via yabridge). It shares no code with PiPedal and is not
+proposed for merge here. It is mentioned only because one design choice
+overlaps with Robin's stated preference above: uPedal keeps every signal lane
+running continuously and crossfades between them, rather than suspending
+processors, for the same reasons he gave (avoids ducking, keeps state and tails
+alive). No action needed on the PiPedal side; noted here so the two efforts
+are not confused with each other in review.
 
 ## What to Send the Maintainer
 
