@@ -32,17 +32,6 @@ reflects what he will and will not consider rather than what we hoped he would.
   order to be usable. Confirm this before opening the PR, not after.
 - LV2 category patching
 - Custom layouts for Chow Tape, Calf, Dragonfly, Dusk Reverb
-- Sidechain input selection (choosing a specific plugin's output as another
-  plugin's sidechain input) — **not currently a numbered item above**; add as
-  its own PR, separate from the JUCE-style sidechain *group* metadata already
-  folded into item 2. **Verified scope, so this can be stated precisely in the
-  PR description rather than left open:** selecting any plugin's output as a
-  sidechain source is implemented end to end (`sideChainInputId`,
-  `SideChainSelectControl.tsx`, `Lv2Pedalboard::GetEffect` resolves across the
-  whole board). What is **not** implemented is execution reordering for a send
-  from a lower split branch to an upper one — signal processing is strictly
-  top-to-bottom, so that specific direction still incurs the one-buffer delay
-  he asked about. State this limitation up front rather than let him find it.
 - S24_LE capture/playback scaling fix
 - NAM Gateway calibration/quality-default alignment, with careful preset
   versioning (he offered to advise on the versioning approach — take him up
@@ -81,11 +70,21 @@ reflects what he will and will not consider rather than what we hoped he would.
 Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
 💬 his call to make, ⏳ blocked on his own design work landing first.
 
-1. ✅ **ALSA multichannel detection fix**: the narrow device-detection correction
-   and its hardware-independent tests.
+1. ✅ **ALSA multichannel detection fix** — extracted and pushed:
+   [`upstream-pr/alsa-multichannel-detection`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/alsa-multichannel-detection),
+   branched directly from `upstream/main`. One line: disables
+   `ShouldForceStereoChannels()`'s channel-map heuristic for genuinely
+   multichannel devices. No isolated test exists for this function; noted as an
+   open point in the commit rather than claimed. Not yet opened as a PR against
+   `rerdavies/pipedal` — that step is the maintainer's to take.
 2. ✅ **S24_LE scaling and host fixes**: audio-format correction, bounded block
-   length and sidechain *group* compatibility, split into separate PRs if
-   requested.
+   length, split into separate PRs if requested. The S24_LE bug is real and
+   already fixed in the fork (verified: old scale constant used 2^24 instead of
+   the correct 2^23 full-scale for signed 24-bit; on playback this overflowed
+   past the valid range at any level above -6 dBFS, causing level-dependent
+   high-frequency distortion, not just a quiet signal). The JUCE-style
+   sidechain-*group* compatibility part of this item is now its own entry — see
+   item 7 below, which supersedes the mention of it here.
 3. ✅ **Generic numeric LV2 patch properties**: host model, persistence, controls
    and tests. This enables Dusk controls without bundling Dusk skins.
 4. 💬 **Block editing interactions**: copy, paste, duplicate, delete and touch
@@ -98,9 +97,28 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
    objection). Controller profiles and per-snapshot actions overlap with his
    own MIDI Mappings → Control Hub evolution plan — sequence after that
    conversation, not before.
-7. ✅ **Sidechain input selection**: new item, not in the original series. See
-   the verified scope above; disclose the split-branch reordering limitation
-   in the PR description.
+7. ✅ **JUCE sidechain port-group name fallback** — extracted and pushed:
+   [`upstream-pr/juce-sidechain-group-fallback`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/juce-sidechain-group-fallback),
+   branched from `upstream/main`. **This replaces an earlier, incorrect entry
+   in this document** that described "sidechain input selection" (choosing a
+   specific plugin's output as another plugin's sidechain source) as fork work
+   worth a PR. That was checked directly against `upstream/main` and is wrong:
+   the entire mechanism — `sideChainInputId`, its `GetEffect()`-based
+   resolution in `Lv2Pedalboard.cpp`, the `IEffect`/`Lv2Effect` plumbing, and
+   `SideChainSelectControl.tsx` — already exists in upstream, byte-for-byte
+   identical to the fork. There is nothing to submit for that. The one
+   genuine, narrow gap is `isSidechainGroupName()`: a name-based fallback so
+   JUCE-exported plugins (Dusk Multi-Comp) that omit the proper
+   `pg:sideChainOf` property but name their port group with "sidechain" are
+   still recognized. Three lines of real logic plus a helper function; nothing
+   else changes.
+
+   Still genuinely unresolved and *not* part of this PR: execution reordering
+   for a sidechain send from a lower split branch to an upper one. Signal
+   processing is strictly top-to-bottom in both the fork and upstream, so that
+   direction still incurs the one-buffer delay he asked about. This would be
+   new work, not an extraction, and needs his input on the intended semantics
+   before anyone builds it.
 8. ⏳ **Input-terminal noise gate**: data model, DSP, UI, snapshot behavior and
    tests. Was scoped to depend on per-path terminals; multipath is declined
    (item 9), so this needs re-scoping to his main/aux(+aux2) channel model once
