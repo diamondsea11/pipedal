@@ -77,13 +77,26 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
    multichannel devices. No isolated test exists for this function; noted as an
    open point in the commit rather than claimed. Not yet opened as a PR against
    `rerdavies/pipedal` — that step is the maintainer's to take.
-2. ✅ **S24_LE scaling and host fixes**: audio-format correction, bounded block
-   length, split into separate PRs if requested. The S24_LE bug is real and
-   already fixed in the fork (verified: old scale constant used 2^24 instead of
-   the correct 2^23 full-scale for signed 24-bit; on playback this overflowed
-   past the valid range at any level above -6 dBFS, causing level-dependent
-   high-frequency distortion, not just a quiet signal). The JUCE-style
-   sidechain-*group* compatibility part of this item is now its own entry — see
+2. ✅ **S24_LE scaling fix** — extracted and pushed:
+   [`upstream-pr/s24-le-scaling-fix`](https://github.com/diamondsea11/pipedal/tree/upstream-pr/s24-le-scaling-fix),
+   branched from `upstream/main`. Root cause confirmed precisely: the
+   `SND_PCM_FORMAT_S24_LE`/`S24_BE` (24 bits unpacked into a 4-byte container)
+   capture and playback paths used `0x00FFFFFF` (2^24-1) as the signed 24-bit
+   full-scale constant instead of the correct `0x7FFFFF` (2^23-1). Capture
+   simply decoded 6 dB low. Playback was worse: any level above 0.5 (-6 dBFS,
+   an ordinary signal level) multiplied past the valid signed-24-bit range and
+   wrapped to the opposite polarity in the low 24 bits — audible as
+   level-dependent high-frequency distortion, with no xruns and normal CPU
+   load, which is why it's an unpleasant one to chase by ear. The pre-existing
+   `[-1, 1]` clamp was already correct; it just couldn't help while the scale
+   put post-clamp full-scale outside the valid range. Only these two functions
+   each on capture/playback are touched — the packed 3-byte `S24_3LE`/`S24_3BE`
+   paths already used the correct constant (they reconstruct the sample
+   left-justified into the full 32-bit range, a different convention that
+   correctly calls for a different scale) and are confirmed identical to
+   upstream. Bounded block length is unrelated and still open — split into its
+   own PR if pursued. The JUCE-style sidechain-*group* compatibility part of
+   this item is its own entry — see
    item 7 below, which supersedes the mention of it here.
 3. ✅ **Generic numeric LV2 patch properties**: host model, persistence, controls
    and tests. This enables Dusk controls without bundling Dusk skins.
