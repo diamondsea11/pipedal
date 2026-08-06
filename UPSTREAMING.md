@@ -33,9 +33,9 @@ reflects what he will and will not consider rather than what we hoped he would.
 - LV2 category patching
 - Custom layouts for Chow Tape, Calf, Dragonfly, Dusk Reverb
 - S24_LE capture/playback scaling fix
-- NAM Gateway calibration/quality-default alignment, with careful preset
-  versioning (he offered to advise on the versioning approach — take him up
-  on it before writing migration code)
+- NAM Gateway calibration/quality-default alignment — **blocked on a ToobAmp
+  change, not ready to extract.** See the dedicated section below before doing
+  anything here.
 
 **Declined — do not prepare a PR:**
 - Four independent signal paths (multipath) as currently designed. He
@@ -174,6 +174,49 @@ Status markers reflect the response above: ✅ confirmed interest, ⛔ declined,
 
 NAM Gateway behavior belongs partly to TooB Amp. Rebuilt TooB binaries, plugin
 bundles and third-party skins should not be mixed into PiPedal core PRs.
+
+## NAM calibration: blocked on ToobAmp, and a live bug in this fork's amd64 build
+
+Investigated for extraction; **not extracted**, because the PiPedal-side code
+cannot work correctly against the ToobAmp that ships today. Verified directly
+from the TTL of each build rather than inferred:
+
+| ToobAmp build | `calibration` port name | range | default |
+|---|---|---|---|
+| arm64 bundled in this fork (patched) | `Interface Input Level` | −60 … 60 | 13.0 |
+| **amd64 `toobamp_1.3.85` bundled in this fork** | `Value` | **−30 … 12** | −6.0 |
+| `rerdavies/ToobAmp` master (2026-07-27) | `Value` | **−30 … 12** | −6.0 |
+
+The patched port means "analog input level in dBu RMS corresponding to 0 dBFS
+peak". The stock port means "measured instrument voltage level in dBU" — a
+different quantity, with a maximum of 12.0.
+
+`PiPedalModel.cpp` writes `calibration = GetNamInputCalibrationDbu()`, which is
+**13.0** for an RME Babyface Pro (`NamInputCalibrationProfiles.hpp`). Against a
+stock plugin that value is both out of range (clamped to 12.0) and interpreted
+as a different quantity. No error is raised; the gain staging is simply wrong.
+
+**Consequence for upstreaming:** the PiPedal side is not independently
+mergeable. The ToobAmp change has to land first, and it is a semantic
+redefinition of an existing port, so it needs its own versioning discussion.
+Robin owns both repositories, so the ordering is his to decide — but proposing
+the PiPedal half now would hand him something that silently misbehaves for
+every user running stock ToobAmp. The source patch is in
+`patches/toobamp-1.3.83-gateway-calibration.patch`; it belongs in a ToobAmp
+PR, not here.
+
+**Consequence for this fork right now:** the bundled **amd64** ToobAmp is
+stock, while the bundled **arm64** build is patched. The Raspberry Pi
+deployment is therefore self-consistent, and the **x86-64 deployment is not** —
+on the Intel box, NAM interface calibration is being clamped and misinterpreted.
+Fixing that means building ToobAmp from source with the patch applied for
+amd64, the same way the arm64 binaries were produced. Until then, treat NAM
+calibration on x86-64 as not working, regardless of what the UI shows.
+
+Take Robin up on his offer of versioning advice **before** writing any
+migration code: the fork's schema steps 2→6 were designed around the patched
+plugin's semantics, so if he chooses a different ToobAmp-side design the
+migration path changes with it.
 
 ## uPedal (context, not part of this upstreaming effort)
 
